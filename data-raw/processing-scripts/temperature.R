@@ -565,6 +565,6 @@ sand <- readNWISdv(
 
 all_data <- bind_rows(all_gage_data_lost, all_gage_data_upper_kl, all_gage_data, sprague, williamson, 
                       wood_river, fourmile_canal, klamath_river, link, link_dam, jackson, irving, sand)
-
+#Note since this file seems to be too big for github, we try storing in aws bucket. We want to find a way to automatically generate key
 # write.csv(all_data, "data/temperature_usgs.csv")
 
