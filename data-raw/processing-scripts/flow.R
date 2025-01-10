@@ -247,19 +247,106 @@ indian_creek <- bind_rows(all_gage_list_indian_creek)
 
 glimpse(indian_creek)
 
-#Still need to pull:
-# Klamath Straits Drain Near Worden, OR - 11509340
-# - Ady Canal Above Lower Klamath Nwr, Near Worden, OR - 11509250
-# - North Canal at Highway 97, Near Midland, OR - 11509105
-# - Link River at Klamath Falls, OR - 11507500
-# - Williamson River Blw Sprague River NR Chiloquin,or - 11502500
-# - Crystal Creek Near Rocky Point, OR - 11504270 - NODATA
-# - Fourmile Canal Near Klamath Agency, OR - 11504260
-# - Sevenmile Cnl at Dike RD Br, NR Klamath Agency, OR - 11504290
+### Link River ---
+link_river <- readNWISdv(
+  siteNumber = "11507500", 
+  parameterCd = "00060", 
+  statCd = "00003"       
+) |> 
+  select(
+    date = Date,
+    mean_flow = X_00060_00003 
+  ) |> 
+  rename(value = mean_flow) |> 
+  mutate(
+    statistic = "mean",
+    stream = "link river",
+    gage_number = "11507500",
+    gage_name = "Link River at Klamath Falls, OR",
+    variable_name = "flow",
+    unit = "cfs"
+  ) |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+glimpse(link_river)
+
+### Williamson ---- 
+williamson_river <- readNWISdv(
+  siteNumber = "11502500", 
+  parameterCd = "00060", 
+  statCd = "00003"       
+) |> 
+  select(
+    date = Date,
+    mean_flow = X_00060_00003 # Mean flow
+  ) |> 
+  rename(value = mean_flow) |> 
+  mutate(
+    statistic = "mean",
+    stream = "williamson river",
+    gage_number = "11502500",
+    gage_name = "Williamson River Below Sprague River Near Chiloquin, OR",
+    variable_name = "flow",
+    unit = "cfs"
+  ) |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+glimpse(williamson_river)
+
+### Other ----
+gage_info_other <- tibble(
+  gage_number = c(
+    "11509340", # Klamath Straits Drain Near Worden, OR
+    "11509250", # Ady Canal Above Lower Klamath Nwr, Near Worden, OR
+    "11509105", # North Canal at Highway 97, Near Midland, OR
+    # "11504270", # Crystal Creek Near Rocky Point, OR - NODATA
+    "11504260", # Fourmile Canal Near Klamath Agency, OR
+    "11504290"  # Sevenmile Cnl at Dike RD Br, NR Klamath Agency, OR
+  ),
+  gage_name = c(
+    "Klamath Straits Drain Near Worden, OR",
+    "Ady Canal Above Lower Klamath Nwr, Near Worden, OR",
+    "North Canal at Highway 97, Near Midland, OR",
+    # "Crystal Creek Near Rocky Point, OR - NODATA",
+    "Fourmile Canal Near Klamath Agency, OR",
+    "Sevenmile Cnl at Dike RD Br, NR Klamath Agency, OR"))
+
+all_gage_list_other <- list()
+
+for (i in seq_len(nrow(gage_info_other))) {
+  gage_number <- gage_info_other$gage_number[i]
+  gage_name <- gage_info_other$gage_name[i]
+  
+  data <- readNWISdv(
+    siteNumbers = gage_number, 
+    parameterCd = "00060", 
+    statCd = "00003"       
+  ) |> 
+    select(
+      date = Date,
+      mean_flow = X_00060_00003 
+    ) |> 
+    rename(value = mean_flow) |> 
+    mutate(
+      statistic = "mean",
+      stream = "other", 
+      gage_number = gage_number,
+      gage_name = gage_name,
+      variable_name = "flow",
+      unit = "cfs"
+    ) |> 
+    select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+  
+  all_gage_list_other[[i]] <- data
+}
+
+other_streams <- bind_rows(all_gage_list_other)
+glimpse(other_streams)
 
 
-
-### Test binding with data so far
-
-all_flow_data <- bind_rows(trinity, klamath, scott_river, shasta, salmon_river, sprague_river, indian_creek) |> 
+### Binding all data
+all_flow_data <- bind_rows(trinity, klamath, scott_river, shasta, salmon_river, sprague_river, indian_creek, 
+                           link_river, williamson_river, other_streams) |> 
   glimpse()
+
+write.csv(all_flow_data, "data/flow_usgs.csv")
