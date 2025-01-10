@@ -568,3 +568,4 @@ all_data <- bind_rows(all_gage_data_lost, all_gage_data_upper_kl, all_gage_data,
 #Note since this file seems to be too big for github, we try storing in aws bucket. We want to find a way to automatically generate key
 # write.csv(all_data, "data/temperature_usgs.csv")
 
+# Another TODO will be to unify the stream categories, specially for those that are creeks
