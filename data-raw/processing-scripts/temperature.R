@@ -176,7 +176,6 @@ glimpse(all_gage_data_trinity)
 
 
 ### Upper Klamath River ----
-
 gage_info_upper_kl <- tibble(
   gage_number = c("422042121513100", "421935121551200", "422305121553800", "422305121553803", "422444121580400",
                   "422622122004000", "422622122004003", "422719121571400", "11504290"),
@@ -187,11 +186,8 @@ gage_info_upper_kl <- tibble(
   )
 )
 
-# Function to fetch and process data for a single gage
-# Initialize an empty list to store data frames for each gage
 all_gage_list_upper_kl <- list()
 
-# Loop through each gage in main_steam
 for (i in seq_len(nrow(gage_info_upper_kl))) {
   gage_number <- gage_info_upper_kl$gage_number[i]
   gage_name <- gage_info_upper_kl$gage_name[i]
@@ -242,3 +238,333 @@ for (i in seq_len(nrow(gage_info_upper_kl))) {
 
 all_gage_data_upper_kl <- bind_rows(all_gage_list_upper_kl)
 glimpse(all_gage_data_upper_kl)
+
+### Lost River ----
+gage_info_lost <- tibble(
+  gage_number = c(
+    "420037121334100", 
+    "420036121333700", 
+    "420833121402000", 
+    "421010121271200", 
+    "421015121471800", 
+    "415954121312100"),
+  gage_name = c(
+    "LOST RVR AT ANDERSON ROSE DVRSN DAM AT MALONE, OR", 
+    "LOST RVR BLW ANDERSON ROSE DVRSN DAM AT MALONE, OR", 
+    "LOST RIVER AT WILSON DAM, AT HENLEY, OR", 
+    "LOST R AT BR XING BLW HARPOLD DAM, NR BONANZA, OR", 
+    "LOST RIVER DIVERSION CHANNEL NR KLAMATH RIVER, OR", 
+    "LOST RIVER AT STATELINE ROAD, NR HATFIELD, CA"))
+
+all_gage_list_lost <- list()
+
+for (i in seq_len(nrow(gage_info_lost))) {
+  gage_number <- gage_info_lost$gage_number[i]
+  gage_name <- gage_info_lost$gage_name[i]
+  
+  data <- tryCatch(
+    {
+      readNWISdv(
+        siteNumbers = gage_number, 
+        parameterCd = "00010", 
+        statCd = c("00001", "00002", "00003")
+      ) |> 
+        select(
+          date = Date,
+          max_temp = X_00010_00001, # Max
+          min_temp = X_00010_00002, # Min
+          mean_temp = X_00010_00003 # Mean 
+        ) |> 
+        pivot_longer(
+          cols = c(max_temp, min_temp, mean_temp),
+          names_to = "statistic",
+          values_to = "value",
+          values_drop_na = TRUE
+        ) |> 
+        mutate(
+          statistic = case_when(
+            statistic == "max_temp" ~ "maximum",
+            statistic == "min_temp" ~ "minimum",
+            statistic == "mean_temp" ~ "mean"
+          ),
+          stream = "lost river", 
+          gage_number = gage_number,
+          gage_name = gage_name,
+          variable_name = "temperature",
+          unit = "celsius"
+        ) |> 
+        select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+    },
+    error = function(e) {
+      message(paste("Error fetching data for gage", gage_number, ":", e$message))
+      return(NULL)
+    }
+  )
+  
+  if (!is.null(data)) {
+    all_gage_list_lost[[i]] <- data
+  }
+}
+
+all_gage_data_lost <- bind_rows(all_gage_list_lost)
+glimpse(all_gage_data_lost)
+
+
+### Sprague River ----
+sprague <- readNWISdv(
+  siteNumbers = "11501000", 
+  parameterCd = "00010", 
+  statCd = c("00001", "00002", "00003")) |> 
+  select(date = Date,
+         max_temp = X_00010_00001, 
+         min_temp = X_00010_00002, 
+         mean_temp = X_00010_00003) |> 
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean_temp" ~ "mean"),
+    stream = "sprague river", 
+    gage_number = "11501000",
+    gage_name = "SPRAGUE RIVER NEAR CHILOQUIN, OR",
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+### Williamson River ----
+williamson <- readNWISdv(
+  siteNumbers = "11502500", 
+  parameterCd = "00010", 
+  statCd = c("00001", "00002", "00003")) |> 
+  select(date = Date,
+         max_temp = X_00010_00001, 
+         min_temp = X_00010_00002, 
+         mean_temp = X_00010_00003) |> 
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean_temp" ~ "mean"),
+    stream = "williamson river", 
+    gage_number = "11502500",
+    gage_name = "WILLIAMSON RIVER BLW SPRAGUE RIVER NR CHILOQUIN,OR",
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+### Wood River ----
+wood_river <- readNWISdv(
+  siteNumbers = "11504115", 
+  parameterCd = "00010", 
+  statCd = c("00001", "00002", "00003")) |> 
+  select(date = Date,
+         max_temp = X_00010_00001, 
+         min_temp = X_00010_00002, 
+         mean_temp = X_00010_00003) |> 
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean_temp" ~ "mean"),
+    stream = "wood river", 
+    gage_number = "11504115",
+    gage_name = "WOOD RIVER NEAR KLAMATH AGENCY, OR",
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+### Other ----
+# Only mean available for fourmile canal
+# fourmile_canal <- readNWISdv(
+#   siteNumbers = "11504260", 
+#   parameterCd = "00010", 
+#   statCd = c("00001", "00002", "00003")
+# ) |> 
+#   select(date = Date,
+#          max_temp = X_00010_00001, 
+#          min_temp = X_00010_00002, 
+#          mean_temp = X_00010_00003) |> 
+#   pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+#                names_to = "statistic",
+#                values_to = "value",
+#                values_drop_na = TRUE) |> 
+#   mutate(statistic = case_when(
+#     statistic == "max_temp" ~ "maximum",
+#     statistic == "min_temp" ~ "minimum",
+#     statistic == "mean_temp" ~ "mean"),
+#     stream = "fourmile canal", 
+#     gage_number = "11504260",
+#     gage_name = "FOURMILE CANAL NEAR KLAMATH AGENCY, OR",
+#     variable_name = "temperature",
+#     unit = "celsius") |> 
+#   select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+# KLAMATH R AB FALL C NR COPCO CA
+klamath_river <- readNWISdv(
+  siteNumbers = "11511990", 
+  parameterCd = "00010", 
+  statCd = c("00001", "00002", "00003")
+) |> 
+  select(date = Date,
+         max_temp = X_00010_00001, 
+         min_temp = X_00010_00002, 
+         mean_temp = X_00010_00003) |> 
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean" ~ "mean"),
+    stream = "klamath river", 
+    gage_number = "11511990",
+    gage_name = "KLAMATH R AB FALL C NR COPCO CA",
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+### Link River ----
+link <- readNWISdv(
+  siteNumbers = "11507501", 
+  parameterCd = "00010", 
+  statCd = c("00001", "00002", "00003")
+) |> 
+  select(date = Date,
+         max_temp = X_00010_00001, 
+         min_temp = X_00010_00002, 
+         mean_temp = X_00010_00003) |> 
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean_temp" ~ "mean"),
+    stream = "link river", 
+    gage_number = "11507501",
+    gage_name = "LINK RIVER BELOW KENO CANAL, NEAR KLAMATH FALLS, OR",
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+# LINK RIVER DAM
+link_dam <- readNWISdv(
+  siteNumbers = "421401121480900", 
+  parameterCd = "00010", 
+  statCd = c("00001", "00002", "00003")
+) |> 
+  select(date = Date,
+         max_temp = X_00010_00001, 
+         min_temp = X_00010_00002, 
+         mean_temp = X_00010_00003) |> 
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean_temp" ~ "mean"),
+    stream = "link river", 
+    gage_number = "421401121480900",
+    gage_name = "LINK RIVER DAM",
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+### Jackson Creek
+jackson <- readNWISdv(
+  siteNumbers = "11491470", 
+  parameterCd = "00010", 
+  statCd = c("00001", "00002", "00003")
+) |> 
+  select(date = Date,
+         max_temp = X_00010_00001, 
+         min_temp = X_00010_00002, 
+         mean_temp = X_00010_00003) |> 
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean_temp" ~ "mean"),
+    stream = "jackson creek", 
+    gage_number = "11491470",
+    gage_name = "JACKSON CREEK NEAR LENZ, OR",
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+### Irving Creek ----
+irving <- readNWISdv(
+  siteNumbers = "11491450", 
+  parameterCd = "00010", 
+  statCd = c("00001", "00002", "00003")
+) |> 
+  select(date = Date,
+         max_temp = X_00010_00001, 
+         min_temp = X_00010_00002, 
+         mean_temp = X_00010_00003) |> 
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean_temp" ~ "mean"),
+    stream = "irving creek", 
+    gage_number = "11491450",
+    gage_name = "IRVING CREEK NEAR LENZ, OR",
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+
+### Sand Creek ----
+sand <- readNWISdv(
+  siteNumbers = "11492550", 
+  parameterCd = "00010", 
+  statCd = c("00001", "00002", "00003")
+) |> 
+  select(date = Date,
+         max_temp = X_00010_00001, 
+         min_temp = X_00010_00002, 
+         mean_temp = X_00010_00003) |> 
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean_temp" ~ "mean"),
+    stream = "sand creek", 
+    gage_number = "11492550",
+    gage_name = "SAND CREEK BLW SAND CREEK CANAL NR CHINCHALO, OR",
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+
+
+
+### Test binding with data so far
+
+all_data <- bind_rows(all_gage_data_lost, all_gage_data_upper_kl, all_gage_data, sprague, williamson, 
+                      wood_river, fourmile_canal, klamath_river, link, link_dam, jackson, irving, sand)
+
+# write.csv(all_data, "data/temperature_usgs.csv")
+
