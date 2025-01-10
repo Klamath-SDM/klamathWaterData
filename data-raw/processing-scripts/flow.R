@@ -19,9 +19,7 @@ gage_info_klamath <- tibble(
     "Klamath River Below Irongate Dam",
     "Klamath River Nr Seiad Valley CA",
     "Klamath River At Orleans",
-    "Klamath River Near Klamath (Furthest Downstream)"
-  )
-)
+    "Klamath River Near Klamath (Furthest Downstream)"))
 
 # Initialize an empty list to store data
 all_gage_klamath <- list()
@@ -65,19 +63,15 @@ for (i in seq_len(nrow(gage_klamath))) {
   }
 }
 
-
 # Combine all data into a single tibble
 klamath <- bind_rows(all_gage_list)
-
-# View the combined data
 glimpse(klamath)
 
 ### Trinity River ----
 gage_info_trinity <- tibble(
   gage_number = c(
     "11528700", "11530000", "11523200", "11525500", "11525655",
-    "11525854", "11526250", "11526400", "11527000"
-  ),
+    "11525854", "11526250", "11526400", "11527000"),
   gage_name = c(
     "SF Trinity River Below Hyampom CA",
     "Trinity River At Hoopa CA",
@@ -100,21 +94,17 @@ for (i in seq_len(nrow(gage_info_trinity))) {
       readNWISdv(
         siteNumbers = gage_number, 
         parameterCd = "00060", 
-        statCd = "00003"      
-      ) |> 
+        statCd = "00003") |> 
         select(
           date = Date,
-          mean_flow = X_00060_00003
-        ) |> 
+          mean_flow = X_00060_00003) |> 
         rename(value = mean_flow) |> 
-        mutate(
-          statistic = "mean",
-          stream = "trinity river",
-          gage_number = gage_number,
-          gage_name = gage_name,
-          variable_name = "flow",
-          unit = "cfs"
-        ) |> 
+        mutate(statistic = "mean",
+               stream = "trinity river",
+               gage_number = gage_number,
+               gage_name = gage_name,
+               variable_name = "flow",
+               unit = "cfs") |> 
         select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
     },
     error = function(e) {
@@ -159,21 +149,17 @@ for (i in seq_len(nrow(gage_info_shasta))) {
   gage_number <- gage_info_shasta$gage_number[i]
   gage_name <- gage_info_shasta$gage_name[i]
   
- data <- readNWISdv(
-    siteNumbers = gage_number, 
-    parameterCd = "00060", 
-    statCd = "00003") |> 
-    select(date = Date,
-           mean_flow = X_00060_00003) |> 
-    rename(value = mean_flow) |> 
-    mutate(
-      statistic = "mean",
-      stream = "shasta river",
-      gage_number = gage_number,
-      gage_name = gage_name,
-      variable_name = "flow",
-      unit = "cfs") |> 
-    select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
+ data <- readNWISdv(siteNumbers = gage_number, parameterCd = "00060", statCd = "00003") |> 
+   select(date = Date,
+          mean_flow = X_00060_00003) |> 
+   rename(value = mean_flow) |> 
+   mutate(statistic = "mean",
+          stream = "shasta river",
+          gage_number = gage_number,
+          gage_name = gage_name,
+          variable_name = "flow",
+          unit = "cfs") |> 
+   select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
   
   all_gage_list_shasta[[i]] <- data
 }
@@ -183,34 +169,30 @@ glimpse(shasta)
 
 ### Salmon ----
 salmon_river <- readNWISdv( siteNumber = "11522500", parameterCd = "00060", statCd = "00003") |> 
-  select(
-    date = Date,
-    mean_flow = X_00060_00003) |> 
+  select(date = Date,
+         mean_flow = X_00060_00003) |> 
   rename(value = mean_flow) |> 
-  mutate(
-    statistic = "mean",
-    stream = "salmon river",
-    gage_number = "11522500",
-    gage_name = "Salmon River At Somes Bar CA",
-    variable_name = "flow",
-    unit = "cfs") |> 
+  mutate(statistic = "mean",
+         stream = "salmon river",
+         gage_number = "11522500",
+         gage_name = "Salmon River At Somes Bar CA",
+         variable_name = "flow",
+         unit = "cfs") |> 
   select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
 
 glimpse(salmon_river)
 
 ### Sprague river ----
 sprague_river <- readNWISdv(siteNumber = "11501000", parameterCd = "00060", statCd = "00003") |> 
-  select(
-    date = Date,
-    mean_flow = X_00060_00003) |> 
+  select(date = Date,
+         mean_flow = X_00060_00003) |> 
   rename(value = mean_flow) |> 
-  mutate(
-    statistic = "mean",
-    stream = "sprague river",
-    gage_number = "11501000",
-    gage_name = "Sprague River Near Chiloquin, OR",
-    variable_name = "flow",
-    unit = "cfs") |> 
+  mutate(statistic = "mean",
+         stream = "sprague river",
+         gage_number = "11501000",
+         gage_name = "Sprague River Near Chiloquin, OR",
+         variable_name = "flow",
+         unit = "cfs") |> 
   select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
 
 glimpse(sprague_river)
@@ -248,47 +230,31 @@ indian_creek <- bind_rows(all_gage_list_indian_creek)
 glimpse(indian_creek)
 
 ### Link River ---
-link_river <- readNWISdv(
-  siteNumber = "11507500", 
-  parameterCd = "00060", 
-  statCd = "00003"       
-) |> 
-  select(
-    date = Date,
-    mean_flow = X_00060_00003 
-  ) |> 
+link_river <- readNWISdv(siteNumber = "11507500", parameterCd = "00060", statCd = "00003") |> 
+  select(date = Date,
+         mean_flow = X_00060_00003) |> 
   rename(value = mean_flow) |> 
-  mutate(
-    statistic = "mean",
-    stream = "link river",
-    gage_number = "11507500",
-    gage_name = "Link River at Klamath Falls, OR",
-    variable_name = "flow",
-    unit = "cfs"
-  ) |> 
+  mutate(statistic = "mean",
+         stream = "link river",
+         gage_number = "11507500",
+         gage_name = "Link River at Klamath Falls, OR",
+         variable_name = "flow",
+         unit = "cfs") |> 
   select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
 
 glimpse(link_river)
 
 ### Williamson ---- 
-williamson_river <- readNWISdv(
-  siteNumber = "11502500", 
-  parameterCd = "00060", 
-  statCd = "00003"       
-) |> 
-  select(
-    date = Date,
-    mean_flow = X_00060_00003 # Mean flow
-  ) |> 
+williamson_river <- readNWISdv(siteNumber = "11502500", parameterCd = "00060", statCd = "00003") |> 
+  select(date = Date,
+         mean_flow = X_00060_00003) |> 
   rename(value = mean_flow) |> 
-  mutate(
-    statistic = "mean",
-    stream = "williamson river",
-    gage_number = "11502500",
-    gage_name = "Williamson River Below Sprague River Near Chiloquin, OR",
-    variable_name = "flow",
-    unit = "cfs"
-  ) |> 
+  mutate(statistic = "mean",
+         stream = "williamson river",
+         gage_number = "11502500",
+         gage_name = "Williamson River Below Sprague River Near Chiloquin, OR",
+         variable_name = "flow",
+         unit = "cfs") |> 
   select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
 
 glimpse(williamson_river)
@@ -296,18 +262,11 @@ glimpse(williamson_river)
 ### Other ----
 gage_info_other <- tibble(
   gage_number = c(
-    "11509340", # Klamath Straits Drain Near Worden, OR
-    "11509250", # Ady Canal Above Lower Klamath Nwr, Near Worden, OR
-    "11509105", # North Canal at Highway 97, Near Midland, OR
-    # "11504270", # Crystal Creek Near Rocky Point, OR - NODATA
-    "11504260", # Fourmile Canal Near Klamath Agency, OR
-    "11504290"  # Sevenmile Cnl at Dike RD Br, NR Klamath Agency, OR
-  ),
+    "11509340", "11509250", "11509105", "11504260",  "11504290"),
   gage_name = c(
     "Klamath Straits Drain Near Worden, OR",
     "Ady Canal Above Lower Klamath Nwr, Near Worden, OR",
     "North Canal at Highway 97, Near Midland, OR",
-    # "Crystal Creek Near Rocky Point, OR - NODATA",
     "Fourmile Canal Near Klamath Agency, OR",
     "Sevenmile Cnl at Dike RD Br, NR Klamath Agency, OR"))
 
@@ -317,24 +276,16 @@ for (i in seq_len(nrow(gage_info_other))) {
   gage_number <- gage_info_other$gage_number[i]
   gage_name <- gage_info_other$gage_name[i]
   
-  data <- readNWISdv(
-    siteNumbers = gage_number, 
-    parameterCd = "00060", 
-    statCd = "00003"       
-  ) |> 
-    select(
-      date = Date,
-      mean_flow = X_00060_00003 
-    ) |> 
+  data <- readNWISdv(siteNumbers = gage_number, parameterCd = "00060", statCd = "00003") |> 
+    select(date = Date,
+           mean_flow = X_00060_00003) |> 
     rename(value = mean_flow) |> 
-    mutate(
-      statistic = "mean",
-      stream = "other", 
-      gage_number = gage_number,
-      gage_name = gage_name,
-      variable_name = "flow",
-      unit = "cfs"
-    ) |> 
+    mutate(statistic = "mean",
+           stream = "other", 
+           gage_number = gage_number,
+           gage_name = gage_name,
+           variable_name = "flow",
+           unit = "cfs") |> 
     select(stream, gage_number, gage_name, variable_name, date, value, unit, statistic)
   
   all_gage_list_other[[i]] <- data
