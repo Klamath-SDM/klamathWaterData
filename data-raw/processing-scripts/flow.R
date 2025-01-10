@@ -349,4 +349,4 @@ all_flow_data <- bind_rows(trinity, klamath, scott_river, shasta, salmon_river, 
                            link_river, williamson_river, other_streams) |> 
   glimpse()
 
-write.csv(all_flow_data, "data/flow_usgs.csv")
+# write.csv(all_flow_data, "data/flow_usgs.csv")
