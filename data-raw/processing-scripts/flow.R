@@ -6,7 +6,6 @@ library(tidyr)
 library(purrr)
 library(pins)
 
-# pull raw data -----------------------------------------------------------
 # define AWS data bucket
 # note that you need to set up access keys in R environ
 klamath_project_board <- pins::board_s3(
