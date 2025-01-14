@@ -9,6 +9,17 @@ library(purrr)
 # 00002	Minimum
 # 00003	Mean
 
+# define AWS data bucket
+# note that you need to set up access keys in R environ
+klamath_project_board <- pins::board_s3(
+  bucket="klamath-sdm",
+  access_key=Sys.getenv("aws_access_key_id"),
+  secret_access_key=Sys.getenv("secret_access_key_id"),
+  session_token = Sys.getenv("session_token_id"),
+  region = "us-east-1"
+)
+
+
 # code for reference, delete later
 klamath_fl <- dataRetrieval::readNWISdv(11507500, "00010", statCd = c("00001", "00002", "00003")) |> 
   select(date = Date,     
@@ -563,9 +574,15 @@ sand <- readNWISdv(
 
 ### Test binding with data so far
 
-all_data <- bind_rows(all_gage_data_lost, all_gage_data_upper_kl, all_gage_data, sprague, williamson, 
-                      wood_river, fourmile_canal, klamath_river, link, link_dam, jackson, irving, sand)
+all_usgs_temperature_data <- bind_rows(all_gage_data_lost, all_gage_data_upper_kl, all_gage_data, sprague, williamson, 
+                      wood_river, klamath_river, link, link_dam, jackson, irving, sand)
 #Note since this file seems to be too big for github, we try storing in aws bucket. We want to find a way to automatically generate key
 # write.csv(all_data, "data/temperature_usgs.csv")
 
 # Another TODO will be to unify the stream categories, specially for those that are creeks
+
+# save to s3 storage
+klamath_project_board |> pins::pin_write(all_usgs_temperature_data,
+                                         type = "csv",
+                                         title = "usgs_temperature")
+
