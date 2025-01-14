@@ -4,10 +4,24 @@ library(dplyr)
 library(dataRetrieval)
 library(tidyr)
 library(purrr)
+library(pins)
+
+# pull raw data -----------------------------------------------------------
+# define AWS data bucket
+# note that you need to set up access keys in R environ
+klamath_project_board <- pins::board_s3(
+  bucket="klamath-sdm",
+  access_key=Sys.getenv("aws_access_key_id"),
+  secret_access_key=Sys.getenv("secret_access_key_id"),
+  session_token = Sys.getenv("session_token_id"),
+  region = "us-east-1"
+)
+
 
 # USGS primarily provides mean daily flow data (statCd = "00003") for most gages when querying the daily value.
 # Minimum (statCd = "00002") and maximum (statCd = "00001") statistics are generally not available for flow data 
 # unless they are specifically collected and reported for a given site. For now we are just pulling mean flow
+# TODO unify the stream categories we will use. Probably establish on data schema
 
 ### Klmath mainsteam
 
@@ -25,9 +39,9 @@ gage_info_klamath <- tibble(
 all_gage_klamath <- list()
 
 # Loop through each gage
-for (i in seq_len(nrow(gage_klamath))) {
-  gage_number <- gage_klamath$gage_number[i]
-  gage_name <- gage_klamath$gage_name[i]
+for (i in seq_len(nrow(gage_info_klamath))) {
+  gage_number <- gage_info_klamath$gage_number[i]
+  gage_name <- gage_info_klamath$gage_name[i]
   
   # Fetch mean flow data
   data <- tryCatch(
@@ -59,12 +73,12 @@ for (i in seq_len(nrow(gage_klamath))) {
   )
   
   if (!is.null(data)) {
-    all_gage_list[[i]] <- data
+    all_gage_klamath[[i]] <- data
   }
 }
 
 # Combine all data into a single tibble
-klamath <- bind_rows(all_gage_list)
+klamath <- bind_rows(all_gage_klamath)
 glimpse(klamath)
 
 ### Trinity River ----
@@ -296,8 +310,13 @@ glimpse(other_streams)
 
 
 ### Binding all data
-all_flow_data <- bind_rows(trinity, klamath, scott_river, shasta, salmon_river, sprague_river, indian_creek, 
+all_usgs_flow_data <- bind_rows(trinity, klamath, scott_river, shasta, salmon_river, sprague_river, indian_creek, 
                            link_river, williamson_river, other_streams) |> 
   glimpse()
 
 # write.csv(all_flow_data, "data/flow_usgs.csv")
+
+# save to s3 storage
+klamath_project_board |> pins::pin_write(all_usgs_flow_data,
+                                         type = "csv",
+                                         title = "usgs_flow")
