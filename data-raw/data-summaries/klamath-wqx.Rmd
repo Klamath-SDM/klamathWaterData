@@ -1,0 +1,142 @@
+---
+title: "Klamath Tribes Water Quality Portal Data "
+author: "Badhia Yunes Katz"
+date: "January 2025"
+output: rmarkdown::github_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.width=15, fig.height=10)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(scales)
+library(readxl)
+library(leaflet)
+
+# define AWS data bucket
+# note that you need to set up access keys in R environ
+# klamath_project_board <- pins::board_s3(
+#   bucket="klamath-sdm",
+#   access_key=Sys.getenv("aws_access_key_id"),
+#   secret_access_key=Sys.getenv("secret_access_key_id"),
+#   session_token = Sys.getenv("session_token_id"),
+#   region = "us-east-1"
+# )
+```
+
+The purpose of this markdown is to give an overview of the dataset including specific data types, temporal coverage, and geographic coverage. This document is helpful in developing schemas to bring together disparate datasets and exploring data limitations.
+
+This data was downloaded from the [Klamath Tribes Water Quality Portal](https://klamathtribeswaterquality.com/data/) and it is publicly available. 
+
+### Overview
+
+**Data type:**
+
+## Data Available {.tabset} 
+
+**Dataset 1**
+
+- The monitoring program includes sampling water nutrients, water chemistry, algal toxins, and aquatic biota at up to 11 lake sites and water nutrients, water chemistry, and stream discharge at up to 20 river and stream sites.
+  
+### Dataset 1
+
+```{r, include=FALSE}
+klamath_tribes_data <- read.csv("data-raw/all_klamath_wqx_data.csv")
+```
+
+ - Title: Klamath Tribes Water Quality Portal Data
+ - Spatial extent: 
+ - Description:
+This data was collected by Klamath Tribes and contains different surface water parameters including:
+    - Phosphorus
+    - Dissolved oxygen saturation 
+    - pH
+    - Light, photosynthetic active radiation (PAR)
+    - Water Temperature
+    - Dissolved oxygen (DO)
+    - Silica
+    - Ammonia-nitrogen
+    - Total Phosphorus, mixed forms
+    - Nitrogen
+    - Conductivity
+    - Nitrite
+    - Chlorophyll a
+    - Depth, Secchi disk depth
+    - Pheophytin a
+    - Nitrate + Nitrite
+    - Total suspended solids
+    - Gage Height
+    - Flow
+ - Fields included: `r colnames(klamath_tribes_data)`
+ - Name of data file: `all_klamath_wqx_data.csv`  
+
+A breakdown of each of the parameters will be done below
+ 
+**Data processing implications:**
+All parameters are in the same file, these would need to be filtered to be analized more in detail
+
+**Questions:**
+
+**Action items:**
+
+#### Data summary
+
+This section may (or may not) explore every variable in the dataset. It will include high level summaries of the data to communicate the primary story of the data.
+ 
+```{r, echo = FALSE}
+# insert plot
+klamath_tribes_data_plot <- klamath_tribes_data |> 
+  mutate(activity_start_date = as.Date(activity_start_date),
+         year = year(activity_start_date),
+         month = month(activity_start_date, label = TRUE, abbr = TRUE))
+
+klamath_tribes_data_plot |> 
+  group_by(year, month, characteristic_name) |> 
+  summarise(observation_count = n()) |> 
+  ggplot(aes(x = month, y = year, fill = observation_count)) +
+  geom_tile() +
+  facet_wrap(~characteristic_name, scales = "free_y") +
+  labs(title = "Heatmap of the Different Parameters", x = "Month", y = "Year", fill = "Observations") +
+  theme_minimal() +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+   axis.text.y = element_text(angle = 35, hjust = 1, size = 5)) +
+    scale_y_continuous(breaks = seq(min(klamath_tribes_data_plot$year, na.rm = TRUE), 
+                                  max(klamath_tribes_data_plot$year, na.rm = TRUE), by = 4))
+
+
+# note that in some situations it may be worthwhile to include data summaries for all fields included and other times best to include summary figure
+```
+
+**Temperature**
+
+ - Spatial extent: 
+ - Description:
+ 
+```{r, echo = FALSE}
+klamath_tribes_data_plot |>
+  filter(characteristic_name == "Water Temperature") |> 
+  group_by(year, month) |> 
+  summarise(observation_count = n()) |> 
+  ggplot(aes(x = month, y = year, fill = observation_count)) +
+  geom_tile() +
+  labs(title = "Water Temperature Heatmap", x = "Month", y = "Year", fill = "Observations") +
+  theme_minimal() +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(breaks = seq(min(klamath_tribes_data_plot$year, na.rm = TRUE), 
+                                  max(klamath_tribes_data_plot$year, na.rm = TRUE), by = 1))
+
+
+```
+
+
+## Save data
+
+Data files are stored on AWS
+
+```{r, include = F}
+# klamath_project_board |> pin_write(dataset_1,
+#                                type = "csv",
+#                                title = "dataset_1")
