@@ -16,19 +16,21 @@ available.
 
 **Data type:**
 
-## Data Available
+When data is downloaded from portal it is in an excel file format.
 
-**Dataset 1**
+## Data Available
 
 - The monitoring program includes sampling water nutrients, water
   chemistry, algal toxins, and aquatic biota at up to 11 lake sites and
   water nutrients, water chemistry, and stream discharge at up to 20
   river and stream sites.
 
-### Dataset 1
+### Dataset
 
 - Title: Klamath Tribes Water Quality Portal Data
-- Spatial extent:
+- Spatial extent: Most data was collected on Upper Klamath Lake, and
+  Sprague River. Data ranges from 1990 to 2018 with some data gaps up
+  until year 2002. Noticeable gaps during 2017 and 2018
 - Description: This data was collected by Klamath Tribes and contains
   different surface water parameters including:
   - Phosphorus
@@ -60,37 +62,47 @@ available.
   huc_eight_digit_code, latitude_measure, longitude_measure
 - Name of data file: `all_klamath_wqx_data.csv`
 
-A breakdown of each of the parameters will be done below
+A breakdown of each of relevant parameters will be done below
 
-**Data processing implications:** All parameters are in the same file,
-these would need to be filtered to be analized more in detail
+**Data processing implications:**
 
-**Questions:**
-
-**Action items:**
+All parameters are in the same file, these would need to be filtered to
+be analyzed more in detail
 
 #### Data summary
-
-This section may (or may not) explore every variable in the dataset. It
-will include high level summaries of the data to communicate the primary
-story of the data.
 
     ## `summarise()` has grouped output by 'year', 'month'. You can override using the
     ## `.groups` argument.
 
 ![](klamath-wqx_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
-**Temperature**
+### Temperature
 
-- Spatial extent:
-- Description:
+    ## `summarise()` has grouped output by 'year'. You can override using the
+    ## `.groups` argument.
+
+![](klamath-wqx_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+
+![](klamath-wqx_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+
+### Dissolved oxygen saturation
+
+- DO data ranges from 1990 to 2018 with some data gaps up until year
+  2002
 
 <!-- -->
 
     ## `summarise()` has grouped output by 'year'. You can override using the
     ## `.groups` argument.
 
-![](klamath-wqx_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](klamath-wqx_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->![](klamath-wqx_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
+
+### pH
+
+    ## `summarise()` has grouped output by 'year'. You can override using the
+    ## `.groups` argument.
+
+![](klamath-wqx_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->![](klamath-wqx_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
 
 ## Save data
 
