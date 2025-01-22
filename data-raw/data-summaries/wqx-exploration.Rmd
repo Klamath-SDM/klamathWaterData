@@ -1,0 +1,86 @@
+```{r}
+library(tidyverse)
+library(dataRetrieval)
+```
+
+
+```{r}
+col_select <- function(data) {
+  data |> 
+    janitor::clean_names() |> 
+    select(organization_identifier,
+           organization_formal_name,
+           activity_media_name,
+           activity_media_subdivision_name,
+           activity_start_date,
+           activity_start_time_time,
+           activity_start_time_time_zone_code,
+           activity_end_date,
+           activity_end_time_time,
+           activity_end_time_time_zone_code,
+           monitoring_location_identifier,
+           characteristic_name,
+           result_sample_fraction_text,
+           result_measure_value,
+           result_measure_measure_unit_code,
+           result_status_identifier,
+           result_analytical_method_method_name,
+           provider_name)
+}
+
+
+# Define the Klamath River watershed HUC
+klamath_huc <- "180102"
+
+storet_query <- list(
+  huc = klamath_huc,                       
+  characteristicName = c(
+    "Temperature, water",
+    "Dissolved oxygen (DO)",
+    "Turbidity",
+    "Total suspended solids"
+  ),
+  startDateLo = "2024-01-01",               
+  startDateHi = Sys.Date()                  
+)
+
+# Retrieve STORET data
+storet_data <- readWQPdata(storet_query)
+
+storet_data_clean <- storet_data |> col_select()
+
+storet_data_clean |> glimpse()
+
+unique(storet_data_clean$characteristic_name)
+
+# get lat/longs
+url_call <- paste0('https://www.waterqualitydata.us/Result/search?huc=', klamath_huc, '&mimeType=tsv&sorted=no')
+
+url_station <- gsub("/Result/", "/Station/", url_call)
+
+site_info <- importWQP(url_station, FALSE, tz="") |>
+  janitor::clean_names() |>
+  select(monitoring_location_identifier, huc_eight_digit_code, latitude_measure, longitude_measure)
+
+
+# join 
+all_storet_data <- storet_data_clean |> left_join(site_info) |> 
+  mutate(latitude_measure = as.numeric(latitude_measure),
+         longitude_measure = as.numeric(longitude_measure)) |> 
+  glimpse()
+```
+
+
+```{r}
+# visualize 
+leaflet(data = all_storet_data)  |> 
+  addTiles()  |> 
+  addCircleMarkers(
+    ~longitude_measure, ~latitude_measure,
+    popup = ~paste0("<br><b>Latitude: </b>", latitude_measure, 
+                    "<br><b>Longitude: </b>", longitude_measure),
+    fillOpacity = 0.7,
+    radius = 5
+  ) 
+```
+
