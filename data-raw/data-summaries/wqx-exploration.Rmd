@@ -1,10 +1,26 @@
-```{r}
+---
+title: "WQX Data Portal Exploration "
+author: "Badhia Yunes Katz"
+date: "January 2025"
+# output: rmarkdown::github_document
+---
+
+
+```{r include=FALSE}
 library(tidyverse)
 library(dataRetrieval)
+library(leaflet)
 ```
-The WQP brings data from all these organizations together and provides it in a single format that has a more verbose output than NWIS. To get non-NWIS data, need to use CharacteristicName instead of parameter code.
 
-```{r}
+## Overview {.tabset}
+
+On this markdown, data exploration will be done at a high level (and last 10 years only). The parameters of interest that were selected (for now) are: temperature, dissolved oxygen, turbidity and TSS.
+
+The available databases on WQX are NWIS (USGS) and WQX(EPA). WQX is a data warehouse for water quality, biological, and physical data used by state environmental agencies, the EPA, other federal agencies, universities, private citizens, and others.
+
+Note for pulling data: The WQP brings data from all these organizations together and provides it in a single format that has a more verbose output than NWIS. To get non-NWIS data, need to use CharacteristicName instead of parameter code.
+
+```{r echo=TRUE}
 klamath_data <- whatWQPdata(huc = "180102")
 
 summary <- klamath_data |> 
@@ -17,9 +33,11 @@ summary <- klamath_data |>
 print(summary)
 ```
 
-### Temperature (last 10 years)
+### Temperature 
 
-```{r}
+Table showing the total temperature records for each organization for every year
+
+```{r, echo=FALSE, warning=FALSE}
 huc_code <- "180102"  # Klamath Basin
 temp <- "Temperature, water" 
 
@@ -51,7 +69,8 @@ for (year in years) {
 
 print(yearly_agency_summary_temp)
 ```
-```{r}
+
+```{r fig.width=10, fig.height=8, echo=FALSE}
 ggplot(yearly_agency_summary_temp, aes(x = OrganizationIdentifier, y = total_records, fill = OrganizationIdentifier)) +
   geom_bar(stat = "identity") +
   facet_wrap(~year, scales = "free_y") +  # Facet by year, allowing different y-axis scales
@@ -61,16 +80,181 @@ ggplot(yearly_agency_summary_temp, aes(x = OrganizationIdentifier, y = total_rec
     x = "Organization Identifier",
     y = "Total Records"
   ) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8))
+    theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 8),  
+    legend.text = element_text(size = 8), 
+    legend.title = element_text(size = 10),  
+    legend.key.size = unit(0.5, "cm")
+  )
 ```
 
-### pH 
+### Dissolved oxygen (DO)
 
+Table showing the total DO records for each organization for every year
 
+```{r, echo=FALSE, warning=FALSE}
+huc_code <- "180102"  # Klamath Basin
+do <- "Dissolved oxygen (DO)" 
+
+years <- seq(2014, as.numeric(format(Sys.Date(), "%Y")))  # Change starting year as needed
+
+yearly_agency_summary_do <- data.frame()
+
+for (year in years) {
+  start_date <- paste0(year, "-01-01")
+  end_date <- paste0(year, "-12-31")
+  
+  do_data <- readWQPdata(
+    huc = huc_code,
+    characteristicName = do,
+    startDateLo = start_date,
+    startDateHi = end_date
+  )
+
+  do_data$ActivityStartDate <- as.Date(do_data$ActivityStartDate)
+  
+  yearly_summary_do <- do_data |> 
+    group_by(OrganizationIdentifier) |> 
+    summarize(year = year,
+              total_records = n(),
+              .groups = "drop")
+  
+  yearly_agency_summary_do <- bind_rows(yearly_agency_summary_do, yearly_summary_do)
+}
+
+print(yearly_agency_summary_do)
+```
+```{r fig.width=10, fig.height=8, echo=FALSE}
+ggplot(yearly_agency_summary_do, aes(x = OrganizationIdentifier, y = total_records, fill = OrganizationIdentifier)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~year, scales = "free_y") +  # Facet by year, allowing different y-axis scales
+  theme_minimal() +
+  labs(
+    title = "Total Water DO Records by Organization for Each Year",
+    x = "Organization Identifier",
+    y = "Total Records"
+  ) +
+    theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 8),  
+    legend.text = element_text(size = 8), 
+    legend.title = element_text(size = 10),  
+    legend.key.size = unit(0.5, "cm")
+  )
+```
+
+### Turbidity
+
+Table showing the total turbidity records for each organization for every year
+
+```{r, echo=FALSE, warning=FALSE}
+huc_code <- "180102"  # Klamath Basin
+turbidity <- "Turbidity" 
+
+years <- seq(2014, as.numeric(format(Sys.Date(), "%Y")))  # Change starting year as needed
+
+yearly_agency_summary_turbidity <- data.frame()
+
+for (year in years) {
+  start_date <- paste0(year, "-01-01")
+  end_date <- paste0(year, "-12-31")
+  
+  turbidity_data <- readWQPdata(
+    huc = huc_code,
+    characteristicName = turbidity,
+    startDateLo = start_date,
+    startDateHi = end_date
+  )
+
+  turbidity_data$ActivityStartDate <- as.Date(turbidity_data$ActivityStartDate)
+  
+  yearly_summary_turbidity <- turbidity_data |> 
+    group_by(OrganizationIdentifier) |> 
+    summarize(year = year,
+              total_records = n(),
+              .groups = "drop")
+  
+  yearly_agency_summary_turbidity <- bind_rows(yearly_agency_summary_turbidity, yearly_summary_turbidity)
+}
+
+print(yearly_agency_summary_turbidity)
+```
+
+```{r fig.width=10, fig.height=8, echo=FALSE}
+ggplot(yearly_agency_summary_turbidity, aes(x = OrganizationIdentifier, y = total_records, fill = OrganizationIdentifier)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~year, scales = "free_y") +  # Facet by year, allowing different y-axis scales
+  theme_minimal() +
+  labs(
+    title = "Total Turbidity Records by Organization for Each Year",
+    x = "Organization Identifier",
+    y = "Total Records"
+  ) +
+    theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 8),  
+    legend.text = element_text(size = 8), 
+    legend.title = element_text(size = 10),  
+    legend.key.size = unit(0.5, "cm")
+  )
+```
+
+### Total suspended solids
+
+Table showing the total Total suspended solids records for each organization for every year
+
+```{r, echo=FALSE, warning=FALSE}
+huc_code <- "180102"  # Klamath Basin
+tss <- "Total suspended solids" 
+
+years <- seq(2014, as.numeric(format(Sys.Date(), "%Y")))  # Change starting year as needed
+
+yearly_agency_summary_tss <- data.frame()
+
+for (year in years) {
+  start_date <- paste0(year, "-01-01")
+  end_date <- paste0(year, "-12-31")
+  
+  tss_data <- readWQPdata(
+    huc = huc_code,
+    characteristicName = tss,
+    startDateLo = start_date,
+    startDateHi = end_date
+  )
+
+  tss_data$ActivityStartDate <- as.Date(tss_data$ActivityStartDate)
+  
+  yearly_summary_tss <- tss_data |> 
+    group_by(OrganizationIdentifier) |> 
+    summarize(year = year,
+              total_records = n(),
+              .groups = "drop")
+  
+  yearly_agency_summary_tss <- bind_rows(yearly_agency_summary_tss, yearly_summary_tss)
+}
+
+print(yearly_agency_summary_tss)
+```
+
+```{r fig.width=10, fig.height=8, echo=FALSE}
+ggplot(yearly_agency_summary_tss, aes(x = OrganizationIdentifier, y = total_records, fill = OrganizationIdentifier)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~year, scales = "free_y") +  # Facet by year, allowing different y-axis scales
+  theme_minimal() +
+  labs(
+    title = "Total Total suspended solids Records by Organization for Each Year",
+    x = "Organization Identifier",
+    y = "Total Records"
+  ) +
+    theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 8),  
+    legend.text = element_text(size = 8), 
+    legend.title = element_text(size = 10),  
+    legend.key.size = unit(0.5, "cm")
+  )
+```
 
 ---- Maddee's code below, keeping for reference for now ----
 
-```{r}
+```{r include=FALSE}
 col_select <- function(data) {
   data |> 
     janitor::clean_names() |> 
@@ -138,7 +322,7 @@ all_storet_data <- storet_data_clean |> left_join(site_info) |>
 ```
 
 
-```{r}
+```{r, echo=FALSE}
 # visualize 
 leaflet(data = all_storet_data)  |> 
   addTiles()  |> 
