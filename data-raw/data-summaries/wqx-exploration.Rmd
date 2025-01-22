@@ -2,7 +2,73 @@
 library(tidyverse)
 library(dataRetrieval)
 ```
+The WQP brings data from all these organizations together and provides it in a single format that has a more verbose output than NWIS. To get non-NWIS data, need to use CharacteristicName instead of parameter code.
 
+```{r}
+klamath_data <- whatWQPdata(huc = "180102")
+
+summary <- klamath_data |> 
+  group_by(MonitoringLocationTypeName) |>   # Group by site type
+  summarize(total_activities = sum(activityCount, na.rm = TRUE),
+            total_results = sum(resultCount, na.rm = TRUE),
+            site_count = n(),
+            .groups = "drop")
+
+print(summary)
+```
+
+### Temperature (last 10 years)
+
+```{r}
+huc_code <- "180102"  # Klamath Basin
+temp <- "Temperature, water" 
+
+years <- seq(2014, as.numeric(format(Sys.Date(), "%Y")))  # Change starting year as needed
+
+yearly_agency_summary_temp <- data.frame()
+
+for (year in years) {
+  start_date <- paste0(year, "-01-01")
+  end_date <- paste0(year, "-12-31")
+  
+  temperature_data <- readWQPdata(
+    huc = huc_code,
+    characteristicName = temp,
+    startDateLo = start_date,
+    startDateHi = end_date
+  )
+
+  temperature_data$ActivityStartDate <- as.Date(temperature_data$ActivityStartDate)
+  
+  yearly_summary_temp <- temperature_data |> 
+    group_by(OrganizationIdentifier) |> 
+    summarize(year = year,
+              total_records = n(),
+              .groups = "drop")
+  
+  yearly_agency_summary_temp <- bind_rows(yearly_agency_summary_temp, yearly_summary_temp)
+}
+
+print(yearly_agency_summary_temp)
+```
+```{r}
+ggplot(yearly_agency_summary_temp, aes(x = OrganizationIdentifier, y = total_records, fill = OrganizationIdentifier)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~year, scales = "free_y") +  # Facet by year, allowing different y-axis scales
+  theme_minimal() +
+  labs(
+    title = "Total Water Temperature Records by Organization for Each Year",
+    x = "Organization Identifier",
+    y = "Total Records"
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8))
+```
+
+### pH 
+
+
+
+---- Maddee's code below, keeping for reference for now ----
 
 ```{r}
 col_select <- function(data) {
@@ -44,6 +110,7 @@ storet_query <- list(
   startDateHi = Sys.Date()                  
 )
 
+
 # Retrieve STORET data
 storet_data <- readWQPdata(storet_query)
 
@@ -59,8 +126,8 @@ url_call <- paste0('https://www.waterqualitydata.us/Result/search?huc=', klamath
 url_station <- gsub("/Result/", "/Station/", url_call)
 
 site_info <- importWQP(url_station, FALSE, tz="") |>
-  janitor::clean_names() |>
-  select(monitoring_location_identifier, huc_eight_digit_code, latitude_measure, longitude_measure)
+  janitor::clean_names() |> glimpse()
+  # select(monitoring_location_identifier, huc_eight_digit_code, latitude_measure, longitude_measure)
 
 
 # join 
