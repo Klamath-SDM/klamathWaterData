@@ -67,7 +67,7 @@ for (year in years) {
   yearly_agency_summary_temp <- bind_rows(yearly_agency_summary_temp, yearly_summary_temp)
 }
 
-print(yearly_agency_summary_temp)
+print(yearly_agency_summary_temp) #TODO add site name here too
 ```
 
 ```{r fig.width=10, fig.height=8, echo=FALSE}
@@ -329,7 +329,8 @@ leaflet(data = all_storet_data)  |>
   addCircleMarkers(
     ~longitude_measure, ~latitude_measure,
     popup = ~paste0("<br><b>Latitude: </b>", latitude_measure, 
-                    "<br><b>Longitude: </b>", longitude_measure),
+                    "<br><b>Longitude: </b>", longitude_measure,
+                    "<br><b>Characteristic Name: </b>", characteristic_name),
     fillOpacity = 0.7,
     radius = 5
   ) 
