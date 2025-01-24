@@ -33,6 +33,9 @@ summary <- klamath_data |>
 print(summary)
 ```
 
+#TODO maybe for each of the parameters of interest we pull in lat/long and plot the locations of stations. Alternatively,
+use the current map plot and refine by being able to differentiate what is being monitored at each of the points
+
 ### Temperature 
 
 Table showing the total temperature records for each organization for every year
@@ -317,7 +320,11 @@ all_temp_data <- yearly_agency_summary_temp |>
 print(all_temp_data)
 ```
 
-```{r}
+Overview of column names: We are using two dataRetrival functions, `whatWQPsites` and `readWQPdata`
+
+  * column names of site/station information
+
+```{r, echo=FALSE}
 # Here's an example of how we can do the data overview per parameter (?)
 
 # this could serve as an overview of what fields are included when pulling (1) site data and (2) actual data pull
@@ -329,6 +336,11 @@ end_date <- "2024-12-31"
 # (1) station/site information 
 stations <- whatWQPsites(huc = huc_code, characteristicName = characteristic_name)
 colnames(stations)
+```
+
+* column names of data pull
+
+```{r, echo=FALSE}
 # (2) actual water temperature data for the 10 year period
 temperature_data <- readWQPdata(
   huc = huc_code,
@@ -336,10 +348,13 @@ temperature_data <- readWQPdata(
   startDateLo = start_date,
   startDateHi = end_date
 )
-
 colnames(temperature_data)
-# using the "MonitoringLocationIdentifier" as the key - here's where we can keep just the fields that we want
+```
 
+Overview of parameters available (`CharacteristicName`) for Klamath Basin HUC code
+
+```{r, echo=FALSE}
+# using the "MonitoringLocationIdentifier" as the key - here's where we can keep just the fields that we want
 merged_data <- merge(temperature_data, stations, by = "MonitoringLocationIdentifier")
 
 # ---- here I am trying to get an overview of what parameters (characteristicName) are available, will pull 1 year's data as a sample
@@ -440,10 +455,6 @@ site_info <- importWQP(url_station, FALSE, tz="") |>
 all_storet_data <- storet_data_clean |> left_join(site_info) |> 
   mutate(latitude_measure = as.numeric(latitude_measure),
          longitude_measure = as.numeric(longitude_measure)) |> 
-  glimpse()
-
-temp_storet <- all_storet_data |> 
-  filter(characteristic_name == "Temperature, water") |> 
   glimpse()
 ```
 
