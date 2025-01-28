@@ -10,6 +10,7 @@ date: "January 2025"
 library(tidyverse)
 library(dataRetrieval)
 library(leaflet)
+library(janitor)
 ```
 
 ## Overview {.tabset}
@@ -20,6 +21,8 @@ The available databases on WQX are NWIS (USGS) and WQX(EPA). WQX is a data wareh
 
 Note for pulling data: The WQP brings data from all these organizations together and provides it in a single format that has a more verbose output than NWIS. To get non-NWIS data, need to use CharacteristicName instead of parameter code.
 
+
+The following table shows the types of monitoring locations, the 
 ```{r echo=TRUE}
 klamath_data <- whatWQPdata(huc = "180102")
 
@@ -40,7 +43,7 @@ use the current map plot and refine by being able to differentiate what is being
 
 Table showing the total temperature records for each organization for every year
 
-```{r, echo=FALSE, warning=FALSE}
+```{r eval=FALSE, warning=FALSE, include=FALSE}
 huc_code <- "180102"  # Klamath Basin
 temp <- "Temperature, water" 
 
@@ -154,6 +157,52 @@ ggplot(yearly_agency_summary_do, aes(x = OrganizationIdentifier, y = total_recor
   )
 ```
 
+```{r}
+# get lat/longs
+do_url_call <- paste0('https://www.waterqualitydata.us/Result/search?huc=', huc_code, '&mimeType=tsv&sorted=no')
+
+do_url_station <- gsub("/Result/", "/Station/", do_url_call)
+
+do_site_info <- importWQP(do_url_station, FALSE, tz="") |>
+  janitor::clean_names() |> glimpse()
+  # select(monitoring_location_identifier, huc_eight_digit_code, latitude_measure, longitude_measure)
+
+#TODO the idea here would be to join to actual data and summarize so that we can see where the stations that collect DO are located. Code below is here just for reference, probably need to call for readWQPdata function
+# join 
+
+do_data_info <- readWQPdata(huc = huc_code,
+    characteristicName = do,
+    startDateLo = "01-01-2020",
+    startDateHi = "01-01-2021") |> 
+  clean_names()
+    
+    
+all_do_data <- do_data_info |> left_join(do_site_info) |> 
+  mutate(latitude_measure = as.numeric(latitude_measure),
+         longitude_measure = as.numeric(longitude_measure)) |> 
+  glimpse()
+
+
+color_palette <- colorFactor(
+  palette = "Set1", # You can use "Set1", "Set2", "Dark2", or any RColorBrewer palette
+  domain = all_do_data$organization_formal_name
+)
+
+
+leaflet(data = all_do_data)  |> 
+  addTiles()  |> 
+  addCircleMarkers(
+    ~longitude_measure, ~latitude_measure,
+    popup = ~paste0("<br><b>Organization Name: </b>",organization_formal_name ,
+                    "<br><b>Characteristic Name: </b>", characteristic_name
+                    ),
+    fillOpacity = 0.7,
+    radius = 5,
+    color = ~color_palette(organization_formal_name)
+  ) 
+```
+
+
 ### Turbidity
 
 Table showing the total turbidity records for each organization for every year
@@ -265,7 +314,7 @@ ggplot(yearly_agency_summary_tss, aes(x = OrganizationIdentifier, y = total_reco
 ```
 
 # Test Code
-```{r}
+```{r eval=FALSE, include=FALSE}
 huc_code <- "180102"  # Klamath Basin
 temp <- "Temperature, water" 
 
@@ -357,7 +406,7 @@ Overview of parameters available (`CharacteristicName`) for Klamath Basin HUC co
 # using the "MonitoringLocationIdentifier" as the key - here's where we can keep just the fields that we want
 merged_data <- merge(temperature_data, stations, by = "MonitoringLocationIdentifier")
 
-# ---- here I am trying to get an overview of what parameters (characteristicName) are available, will pull 1 year's data as a sample
+# ---- here I am trying to get an overview of what parameters (characteristicName) are available, will pull 1 year's data as a sample. There are too many so we should figure out which ones we'd like to highlight other than turbidity, pH, temp and DO
 
 # Get metadata for all water quality data available for the specified HUC
 wqp_metadata <- readWQPdata(huc = huc_code, startDateLo = "2014-01-01",
