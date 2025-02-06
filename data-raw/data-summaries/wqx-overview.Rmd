@@ -15,6 +15,7 @@ library(dplyr)
 library(ggplot2)
 library(DT)         
 library(tidyr)
+library(scales)
 ```
 
 ## Overview {.tabset}
@@ -227,13 +228,47 @@ characteristic_names <- unique(wqp_metadata$CharacteristicName)
 print(characteristic_names)
 ```
 
-### Temmperature
+### Temperature
 
 ```{r include=FALSE}
-col_select <- function(data) {
-  data |> 
-    janitor::clean_names() 
-    select(organization_identifier,
+# col_select <- function(data) {
+#   data |> 
+#     janitor::clean_names() 
+#     select(organization_identifier,
+#            organization_formal_name,
+#            activity_media_name,
+#            activity_media_subdivision_name,
+#            activity_start_date,
+#            activity_start_time_time,
+#            activity_start_time_time_zone_code,
+#            activity_end_date,
+#            activity_end_time_time,
+#            activity_end_time_time_zone_code,
+#            monitoring_location_identifier,
+#            characteristic_name,
+#            result_sample_fraction_text,
+#            result_measure_value,
+#            result_measure_measure_unit_code,
+#            result_status_identifier,
+#            result_analytical_method_method_name,
+#            provider_name)
+# }
+# 
+# storet_query <- list(
+#   huc = huc_code,                       
+#   characteristicName = "Temperature, water",
+#   startDateLo = "2024-01-01",               
+#   startDateHi = Sys.Date()                  
+# )
+
+
+# Retrieve STORET data
+storet_data <- readWQPdata(huc = huc_code,                       
+  characteristicName = "Temperature, water",
+  startDateLo = "2024-01-01",               
+  startDateHi = Sys.Date()) |> 
+  janitor::clean_names() |> 
+  select(organization_identifier,
            organization_formal_name,
            activity_media_name,
            activity_media_subdivision_name,
@@ -251,23 +286,9 @@ col_select <- function(data) {
            result_status_identifier,
            result_analytical_method_method_name,
            provider_name)
-}
-
-storet_query <- list(
-  huc = huc_code,                       
-  characteristicName = "Temperature, water",
-  startDateLo = "2024-01-01",               
-  startDateHi = Sys.Date()                  
-)
 
 
-# Retrieve STORET data
-storet_data <- readWQPdata(storet_query) |> 
-  clean_names()
-
-storet_data_clean <- storet_data |> col_select()
-
-storet_data_clean |> glimpse()
+storet_data |> glimpse()
 
 unique(storet_data$characteristic_name)
 
@@ -303,3 +324,72 @@ leaflet(data = all_storet_data)  |>
     radius = 5
   ) 
 ```
+
+Looking how many data entries there are for eaech day in 2024 
+
+```{r echo=FALSE}
+# Count number of records per date
+daily_record_counts <- all_storet_data |> 
+  group_by(activity_start_date) |> 
+  summarise(record_count = n(), .groups = "drop") |> 
+  mutate(year = year(activity_start_date),
+         month = month(activity_start_date, label = TRUE),
+         day = day(activity_start_date))
+
+daily_record_counts_table <- daily_record_counts |> 
+  select(activity_start_date, record_count)
+
+DT::datatable(daily_record_counts_table, options = list(pageLength = 10))
+```
+
+Plot below shows the same data than table. This indicates that data is not being collected every day
+
+```{r echo=FALSE}
+# Create a complete reference dataset with all days (1–30) for each month
+all_days <- expand.grid(
+  day = 1:30, 
+  month = unique(daily_record_counts$month),  
+  year = unique(daily_record_counts$year)    
+)
+
+# Merge with actual data, filling missing values with 0
+daily_record_counts <- all_days |> 
+  left_join(daily_record_counts, by = c("year", "month", "day")) |> 
+  replace_na(list(record_count = 0))  
+
+# Create the plot
+ggplot(daily_record_counts, aes(x = day, y = record_count)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~month) +  
+  scale_x_continuous(breaks = seq(1, 30, by = 5), limits = c(1, 30)) +  
+  labs(title = "Number of Water Temperature Records per Day",
+       x = "Day of the Month",
+       y = "Record Count") +
+  theme_minimal()
+
+```
+
+Plot below shows the amount of data entries per site, per month 
+
+```{r echo=FALSE}
+monthly_record_counts_persite <- all_storet_data |> 
+  mutate(
+    year = year(activity_start_date),
+    month = month(activity_start_date, label = TRUE)  
+  ) |> 
+  group_by(year, month, monitoring_location_identifier) |>
+  summarise(record_count = n(), .groups = "drop")
+
+# Create the plot
+ggplot(monthly_record_counts_persite, aes(x = month, y = record_count)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~monitoring_location_identifier, scales = "free_y") +  
+  scale_x_discrete() + 
+  scale_y_continuous(breaks = seq(1, max(monthly_record_counts_persite$record_count, na.rm = TRUE), by = 5)) +  
+  labs(title = "Total Records Per Month for Each Monitoring Location",
+       x = "Month",
+       y = "Record Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
