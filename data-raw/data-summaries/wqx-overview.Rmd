@@ -1,0 +1,211 @@
+---
+title: "WQX Data Portal Exploration "
+author: "Badhia Yunes Katz"
+date: "January 2025"
+# output: rmarkdown::github_document
+---
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(dataRetrieval)
+library(leaflet)
+library(janitor)
+library(dplyr)
+library(ggplot2)
+library(DT)         
+library(tidyr)
+```
+
+## Overview {.tabset}
+
+On this markdown, data exploration will be done at a high level (and last 10 years only). The parameters of interest that were selected (for now) are: temperature, dissolved oxygen, turbidity and TSS.
+
+The available databases on WQX are NWIS (USGS) and WQX(EPA). WQX is a data warehouse for water quality, biological, and physical data used by state environmental agencies, the EPA, other federal agencies, universities, private citizens, and others.
+
+Note for pulling data: The WQP brings data from all these organizations together and provides it in a single format that has a more verbose output than NWIS. To get non-NWIS data, need to use CharacteristicName instead of parameter code.
+
+
+Overview of column names: We are using two dataRetrival functions, `whatWQPsites` and `readWQPdata`
+
+### whatWQPsites
+
+  * column names of site/station information
+
+```{r, echo=FALSE}
+# Here's an example of how we can do the data overview per parameter (?)
+
+# this could serve as an overview of what fields are included when pulling (1) site data and (2) actual data pull
+huc_code <- "180102"
+characteristic_name <- "Temperature, water"
+start_date <- "2014-01-01"  
+end_date <- "2024-12-31"    
+
+# (1) station/site information 
+stations <- whatWQPsites(huc = huc_code, characteristicName = characteristic_name)
+colnames(stations)
+```
+
+### readWQPdata
+
+List of column names:
+
+```{r, echo=FALSE}
+# (2) actual water temperature data for the 10 year period
+temperature_data <- readWQPdata(
+  huc = huc_code,
+  characteristicName = characteristic_name,
+  startDateLo = start_date,
+  startDateHi = end_date
+)
+colnames(temperature_data)
+```
+
+### Monitoring Sites
+
+```{r, echo=FALSE}
+# Retrieve available monitoring sites in the Klamath Basin (HUC: 180102)
+klamath_sites <- whatWQPsites(huc = "180102")
+
+# Preview site data
+DT::datatable(klamath_sites, options = list(pageLength = 10))
+```
+
+Monitoring sites plot 
+
+```{r, echo=FALSE}
+# monitoring sites plot
+color_palette <- colorFactor(
+  palette = "Set1", 
+  domain = klamath_sites$OrganizationFormalName
+)
+org_names <- unique(klamath_sites$OrganizationFormalName)
+
+legend_html <- paste0(
+  "<div style='background-color:white; padding:4px; font-size:10px; 
+               border-radius:5px; width:180px; max-height:200px; overflow:auto;'>",
+  "<b>Organization Name</b><br>",
+  paste0("<span style='display:inline-block; width:8px; height:8px; background:", 
+         color_palette(org_names), 
+         "; margin-right:4px;'></span> ", 
+         org_names, collapse = "<br>"),
+  "</div>"
+)
+
+# Create Leaflet map
+leaflet(data = klamath_sites |> 
+          mutate(longitude = as.numeric(LongitudeMeasure),
+                 latitude = as.numeric(LatitudeMeasure))) |> 
+  addTiles() |> 
+  addCircleMarkers(
+    ~longitude, ~latitude,
+    popup = ~paste0("<br><b>Organization Name: </b>", OrganizationFormalName,
+                    "<br><b>Monitoring Location Identifier: </b>", MonitoringLocationIdentifier,
+                    "<br><b>Provider Name: </b>", ProviderName),
+    fillOpacity = 0.7,
+    radius = 5,
+    color = ~color_palette(OrganizationFormalName)
+  ) |> 
+  addControl(legend_html, position = "bottomright")  
+```
+
+Summary of sites by monitoring location type (The descriptive name for a type of monitoring location)
+
+```{r}
+# Summary of sites by type
+site_summary <- klamath_sites |> 
+  group_by(MonitoringLocationTypeName) |> 
+  summarise(Site_Count = n(), .groups = "drop")
+
+DT::datatable(site_summary, options = list(pageLength = 10))
+```
+
+Summary: Total number of records per organization
+
+```{r}
+klamath_data_summary <- whatWQPdata(huc = "180102")
+
+# Total number of records per organization
+org_summary <- klamath_data_summary |> 
+  group_by(OrganizationFormalName) |> 
+  summarise(Total_Results = sum(resultCount, na.rm = TRUE), .groups = "drop")
+
+DT::datatable(org_summary, options = list(pageLength = 10))
+```
+
+Summary: Monitoring locations with the most data
+
+```{r}
+# Monitoring locations with the most data
+site_data_summary <- klamath_data_summary |> 
+  select(MonitoringLocationName, resultCount) |> 
+  arrange(desc(resultCount))
+
+DT::datatable(head(site_data_summary, 10), options = list(pageLength = 10))
+```
+
+
+
+```{r}
+# # Get data from the last 10 years (instead of 3)
+start_date <- as.character(Sys.Date() - years(10))
+
+# # Select the top 20 sites based on result count
+top_sites <- klamath_data_summary |>
+  arrange(desc(resultCount)) |>
+  head(20) |>
+  pull(MonitoringLocationIdentifier)
+# 
+# # Pick the first site to test
+# test_site <- top_sites[1]
+# 
+# # Run test query
+# test_data <- readWQPdata(
+#   siteid = test_site,
+#   startDateLo = start_date
+# )
+# 
+# # Check if test site returned data
+# if (nrow(test_data) == 0) {
+#   message("Test site returned no data. Consider changing sites or increasing the timeframe.")
+# } else {
+#   DT::datatable(head(test_data, 10), options = list(pageLength = 10))
+# }
+# 
+# 
+# 
+# # Retrieve data for the top 20 sites within the last 10 years
+# klamath_sample_data <- readWQPdata(
+#   siteid = top_sites,
+#   startDateLo = start_date
+# )
+# 
+# # Check if data was retrieved successfully
+# if (nrow(klamath_sample_data) == 0) {
+#   message("No data found for the selected sites. Consider further increasing the date range or filtering by parameter.")
+# } else {
+#   DT::datatable(head(klamath_sample_data, 10), options = list(pageLength = 10))
+# }
+```
+
+Summary per data provider: showing the top 10 providers with the most data
+
+```{r}
+# Find which providers have the most data
+provider_summary <- klamath_data_summary |> 
+  count(ProviderName, sort = TRUE)
+
+DT::datatable(provider_summary, options = list(pageLength = 10)) #TODO still need to refine this plot idea
+```
+
+```{r}
+ggplot(klamath_data_summary, aes(x = MonitoringLocationTypeName, y = resultCount)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Data Availability by Monitoring Location Type",
+       x = "Monitoring Location Type",
+       y = "Total Number of Results") +
+  theme_minimal() +
+  coord_flip()
+```
+
+
