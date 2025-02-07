@@ -25,6 +25,8 @@ The goal of this markdown is to see where in the Klamath basin, and what type of
 
 We are using two dataRetrival functions, `whatWQPsites` and `readWQPdata`
 
+Detailed information about fields metadata can be found [here](https://www.waterqualitydata.us/portal_userguide/)
+
 ### whatWQPsites
 
 The following function returns sites that have collected data in the Klamath Basin. Below, is an overview of the column names of the data request are shown.
@@ -37,7 +39,7 @@ The following function returns sites that have collected data in the Klamath Bas
 # this could serve as an overview of what fields are included when pulling (1) site data and (2) actual data pull
 huc_code <- "180102"
 # characteristic_name <- "Temperature, water"
-start_date <- "2014-01-01"  
+start_date <- "2024-01-01"  
 end_date <- "2024-12-31"    
 
 # (1) station/site information 
@@ -55,7 +57,6 @@ Imports data from Water Quality Portal web service.
 # (2) actual water temperature data for the 10 year period
 temperature_data <- readWQPdata(
   huc = huc_code,
-  characteristicName = characteristic_name,
   startDateLo = start_date,
   startDateHi = end_date
 )
@@ -114,7 +115,7 @@ leaflet(data = klamath_sites |>
 
 Summary of sites by monitoring location type (`MonitoringLocationTypeName`: The descriptive name for a type of monitoring location)
 
-```{r}
+```{r echo=FALSE}
 # Summary of sites by type
 site_summary <- klamath_sites |> 
   group_by(MonitoringLocationTypeName) |> 
@@ -125,7 +126,7 @@ DT::datatable(site_summary, options = list(pageLength = 10))
 
 Summary: Total number of records per organization
 
-```{r}
+```{r echo=FALSE}
 klamath_data_summary <- whatWQPdata(huc = "180102")
 
 # Total number of records per organization
@@ -138,7 +139,7 @@ DT::datatable(org_summary, options = list(pageLength = 10))
 
 Summary: Monitoring locations with the most data
 
-```{r}
+```{r echo=FALSE}
 # Monitoring locations with the most data
 site_data_summary <- klamath_data_summary |> 
   select(MonitoringLocationName, resultCount) |> 
@@ -214,18 +215,17 @@ DT::datatable(provider_summary, options = list(pageLength = 10)) #TODO still nee
 
 ### Parameters
 
-These are the water quality parameters available (pulling 2024 data to view parameters). Parameters of interest will be explored on separate tabs 
+These are the water quality parameters available (pulling 2020 - 2024 data to view parameters). Parameters of interest will be explored on separate tabs 
 
 ```{r echo=FALSE}
 # Get metadata for all water quality data available for the specified HUC
-wqp_metadata <- readWQPdata(huc = huc_code, startDateLo = "2024-01-01",
+wqp_metadata <- readWQPdata(huc = huc_code, startDateLo = "2020-01-01",
   startDateHi = "2024-12-31")
 
-# Extract unique characteristic names
-characteristic_names <- unique(wqp_metadata$CharacteristicName)
+characteristic_names_df <- tibble(CharacteristicName = sort(unique(wqp_metadata$CharacteristicName)))
 
-# Display the unique characteristic names
-print(characteristic_names)
+# Display as an interactive datatable
+DT::datatable(characteristic_names_df, options = list(pageLength = 15))
 ```
 
 ### Temperature
@@ -261,9 +261,7 @@ print(characteristic_names)
 #   startDateHi = Sys.Date()                  
 # )
 
-
-# Retrieve STORET data
-storet_data <- readWQPdata(huc = huc_code,                       
+temp_data <- readWQPdata(huc = huc_code,                       
   characteristicName = "Temperature, water",
   startDateLo = "2024-01-01",               
   startDateHi = Sys.Date()) |> 
@@ -288,9 +286,9 @@ storet_data <- readWQPdata(huc = huc_code,
            provider_name)
 
 
-storet_data |> glimpse()
+temp_data |> glimpse()
 
-unique(storet_data$characteristic_name)
+unique(temp_data$characteristic_name)
 
 # get lat/longs
 url_call <- paste0('https://www.waterqualitydata.us/Result/search?huc=', huc_code, '&mimeType=tsv&sorted=no')
@@ -303,33 +301,18 @@ site_info <- importWQP(url_station, FALSE, tz="") |>
 
 
 # join 
-all_storet_data <- storet_data |> left_join(site_info) |> 
+all_temp_data <- temp_data |> left_join(site_info) |> 
   mutate(latitude_measure = as.numeric(latitude_measure),
          longitude_measure = as.numeric(longitude_measure)) |> 
   glimpse()
 ```
 
 
-```{r, echo=FALSE}
-# visualize 
-leaflet(data = all_storet_data)  |> 
-  addTiles()  |> 
-  addCircleMarkers(
-    ~longitude_measure, ~latitude_measure,
-    popup = ~paste0("<br><b>Latitude: </b>", latitude_measure, 
-                    "<br><b>Longitude: </b>", longitude_measure,
-                    "<br><b>Characteristic Name: </b>", characteristic_name),
-    color = ~color_palette(organization_formal_name),
-    fillOpacity = 0.7,
-    radius = 5
-  ) 
-```
-
-Looking how many data entries there are for eaech day in 2024 
+Looking how many data entries there are for each day in 2024 
 
 ```{r echo=FALSE}
 # Count number of records per date
-daily_record_counts <- all_storet_data |> 
+daily_record_counts <- all_temp_data |> 
   group_by(activity_start_date) |> 
   summarise(record_count = n(), .groups = "drop") |> 
   mutate(year = year(activity_start_date),
@@ -372,7 +355,7 @@ ggplot(daily_record_counts, aes(x = day, y = record_count)) +
 Plot below shows the amount of data entries per site, per month 
 
 ```{r echo=FALSE}
-monthly_record_counts_persite <- all_storet_data |> 
+monthly_record_counts_persite <- all_temp_data |> 
   mutate(
     year = year(activity_start_date),
     month = month(activity_start_date, label = TRUE)  
@@ -391,5 +374,111 @@ ggplot(monthly_record_counts_persite, aes(x = month, y = record_count)) +
        y = "Record Count") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Map below shows where monitoring locations are, and what agency is monitoring/mantaing it
+
+```{r, echo=FALSE, warning=FALSE}
+# Define color palette
+color_palette <- colorFactor(topo.colors(length(unique(all_temp_data$organization_formal_name))), 
+                             domain = all_temp_data$organization_formal_name)
+
+# Create Leaflet map
+leaflet(data = all_temp_data) |> 
+  addTiles() |> 
+  addCircleMarkers(
+    ~longitude_measure, ~latitude_measure,
+    popup = ~paste0("<br><b>Monitoring Location: </b>", monitoring_location_name,
+                    "<br><b>Monitoring Location Type: </b>", monitoring_location_type_name,
+                    "<br><b>Characteristic Name: </b>", characteristic_name),
+    color = ~color_palette(organization_formal_name),
+    fillOpacity = 0.7,
+    radius = 5
+  ) |> 
+  addLegend(
+    position = "bottomright",  
+    pal = color_palette,  
+    values = ~organization_formal_name,  
+    title = "Organization Name",  
+    opacity = 1
+  )
+```
+```{r include=FALSE}
+temp <- readWQPdata(huc = huc_code,                       
+  characteristicName = "Temperature, water",
+  startDateLo = "2020-01-01",               
+  startDateHi = Sys.Date()) |> 
+  janitor::clean_names() |> 
+  select(organization_identifier,
+           organization_formal_name,
+           activity_media_name,
+           activity_media_subdivision_name,
+           activity_start_date,
+           activity_start_time_time,
+           activity_start_time_time_zone_code,
+           activity_end_date,
+           activity_end_time_time,
+           activity_end_time_time_zone_code,
+           monitoring_location_identifier,
+           characteristic_name,
+           result_sample_fraction_text,
+           result_measure_value,
+           result_measure_measure_unit_code,
+           result_status_identifier,
+           result_analytical_method_method_name,
+           provider_name)
+```
+
+```{r echo=FALSE}
+# Extract year for faceting
+temp <- temp |> mutate(year = year(activity_start_date))
+
+
+yearly_summary_temp <- temp |> 
+    group_by(organization_identifier) |> 
+    summarize(year = year,
+              total_records = n(),
+              .groups = "drop")
+
+ggplot(yearly_summary_temp, aes(x = organization_identifier, y = total_records, fill = organization_identifier)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~year, scales = "free_y") +  # Facet by year, allowing different y-axis scales
+  theme_minimal() +
+  labs(
+    title = "Total Water Temperature Records by Organization for Each Year",
+    x = "Organization Identifier",
+    y = "Total Records"
+  ) +
+    theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 8),  
+    legend.text = element_text(size = 8), 
+    legend.title = element_text(size = 10),  
+    legend.key.size = unit(0.5, "cm")
+  )
+
+```
+
+```{r echo=FALSE, warning=FALSE}
+# Ensure date is properly formatted
+temp <- temp |> mutate(activity_start_date = as.Date(activity_start_date),
+                       result_measure_value = as.numeric(result_measure_value))
+
+summary(temp$result_measure_value)
+temp <- temp |> filter(!is.na(result_measure_value))
+
+ggplot(temp, aes(x = activity_start_date, y = result_measure_value)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  facet_wrap(~organization_formal_name, scales = "free_y") +  
+  scale_y_continuous(breaks = pretty_breaks(n = 5)) +  
+  labs(title = "Water Temperature Over Time by Agency",
+       x = "Date",
+       y = "Temperature (°C)") +
+  theme_minimal() +
+  theme(
+    legend.position = "none", 
+    axis.text.x = element_text(angle = 45, hjust = 1),  
+    axis.text.y = element_text(size = 8)  
+  )
+
 ```
 
