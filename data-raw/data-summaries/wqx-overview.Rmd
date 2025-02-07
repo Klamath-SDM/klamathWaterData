@@ -230,7 +230,9 @@ DT::datatable(characteristic_names_df, options = list(pageLength = 15))
 
 ### Temperature
 
-```{r include=FALSE}
+Glimpse of temperature data pull 
+
+```{r echo=FALSE}
 # col_select <- function(data) {
 #   data |> 
 #     janitor::clean_names() 
@@ -265,29 +267,37 @@ temp_data <- readWQPdata(huc = huc_code,
   characteristicName = "Temperature, water",
   startDateLo = "2024-01-01",               
   startDateHi = Sys.Date()) |> 
-  janitor::clean_names() |> 
-  select(organization_identifier,
-           organization_formal_name,
-           activity_media_name,
-           activity_media_subdivision_name,
-           activity_start_date,
-           activity_start_time_time,
-           activity_start_time_time_zone_code,
-           activity_end_date,
-           activity_end_time_time,
-           activity_end_time_time_zone_code,
-           monitoring_location_identifier,
-           characteristic_name,
-           result_sample_fraction_text,
-           result_measure_value,
-           result_measure_measure_unit_code,
-           result_status_identifier,
-           result_analytical_method_method_name,
-           provider_name)
+  janitor::clean_names() 
+  # select(organization_identifier,
+  #          organization_formal_name,
+  #          activity_media_name,
+  #          activity_media_subdivision_name,
+  #          activity_start_date,
+  #          activity_start_time_time,
+  #          activity_start_time_time_zone_code,
+  #          activity_end_date,
+  #          activity_end_time_time,
+  #          activity_end_time_time_zone_code,
+  #          monitoring_location_identifier,
+  #          characteristic_name,
+  #          result_sample_fraction_text,
+  #          result_measure_value,
+  #          result_measure_measure_unit_code,
+  #          result_status_identifier,
+  #          result_analytical_method_method_name,
+  #          provider_name)
 
 
 temp_data |> glimpse()
+```
 
+```{r}
+#check that it is only temp data 
+```
+
+Glimpse of station data pull
+
+```{r echo=FALSE}
 unique(temp_data$characteristic_name)
 
 # get lat/longs
@@ -298,8 +308,10 @@ url_station <- gsub("/Result/", "/Station/", url_call)
 site_info <- importWQP(url_station, FALSE, tz="") |>
   janitor::clean_names() |> glimpse()
   # select(monitoring_location_identifier, huc_eight_digit_code, latitude_measure, longitude_measure)
+```
 
 
+```{r include=FALSE}
 # join 
 all_temp_data <- temp_data |> left_join(site_info) |> 
   mutate(latitude_measure = as.numeric(latitude_measure),
@@ -431,6 +443,8 @@ temp <- readWQPdata(huc = huc_code,
 
 ```{r echo=FALSE}
 # Extract year for faceting
+
+#TODO check on this discreapancy of total amount of records, vs the plot above. 
 temp <- temp |> mutate(year = year(activity_start_date))
 
 
@@ -442,7 +456,7 @@ yearly_summary_temp <- temp |>
 
 ggplot(yearly_summary_temp, aes(x = organization_identifier, y = total_records, fill = organization_identifier)) +
   geom_bar(stat = "identity") +
-  facet_wrap(~year, scales = "free_y") +  # Facet by year, allowing different y-axis scales
+  facet_wrap(~year, scales = "free_y") +  
   theme_minimal() +
   labs(
     title = "Total Water Temperature Records by Organization for Each Year",
