@@ -67,7 +67,7 @@ colnames(temperature_data)
 
 This table shows all the monitoring sites available across the Klamath Basin
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, warning=FALSE}
 # Retrieve available monitoring sites in the Klamath Basin (HUC: 180102)
 klamath_sites <- whatWQPsites(huc = "180102")
 
@@ -77,7 +77,7 @@ DT::datatable(klamath_sites, options = list(pageLength = 10))
 
 Monitoring sites plot 
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, warning=FALSE}
 # monitoring sites plot
 color_palette <- colorFactor(
   palette = "Set1", 
@@ -137,7 +137,7 @@ org_summary <- klamath_data_summary |>
 DT::datatable(org_summary, options = list(pageLength = 10))
 ```
 
-Summary: Monitoring locations with the most data
+Summary: The top 50 Monitoring locations with the most data entries
 
 ```{r echo=FALSE}
 # Monitoring locations with the most data
@@ -145,7 +145,7 @@ site_data_summary <- klamath_data_summary |>
   select(MonitoringLocationName, resultCount) |> 
   arrange(desc(resultCount))
 
-DT::datatable(head(site_data_summary, 10), options = list(pageLength = 10))
+DT::datatable(head(site_data_summary, 50), options = list(pageLength = 10))
 ```
 
 
@@ -291,15 +291,14 @@ temp_data <- readWQPdata(huc = huc_code,
 temp_data |> glimpse()
 ```
 
-```{r}
+```{r include=FALSE}
 #check that it is only temp data 
+unique(temp_data$characteristic_name)
 ```
 
 Glimpse of station data pull
 
 ```{r echo=FALSE}
-unique(temp_data$characteristic_name)
-
 # get lat/longs
 url_call <- paste0('https://www.waterqualitydata.us/Result/search?huc=', huc_code, '&mimeType=tsv&sorted=no')
 
@@ -339,7 +338,7 @@ DT::datatable(daily_record_counts_table, options = list(pageLength = 10))
 
 Plot below shows the same data than table. This indicates that data is not being collected every day
 
-```{r echo=FALSE}
+```{r echo=FALSE, warning=FALSE}
 # Create a complete reference dataset with all days (1–30) for each month
 all_days <- expand.grid(
   day = 1:30, 
@@ -357,66 +356,42 @@ ggplot(daily_record_counts, aes(x = day, y = record_count)) +
   geom_col(fill = "steelblue") +
   facet_wrap(~month) +  
   scale_x_continuous(breaks = seq(1, 30, by = 5), limits = c(1, 30)) +  
-  labs(title = "Number of Water Temperature Records per Day",
+  labs(title = "Number of Water Temperature Records per Day in 2014",
        x = "Day of the Month",
        y = "Record Count") +
   theme_minimal()
 
 ```
 
-Plot below shows the amount of data entries per site, per month 
+
 
 ```{r echo=FALSE}
-monthly_record_counts_persite <- all_temp_data |> 
-  mutate(
-    year = year(activity_start_date),
-    month = month(activity_start_date, label = TRUE)  
-  ) |> 
-  group_by(year, month, monitoring_location_identifier) |>
-  summarise(record_count = n(), .groups = "drop")
-
-# Create the plot
-ggplot(monthly_record_counts_persite, aes(x = month, y = record_count)) +
-  geom_col(fill = "steelblue") +
-  facet_wrap(~monitoring_location_identifier, scales = "free_y") +  
-  scale_x_discrete() + 
-  scale_y_continuous(breaks = seq(1, max(monthly_record_counts_persite$record_count, na.rm = TRUE), by = 5)) +  
-  labs(title = "Total Records Per Month for Each Monitoring Location",
-       x = "Month",
-       y = "Record Count") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# Plot below shows the amount of data entries per site, per month - decided to not add plot below since it is only 2014
+# monthly_record_counts_persite <- all_temp_data |> 
+#   mutate(
+#     year = year(activity_start_date),
+#     month = month(activity_start_date, label = TRUE)  
+#   ) |> 
+#   group_by(year, month, monitoring_location_identifier) |>
+#   summarise(record_count = n(), .groups = "drop")
+# 
+# # Create the plot
+# ggplot(monthly_record_counts_persite, aes(x = month, y = record_count)) +
+#   geom_col(fill = "steelblue") +
+#   facet_wrap(~monitoring_location_identifier, scales = "free_y") +  
+#   scale_x_discrete() + 
+#   scale_y_continuous(breaks = seq(1, max(monthly_record_counts_persite$record_count, na.rm = TRUE), by = 5)) +  
+#   labs(title = "Total Records Per Month for Each Monitoring Location",
+#        x = "Month",
+#        y = "Record Count") +
+#   theme_minimal() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-Map below shows where monitoring locations are, and what agency is monitoring/mantaing it
+Temperature from 2020 to 2025
 
-```{r, echo=FALSE, warning=FALSE}
-# Define color palette
-color_palette <- colorFactor(topo.colors(length(unique(all_temp_data$organization_formal_name))), 
-                             domain = all_temp_data$organization_formal_name)
-
-# Create Leaflet map
-leaflet(data = all_temp_data) |> 
-  addTiles() |> 
-  addCircleMarkers(
-    ~longitude_measure, ~latitude_measure,
-    popup = ~paste0("<br><b>Monitoring Location: </b>", monitoring_location_name,
-                    "<br><b>Monitoring Location Type: </b>", monitoring_location_type_name,
-                    "<br><b>Characteristic Name: </b>", characteristic_name),
-    color = ~color_palette(organization_formal_name),
-    fillOpacity = 0.7,
-    radius = 5
-  ) |> 
-  addLegend(
-    position = "bottomright",  
-    pal = color_palette,  
-    values = ~organization_formal_name,  
-    title = "Organization Name",  
-    opacity = 1
-  )
-```
-```{r include=FALSE}
-temp <- readWQPdata(huc = huc_code,                       
+```{r echo=FALSE, warning=FALSE}
+temp_data_2020_2025 <- readWQPdata(huc = huc_code,                       
   characteristicName = "Temperature, water",
   startDateLo = "2020-01-01",               
   startDateHi = Sys.Date()) |> 
@@ -439,16 +414,102 @@ temp <- readWQPdata(huc = huc_code,
            result_status_identifier,
            result_analytical_method_method_name,
            provider_name)
+
+daily_temp_2020_2025 <- temp_data_2020_2025 |> 
+  group_by(activity_start_date) |> 
+  summarise(record_count = n(), .groups = "drop") |> 
+  mutate(year = year(activity_start_date),
+         month = month(activity_start_date, label = TRUE),
+         day = day(activity_start_date))
+
+ggplot(daily_temp_2020_2025, aes(x = day, y = record_count)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~month) +  
+  scale_x_continuous(breaks = seq(1, 30, by = 5), limits = c(1, 30)) +  
+  labs(title = "Number of Water Temperature Records per Day between 2020 and 2025",
+       x = "Day of the Month",
+       y = "Record Count") +
+  theme_minimal()
+
 ```
+
+Map below shows where monitoring locations are, and what agency is monitoring/maintain it
+
+```{r, echo=FALSE, warning=FALSE}
+# Define color palette
+color_palette <- colorFactor(topo.colors(length(unique(temp_data_2020_2025$organization_formal_name))), 
+                             domain = temp_data_2020_2025$organization_formal_name)
+
+all_2020_2025_temp_data <- temp_data_2020_2025 |> left_join(site_info) |> 
+  mutate(latitude_measure = as.numeric(latitude_measure),
+         longitude_measure = as.numeric(longitude_measure))
+
+# Create Leaflet map
+leaflet(data = all_2020_2025_temp_data) |> 
+  addTiles() |> 
+  addCircleMarkers(
+    ~longitude_measure, ~latitude_measure,
+    popup = ~paste0("<br><b>Monitoring Location: </b>", monitoring_location_name,
+                    "<br><b>Monitoring Location Type: </b>", monitoring_location_type_name,
+                    "<br><b>Characteristic Name: </b>", characteristic_name),
+    color = ~color_palette(organization_formal_name),
+    fillOpacity = 0.7,
+    radius = 5
+  ) |> 
+  addLegend(
+    position = "bottomright",  
+    pal = color_palette,  
+    values = ~organization_formal_name,  
+    title = "Organization Name",  
+    opacity = 1
+  )
+```
+
+Table below shows the amount of data entries per site, per year and month
+
+```{r echo=FALSE}
+# Table below shows the amount of data entries per site, per month
+monthly_record_counts_persite <- all_2020_2025_temp_data |>
+  mutate(
+    year = year(activity_start_date),
+    month = month(activity_start_date, label = TRUE)
+  ) |>
+  group_by(year, month, monitoring_location_identifier) |>
+  summarise(record_count = n(), .groups = "drop")
+
+monthly_record_counts_persite_table <- monthly_record_counts_persite |> 
+  select(monitoring_location_identifier, record_count, year, month)
+
+DT::datatable(monthly_record_counts_persite_table, options = list(pageLength = 10))
+```
+
+
+Table below shows the amount of data entries per site, per year (note that this is per each site)
+
+```{r echo=FALSE}
+# Table below shows the amount of data entries per site, per month
+yearly_record_counts_persite <- all_2020_2025_temp_data |>
+  mutate(
+    year = year(activity_start_date),
+    month = month(activity_start_date, label = TRUE)
+  ) |>
+  group_by(year, monitoring_location_identifier) |>
+  summarise(record_count = n(), .groups = "drop")
+
+yearly_record_counts_persite_table <- yearly_record_counts_persite |> 
+  select(monitoring_location_identifier, record_count, year)
+
+DT::datatable(yearly_record_counts_persite_table, options = list(pageLength = 10))
+```
+
+Table plot below shows the amount of data entries per organization, per year (note that this is per each organization, which includes all monitoring stations managed by them)
 
 ```{r echo=FALSE}
 # Extract year for faceting
-
-#TODO check on this discreapancy of total amount of records, vs the plot above. 
-temp <- temp |> mutate(year = year(activity_start_date))
+temp_data_2020_2025 <- temp_data_2020_2025 |> mutate(year = year(activity_start_date))
 
 
-yearly_summary_temp <- temp |> 
+yearly_summary_temp <- temp_data_2020_2025 |> 
     group_by(organization_identifier) |> 
     summarize(year = year,
               total_records = n(),
@@ -474,7 +535,7 @@ ggplot(yearly_summary_temp, aes(x = organization_identifier, y = total_records, 
 
 ```{r echo=FALSE, warning=FALSE}
 # Ensure date is properly formatted
-temp <- temp |> mutate(activity_start_date = as.Date(activity_start_date),
+temp <- temp_data_2020_2025 |> mutate(activity_start_date = as.Date(activity_start_date),
                        result_measure_value = as.numeric(result_measure_value))
 
 summary(temp$result_measure_value)
@@ -484,7 +545,7 @@ ggplot(temp, aes(x = activity_start_date, y = result_measure_value)) +
   geom_point(alpha = 0.5, size = 1) + 
   facet_wrap(~organization_formal_name, scales = "free_y") +  
   scale_y_continuous(breaks = pretty_breaks(n = 5)) +  
-  labs(title = "Water Temperature Over Time by Agency",
+  labs(title = "Water Temperature Over Time by Agency (2020-2024)",
        x = "Date",
        y = "Temperature (°C)") +
   theme_minimal() +
@@ -496,3 +557,180 @@ ggplot(temp, aes(x = activity_start_date, y = result_measure_value)) +
 
 ```
 
+### Dissolved oxygen (DO)
+
+Glimpse of dissolved oxygen data pull 
+
+```{r echo=FALSE}
+do_data <- readWQPdata(huc = huc_code,                       
+  characteristicName = "Dissolved oxygen (DO)",
+  startDateLo = "2020-01-01",               
+  startDateHi = Sys.Date()) |> 
+  janitor::clean_names()
+
+glimpse(do_data)
+```
+
+```{r include=FALSE}
+#check that it is only temp data 
+unique(do_data$characteristic_name)
+```
+
+
+```{r include=FALSE}
+# join 
+all_do_data <- do_data |> left_join(site_info) |> 
+  mutate(latitude_measure = as.numeric(latitude_measure),
+         longitude_measure = as.numeric(longitude_measure)) |> 
+  glimpse()
+```
+
+
+Looking how many data entries there are for each day from 2020 to today 
+
+```{r echo=FALSE}
+# Count number of records per date
+daily_do_record_counts <- all_do_data |> 
+  group_by(activity_start_date) |> 
+  summarise(record_count = n(), .groups = "drop") |> 
+  mutate(year = year(activity_start_date),
+         month = month(activity_start_date, label = TRUE),
+         day = day(activity_start_date))
+
+daily_do_record_counts_table <- daily_do_record_counts |> 
+  select(activity_start_date, record_count)
+
+DT::datatable(daily_do_record_counts_table, options = list(pageLength = 10))
+```
+
+Plot below shows the same data than table. This indicates that data is not being collected every day
+
+```{r echo=FALSE, warning=FALSE}
+
+# Create the plot
+ggplot(daily_do_record_counts, aes(x = day, y = record_count)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~month) +  
+  scale_x_continuous(breaks = seq(1, 30, by = 5), limits = c(1, 30)) +  
+  labs(title = "Number of DO Records per Day (2020 - 2024)",
+       x = "Day of the Month",
+       y = "Record Count") +
+  theme_minimal()
+
+```
+
+Map below shows where monitoring locations are, and what agency is monitoring/maintain it
+
+```{r, echo=FALSE, warning=FALSE}
+
+# Create Leaflet map
+leaflet(data = all_do_data) |> 
+  addTiles() |> 
+  addCircleMarkers(
+    ~longitude_measure, ~latitude_measure,
+    popup = ~paste0("<br><b>Monitoring Location: </b>", monitoring_location_name,
+                    "<br><b>Monitoring Location Type: </b>", monitoring_location_type_name,
+                    "<br><b>Characteristic Name: </b>", characteristic_name),
+    color = ~color_palette(organization_formal_name),
+    fillOpacity = 0.7,
+    radius = 5
+  ) |> 
+  addLegend(
+    position = "bottomright",  
+    pal = color_palette,  
+    values = ~organization_formal_name,  
+    title = "Organization Name",  
+    opacity = 1
+  )
+```
+
+Table below shows the amount of data entries per site, per year and month
+
+```{r echo=FALSE}
+monthly_do_record_counts_persite <- all_do_data |>
+  mutate(
+    year = year(activity_start_date),
+    month = month(activity_start_date, label = TRUE)
+  ) |>
+  group_by(year, month, monitoring_location_identifier) |>
+  summarise(record_count = n(), .groups = "drop")
+
+monthly_record_counts_persite_table <- monthly_record_counts_persite |> 
+  select(monitoring_location_identifier, record_count, year, month)
+
+DT::datatable(monthly_record_counts_persite_table, options = list(pageLength = 10))
+```
+
+Table below shows the amount of data entries per site, per year (note that this is per each site)
+
+```{r echo=FALSE}
+# Table below shows the amount of data entries per site, per month
+yearly_do_record_counts_persite <- all_do_data |>
+  mutate(
+    year = year(activity_start_date),
+    month = month(activity_start_date, label = TRUE)
+  ) |>
+  group_by(year, monitoring_location_identifier) |>
+  summarise(record_count = n(), .groups = "drop")
+
+yearly_do_record_counts_persite_table <- yearly_do_record_counts_persite |> 
+  select(monitoring_location_identifier, record_count, year)
+
+DT::datatable(yearly_do_record_counts_persite_table, options = list(pageLength = 10))
+```
+
+Table plot below shows the amount of data entries per organization, per year (note that this is per each organization, which includes all monitoring stations managed by them)
+
+```{r echo=FALSE}
+# Extract year for faceting
+all_do_data <- all_do_data |> mutate(year = year(activity_start_date))
+
+
+yearly_summary_do <- all_do_data |> 
+    group_by(organization_identifier) |> 
+    summarize(year = year,
+              total_records = n(),
+              .groups = "drop")
+
+ggplot(yearly_summary_do, aes(x = organization_identifier, y = total_records, fill = organization_identifier)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~year, scales = "free_y") +  
+  theme_minimal() +
+  labs(
+    title = "Total DO Records by Organization for Each Year",
+    x = "Organization Identifier",
+    y = "Total Records"
+  ) +
+    theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 8),  
+    legend.text = element_text(size = 8), 
+    legend.title = element_text(size = 10),  
+    legend.key.size = unit(0.5, "cm")
+  )
+
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+# Ensure date is properly formatted
+do_data <- all_do_data |> mutate(activity_start_date = as.Date(activity_start_date),
+                       result_measure_value = as.numeric(result_measure_value))
+
+summary(do_data$result_measure_value)
+do_data <- do_data |> filter(!is.na(result_measure_value))
+
+ggplot(do_data, aes(x = activity_start_date, y = result_measure_value)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  facet_wrap(~organization_formal_name, scales = "free_y") +  
+  scale_y_continuous(breaks = pretty_breaks(n = 5)) +  
+  labs(title = "DO Over Time by Agency (2020-2024)",
+       x = "Date",
+       y = "Dissolved Oxygen (DO)") +
+  theme_minimal() +
+  theme(
+    legend.position = "none", 
+    axis.text.x = element_text(angle = 45, hjust = 1),  
+    axis.text.y = element_text(size = 8)  
+  )
+
+```
