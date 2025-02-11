@@ -725,12 +725,173 @@ ggplot(do_data, aes(x = activity_start_date, y = result_measure_value)) +
   scale_y_continuous(breaks = pretty_breaks(n = 5)) +  
   labs(title = "DO Over Time by Agency (2020-2024)",
        x = "Date",
-       y = "Dissolved Oxygen (DO)") +
+       y = "Dissolved Oxygen (mg/L)") +
   theme_minimal() +
-  theme(
-    legend.position = "none", 
-    axis.text.x = element_text(angle = 45, hjust = 1),  
-    axis.text.y = element_text(size = 8)  
-  )
+  theme(legend.position = "none", 
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.text.y = element_text(size = 8))
+```
 
+### Turbidity 
+
+Glimpse of turbidity data pull 
+
+```{r echo=FALSE}
+tb_data <- readWQPdata(huc = huc_code,                       
+  characteristicName = "Turbidity",
+  startDateLo = "2020-01-01",               
+  startDateHi = Sys.Date()) |> 
+  janitor::clean_names()
+
+glimpse(do_data)
+```
+
+```{r include=FALSE}
+#check that it is only temp data 
+unique(tb_data$characteristic_name)
+```
+
+
+```{r include=FALSE}
+# join 
+all_tb_data <- tb_data |> left_join(site_info) |> 
+  mutate(latitude_measure = as.numeric(latitude_measure),
+         longitude_measure = as.numeric(longitude_measure)) |> 
+  glimpse()
+```
+
+Looking how many data entries there are for each day from 2020 to today 
+
+```{r echo=FALSE}
+# Count number of records per date
+daily_tb_record_counts <- all_tb_data |> 
+  group_by(activity_start_date) |> 
+  summarise(record_count = n(), .groups = "drop") |> 
+  mutate(year = year(activity_start_date),
+         month = month(activity_start_date, label = TRUE),
+         day = day(activity_start_date))
+
+daily_tb_record_counts_table <- daily_tb_record_counts |> 
+  select(activity_start_date, record_count)
+
+DT::datatable(daily_tb_record_counts_table, options = list(pageLength = 10))
+```
+
+Plot below shows the same data than table. This indicates that data is not being collected every day
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(daily_tb_record_counts, aes(x = day, y = record_count)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~month) +  
+  scale_x_continuous(breaks = seq(1, 30, by = 5), limits = c(1, 30)) +  
+  labs(title = "Number of Turbidity Records per Day (2020 - 2024)",
+       x = "Day of the Month",
+       y = "Record Count") +
+  theme_minimal()
+```
+
+Map below shows where monitoring locations are, and what agency is monitoring/maintain it
+
+```{r, echo=FALSE, warning=FALSE}
+leaflet(data = all_tb_data) |> 
+  addTiles() |> 
+  addCircleMarkers(
+    ~longitude_measure, ~latitude_measure,
+    popup = ~paste0("<br><b>Monitoring Location: </b>", monitoring_location_name,
+                    "<br><b>Monitoring Location Type: </b>", monitoring_location_type_name,
+                    "<br><b>Characteristic Name: </b>", characteristic_name),
+    color = ~color_palette(organization_formal_name),
+    fillOpacity = 0.7,
+    radius = 5
+  ) |> 
+  addLegend(
+    position = "bottomright",  
+    pal = color_palette,  
+    values = ~organization_formal_name,  
+    title = "Organization Name",  
+    opacity = 1
+  )
+```
+
+Table below shows the amount of data entries per site, per year and month
+
+```{r echo=FALSE}
+monthly_tb_record_counts_persite <- all_tb_data |>
+  mutate(
+    year = year(activity_start_date),
+    month = month(activity_start_date, label = TRUE)
+  ) |>
+  group_by(year, month, monitoring_location_identifier) |>
+  summarise(record_count = n(), .groups = "drop")
+
+monthly_tb_record_counts_persite_table <- monthly_tb_record_counts_persite |> 
+  select(monitoring_location_identifier, record_count, year, month)
+
+DT::datatable(monthly_tb_record_counts_persite_table, options = list(pageLength = 10))
+```
+
+Table below shows the amount of data entries per site, per year (note that this is per each site)
+
+```{r echo=FALSE}
+# Table below shows the amount of data entries per site, per month
+yearly_tb_record_counts_persite <- all_tb_data |>
+  mutate(
+    year = year(activity_start_date),
+    month = month(activity_start_date, label = TRUE)
+  ) |>
+  group_by(year, monitoring_location_identifier) |>
+  summarise(record_count = n(), .groups = "drop")
+
+yearly_tb_record_counts_persite_table <- yearly_tb_record_counts_persite |> 
+  select(monitoring_location_identifier, record_count, year)
+
+DT::datatable(yearly_tb_record_counts_persite_table, options = list(pageLength = 10))
+```
+
+Table plot below shows the amount of data entries per organization, per year (note that this is per each organization, which includes all monitoring stations managed by them)
+
+```{r echo=FALSE}
+# Extract year for faceting
+all_tb_data <- all_tb_data |> mutate(year = year(activity_start_date))
+
+
+yearly_summary_tb <- all_tb_data |> 
+    group_by(organization_identifier) |> 
+    summarize(year = year,
+              total_records = n(),
+              .groups = "drop")
+
+ggplot(yearly_summary_tb, aes(x = organization_identifier, y = total_records, fill = organization_identifier)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~year, scales = "free_y") +  
+  theme_minimal() +
+  labs(title = "Total Turbidity Records by Organization for Each Year",
+       x = "Organization Identifier",
+       y = "Total Records") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8), 
+          legend.text = element_text(size = 8), 
+          legend.title = element_text(size = 10), 
+          legend.key.size = unit(0.5, "cm"))
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+# Ensure date is properly formatted
+tubidity_data <- all_tb_data |> mutate(activity_start_date = as.Date(activity_start_date),
+                       result_measure_value = as.numeric(result_measure_value))
+
+summary(tubidity_data$result_measure_value)
+tubidity_data <- tubidity_data |> filter(!is.na(result_measure_value))
+
+ggplot(tubidity_data, aes(x = activity_start_date, y = result_measure_value)) +
+  geom_point(alpha = 0.5, size = 1) + 
+  facet_wrap(~organization_formal_name, scales = "free_y") +  
+  scale_y_continuous(breaks = pretty_breaks(n = 5)) +  
+  labs(title = "Turbidity Over Time by Agency (2020-2024)",
+       x = "Date",
+       y = "Turbidity (FNU)") +
+  theme_minimal() +
+  theme(legend.position = "none", 
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.text.y = element_text(size = 8))
 ```
