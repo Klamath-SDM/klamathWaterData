@@ -8,13 +8,20 @@ library(pins)
 
 # define AWS data bucket
 # note that you need to set up access keys in R environ
-klamath_project_board <- pins::board_s3(
-  bucket="klamath-sdm",
-  access_key=Sys.getenv("aws_access_key_id"),
-  secret_access_key=Sys.getenv("secret_access_key_id"),
-  session_token = Sys.getenv("session_token_id"),
-  region = "us-east-1"
-)
+# klamath_project_board <- pins::board_s3(
+#   bucket="klamath-sdm",
+#   access_key=Sys.getenv("aws_access_key_id"),
+#   secret_access_key=Sys.getenv("secret_access_key_id"),
+#   session_token = Sys.getenv("session_token_id"),
+#   region = "us-east-1"
+# )
+water_quality_folder <- pins::board_s3(
+  bucket = "klamath-sdm",
+  access_key = Sys.getenv("aws_access_key_id"),
+  secret_access_key = Sys.getenv("aws_secret_access_key"),
+  session_token = Sys.getenv("aws_session_token"),
+  region = "us-east-1",
+  prefix = "water_quality/")
 
 
 # USGS primarily provides mean daily flow data (statCd = "00003") for most gages when querying the daily value.
@@ -309,13 +316,17 @@ glimpse(other_streams)
 
 
 ### Binding all data
-all_usgs_flow_data <- bind_rows(trinity, klamath, scott_river, shasta, salmon_river, sprague_river, indian_creek, 
+flow_data_usgs <- bind_rows(trinity, klamath, scott_river, shasta, salmon_river, sprague_river, indian_creek, 
                            link_river, williamson_river, other_streams) |> 
   glimpse()
 
 # write.csv(all_flow_data, "data/flow_usgs.csv")
 
 # save to s3 storage
-klamath_project_board |> pins::pin_write(all_usgs_flow_data,
-                                         type = "csv",
-                                         title = "usgs_flow")
+# klamath_project_board |> pins::pin_write(all_usgs_flow_data,
+#                                          type = "csv",
+#                                          title = "usgs_flow")
+
+# water_quality_folder |> pins::pin_write(flow_data_usgs,
+#                                         type = "csv",
+#                                         title = "usgs_flow")
