@@ -67,6 +67,14 @@ site_data <- all_temp_data |>
 
 
 # save to s3 storage
-# klamath_project_board |> pins::pin_write(all_wqx_temperature_data,
+# temp data
+# klamath_project_board |> pins::pin_write(data_wq,
+#                                          name = "water_quality/temperature",
 #                                          type = "csv",
-#                                          title = "wqx_temperature")
+#                                          title = "wqx_temperature_data")
+
+# temp location data
+# klamath_project_board |> pins::pin_write(site_data,
+#                                          name = "water_quality/wqx/temperature",
+#                                          type = "csv",
+#                                          title = "wqx_temperature_location_data")
