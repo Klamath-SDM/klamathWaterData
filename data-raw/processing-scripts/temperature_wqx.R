@@ -7,13 +7,22 @@ library(purrr)
 
 # define AWS data bucket
 # note that you need to set up access keys in R environ
-klamath_project_board <- pins::board_s3(
-  bucket="klamath-sdm",
-  access_key=Sys.getenv("aws_access_key_id"),
-  secret_access_key=Sys.getenv("secret_access_key_id"),
-  session_token = Sys.getenv("session_token_id"),
-  region = "us-east-1"
-)
+# klamath_project_board <- pins::board_s3(
+#   bucket="klamath-sdm",
+#   access_key=Sys.getenv("aws_access_key_id"),
+#   secret_access_key=Sys.getenv("secret_access_key_id"),
+#   session_token = Sys.getenv("session_token_id"),
+#   region = "us-east-1"
+# )
+
+# Creating water quality folder within klamath-sdm
+water_quality_folder <- pins::board_s3(
+  bucket = "klamath-sdm",
+  access_key = Sys.getenv("aws_access_key_id"),
+  secret_access_key = Sys.getenv("aws_secret_access_key"),
+  session_token = Sys.getenv("aws_session_token"),
+  region = "us-east-1",
+  prefix = "water_quality/")
 
 ## Pulling last 10 years of temp data - Filtering to monitoring location types: River/Stream, Lake, Stream, "Lake, Reservoir, Impoundment", Reservoir, spring, estuary
 huc_code <- "180102" # huc code for Klamath basin
@@ -39,7 +48,7 @@ all_temp_data <- temp_data |> left_join(station_metadata) |>
   glimpse()
 
 # drafting water quality data (stream, gage_name, variable_name, value, unit, statistic, date)
-data_wq <- all_temp_data |> 
+temperature_data_wxq <- all_temp_data |> 
   mutate(stream = NA,
          gage_name = monitoring_location_identifier,
          variable_name = characteristic_name,
@@ -51,7 +60,7 @@ data_wq <- all_temp_data |>
   glimpse()
 
 # drafting location data (gage_name, gage_id, agency, latitude, longitude, river_mile, huc_8, stream)
-site_data <- all_temp_data |> 
+temperature_site_data_wqx <- all_temp_data |> 
   mutate(gage_name = monitoring_location_name,
          gage_id = monitoring_location_identifier,
          agency = organization_identifier,
@@ -66,15 +75,14 @@ site_data <- all_temp_data |>
   
 
 
-# save to s3 storage
-# temp data
-# klamath_project_board |> pins::pin_write(data_wq,
-#                                          name = "water_quality/temperature",
-#                                          type = "csv",
-#                                          title = "wqx_temperature_data")
+# save to s3 storage ---
 
-# temp location data
-# klamath_project_board |> pins::pin_write(site_data,
-#                                          name = "water_quality/wqx/temperature",
-#                                          type = "csv",
-#                                          title = "wqx_temperature_location_data")
+# temp data
+water_quality_folder |> pins::pin_write(temperature_data_wxq,
+                                         type = "csv",
+                                         title = "wqx_temperature_data")
+
+# temp site/location data
+water_quality_folder |> pins::pin_write(temperature_site_data_wqx,
+                                         type = "csv",
+                                         title = "wqx_temperature_location_data")
