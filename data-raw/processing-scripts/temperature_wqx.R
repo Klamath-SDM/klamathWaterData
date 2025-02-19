@@ -4,6 +4,8 @@ library(dataRetrieval)
 library(tidyr)
 library(purrr)
 
+source(here::here('data-raw', 'processing-scripts', 'utils.R'))
+
 
 # define AWS data bucket
 # note that you need to set up access keys in R environ
