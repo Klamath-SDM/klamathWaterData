@@ -3,6 +3,7 @@ library(dplyr)
 library(dataRetrieval)
 library(tidyr)
 library(purrr)
+library(pins)
 
 # the goal of this script is to pull temperature data from different sources and save into aws bucket 
 
@@ -24,15 +25,10 @@ huc_code <- "180102" # huc code for Klamath basin
 wqx_temp_data <- readWQPdata(huc = huc_code,                       
                          characteristicName = "Temperature, water",
                          startDateLo = "2014-01-01",               
-                         startDateHi = Sys.Date()) |> 
-  janitor::clean_names() 
+                         startDateHi = "2025-01-01") 
 
-station_metadata <- whatWQPsites(huc = huc_code) |> 
-  janitor::clean_names() 
+wqx_gage_data <- whatWQPsites(huc = huc_code) 
 
-# join station data with temp data
-wqx_temp <- wqx_temp_data |> left_join(station_metadata) |> 
-  glimpse()
 
 
 ### USGS data pull ---- TODO create a loop to pull from all gages of interest
@@ -45,6 +41,14 @@ wqx_temp <- wqx_temp_data |> left_join(station_metadata) |>
 
 # save raw data into aws bucket water-quality/data-raw/
 
-wq_data_raw |> pins::pin_write(wqx_temp,
+# WQX
+## temp data
+wq_data_raw |> pins::pin_write(wqx_temp_data,
                                type = "csv",
                                title = "wqx_temperature")
+## gage data
+wq_data_raw |> pins::pin_write(wqx_gage_data,
+                               type = "csv",
+                               title = "wqx_temperature")
+# USGS 
+## temp data
