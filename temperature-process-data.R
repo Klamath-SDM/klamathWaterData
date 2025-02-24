@@ -8,7 +8,7 @@ library(pins)
 # raw data will be pulled from S3 bucket. These data is originally retrieved on temperature-data-pull.R
 
 # setting up aws bucket
-aws_board <- pins::board_s3(
+wq_data_raw <- pins::board_s3(
   bucket = "klamath-sdm",
   access_key = Sys.getenv("aws_access_key_id"),
   secret_access_key = Sys.getenv("aws_secret_access_key"),
@@ -37,7 +37,7 @@ wqx_gage_raw <- aws_board |>
                                               "Spring", "Estuary")) |> 
   glimpse()
 
-# join station data with temp data
+# JOIN - station data with temp data
 all_wqx_temp_data <- wqx_data_raw |> left_join(wqx_gage_raw) |> 
   glimpse()
 
@@ -53,9 +53,10 @@ sum(is.na(all_wqx_temp_data$waterbody_name)) # lots of na introduced
 missing_names_wqx <- all_wqx_temp_data |> 
   filter(is.na(waterbody_name)) 
 
-table(test$monitoring_location_name) # only 8 names that did not catch on function. This a source for checking those names https://www.waterqualitydata.us/provider/STORET/HVTEPA_WQX/
+table(missing_names_wqx$monitoring_location_name) # only 8 names that did not catch on function. This a source for checking those names https://www.waterqualitydata.us/provider/STORET/HVTEPA_WQX/
 
 
+# WATER QUALITY TABLE
 temperature_wxq <- all_wqx_temp_data |> 
   mutate(gage_id = monitoring_location_identifier,
          gage_name = monitoring_location_name,
@@ -67,7 +68,46 @@ temperature_wxq <- all_wqx_temp_data |>
   select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
+# SITE TABLE
 
 
+### USGS ----
+# pulling raw data
+# TEMPERATURE data
+usgs_data_raw <- wq_data_raw |> 
+  pins::pin_read("water_quality/data-raw/usgs_temp_data") |> 
+  janitor::clean_names() |>
+  glimpse()
 
+usgs_data_raw_clean <- usgs_data_raw |> 
+  mutate(gage_id = site_no,
+         date = as.Date(date),
+         max_temp = x_00010_00001,
+         min_temp = x_00010_00002,
+         mean_temp = x_00010_00003) |>
+  select(-c(x_00010_00001, x_00010_00001_cd, x_00010_00002, x_00010_00002_cd, x_00010_00003, x_00010_00003_cd, date_time, tz_cd)) |>
+  pivot_longer(cols = c(max_temp, min_temp, mean_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_temp" ~ "maximum",
+    statistic == "min_temp" ~ "minimum",
+    statistic == "mean_temp" ~ "mean"),
+    variable_name = "temperature",
+    unit = "celsius") |> 
+  glimpse()
 
+# GAGE data
+usgs_gage_raw <- wq_data_raw |> 
+  pins::pin_read("water_quality/data-raw/usgs_gage_data") |> 
+  janitor::clean_names() |> 
+  glimpse()
+  
+# JOIN - station data with temp data
+all_usgs_temp_data <- usgs_data_raw |> left_join(usgs_data_raw_clean, by = "site_no") |> 
+  glimpse()
+
+#cleaning data
+all_wqx_temp_data <- all_wqx_temp_data |> 
+  mutate(waterbody_name = extract_waterbody(monitoring_location_name)) # testing function
