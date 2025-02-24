@@ -21,7 +21,7 @@ source(here::here('data-raw', 'processing-scripts', 'utils.R'))
 ### WQX ----
 # pulling raw data
 # TEMPERATURE data
-wqx_data_raw <- aws_board |> 
+wqx_data_raw <- wq_data_raw |> 
   pins::pin_read("water_quality/data-raw/wqx_temp_data") |> 
   janitor::clean_names() |> 
   filter(statistical_base_code %in% c("Mean", "Maximum", "Minimum")) |>  # filtering to stats of interest
@@ -29,7 +29,7 @@ wqx_data_raw <- aws_board |>
 
 
 # GAGE data
-wqx_gage_raw <- aws_board |> 
+wqx_gage_raw <- wq_data_raw |> 
   pins::pin_read("water_quality/data-raw/wqx_gage_data") |> 
   janitor::clean_names() |> 
   filter(monitoring_location_type_name %in% c("River/Stream", "Lake", "Stream",
@@ -54,9 +54,15 @@ missing_names_wqx <- all_wqx_temp_data |>
   filter(is.na(waterbody_name)) 
 
 table(missing_names_wqx$monitoring_location_name) # only 8 names that did not catch on function. This a source for checking those names https://www.waterqualitydata.us/provider/STORET/HVTEPA_WQX/
+ #test comparing original vs new names to aviod wrong designation (when two rivers/streams are mentioned on the name)
 
+all_wqx_temp_data |> 
+  select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |> 
+  distinct() |> 
+  view()
+# fix "HOBO at Confluence of Klamath and Trinity Rivers" - this is on Klamath River
 
-# WATER QUALITY TABLE
+  #### water data table ----
 temperature_wxq <- all_wqx_temp_data |> 
   mutate(gage_id = monitoring_location_identifier,
          gage_name = monitoring_location_name,
@@ -68,10 +74,23 @@ temperature_wxq <- all_wqx_temp_data |>
   select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
-# SITE TABLE
+  #### monitoring site table ----
+gage_wqx <- all_wqx_temp_data |> 
+  mutate(gage_name = monitoring_location_name,
+         gage_id = monitoring_location_identifier,
+         agency = organization_formal_name,
+         latitude = latitude_measure,
+         longitude = longitude_measure,
+         river_mile = NA,
+         huc8 = huc_eight_digit_code,
+         stream = waterbody_name) |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  glimpse()
+
 
 
 ### USGS ----
+
 # pulling raw data
 # TEMPERATURE data
 usgs_data_raw <- wq_data_raw |> 
@@ -105,18 +124,48 @@ usgs_gage_raw <- wq_data_raw |>
   glimpse()
   
 # JOIN - station data with temp data
-all_usgs_temp_data <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by = "site_no") |> 
-  select(c(agency_cd.x, site_no, date, gage_id, statistic, value, variable_name, unit, station_nm, dec_lat_va, dec_long_va)) |> 
+all_usgs_temp_data_raw <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by = "site_no") |> 
+  select(c(agency_cd.x, site_no, date, gage_id, statistic, value, variable_name, 
+           unit, station_nm, dec_lat_va, dec_long_va, huc_cd)) |> 
   glimpse()
 
 #cleaning data
-all_usgs_temp_data_test <- all_usgs_temp_data |> 
+all_usgs_temp_data_raw <- all_usgs_temp_data_raw |> 
   mutate(waterbody_name = extract_waterbody(station_nm)) # testing function
 
-unique(all_usgs_temp_data_test$waterbody_name)
-sum(is.na(all_usgs_temp_data_test$waterbody_name))
+unique(all_usgs_temp_data_raw$waterbody_name)
+sum(is.na(all_usgs_temp_data_raw$waterbody_name))
 
 # water_names that did not work with the function
-usgs_fix_needed <- all_usgs_temp_data_test |> 
+usgs_fix_needed <- all_usgs_temp_data_raw |> 
   filter(is.na(waterbody_name)) |> 
   view()
+
+unique(usgs_fix_needed$station_nm)
+
+#### water data table ----
+temperature_usgs <- all_usgs_temp_data_raw |> 
+  mutate(gage_id = site_no,
+         gage_name = station_nm) |> 
+  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+  glimpse()
+
+#### monitoring site table ----
+gage_usgs <- all_usgs_temp_data_raw |> 
+  mutate(gage_name = station_nm,
+         gage_id = site_no,
+         agency = agency_cd.x,
+         latitude = dec_lat_va,
+         longitude = dec_long_va,
+         river_mile = NA,
+         huc8 = huc_cd
+         # stream = waterbody_name
+         ) |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8
+         #, stream
+         ) |> 
+  glimpse()
+
+
+### saves clean data to aws 
+
