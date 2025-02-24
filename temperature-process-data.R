@@ -121,6 +121,7 @@ usgs_data_raw_clean <- usgs_data_raw |>
 usgs_gage_raw <- wq_data_raw |> 
   pins::pin_read("water_quality/data-raw/usgs_gage_data") |> 
   janitor::clean_names() |> 
+  mutate(station_nm = tools::toTitleCase(tolower(station_nm))) |> 
   glimpse()
   
 # JOIN - station data with temp data
@@ -132,6 +133,9 @@ all_usgs_temp_data_raw <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by = "
 #cleaning data
 all_usgs_temp_data_raw <- all_usgs_temp_data_raw |> 
   mutate(waterbody_name = extract_waterbody(station_nm)) # testing function
+
+all_usgs_temp_data_raw |> 
+  select(station_nm, waterbody_name) |> distinct() |> View()
 
 unique(all_usgs_temp_data_raw$waterbody_name)
 sum(is.na(all_usgs_temp_data_raw$waterbody_name))
