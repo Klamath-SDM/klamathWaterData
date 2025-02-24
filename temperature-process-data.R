@@ -105,9 +105,18 @@ usgs_gage_raw <- wq_data_raw |>
   glimpse()
   
 # JOIN - station data with temp data
-all_usgs_temp_data <- usgs_data_raw |> left_join(usgs_data_raw_clean, by = "site_no") |> 
+all_usgs_temp_data <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by = "site_no") |> 
+  select(c(agency_cd.x, site_no, date, gage_id, statistic, value, variable_name, unit, station_nm, dec_lat_va, dec_long_va)) |> 
   glimpse()
 
 #cleaning data
-all_wqx_temp_data <- all_wqx_temp_data |> 
-  mutate(waterbody_name = extract_waterbody(monitoring_location_name)) # testing function
+all_usgs_temp_data_test <- all_usgs_temp_data |> 
+  mutate(waterbody_name = extract_waterbody(station_nm)) # testing function
+
+unique(all_usgs_temp_data_test$waterbody_name)
+sum(is.na(all_usgs_temp_data_test$waterbody_name))
+
+# water_names that did not work with the function
+usgs_fix_needed <- all_usgs_temp_data_test |> 
+  filter(is.na(waterbody_name)) |> 
+  view()
