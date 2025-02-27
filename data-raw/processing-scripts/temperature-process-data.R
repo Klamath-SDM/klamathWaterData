@@ -8,7 +8,7 @@ library(pins)
 # raw data will be pulled from S3 bucket. These data is originally retrieved on temperature-data-pull.R
 
 # setting up aws bucket
-wq_data_raw <- pins::board_s3(
+wq_data_board <- pins::board_s3(
   bucket = "klamath-sdm",
   access_key = Sys.getenv("aws_access_key_id"),
   secret_access_key = Sys.getenv("aws_secret_access_key"),
@@ -21,7 +21,7 @@ source(here::here('data-raw', 'processing-scripts', 'utils.R'))
 ### WQX ----
 # pulling raw data
 # TEMPERATURE data
-wqx_data_raw <- wq_data_raw |> 
+wqx_data_raw <- wq_data_board |> 
   pins::pin_read("water_quality/data-raw/wqx_temp_data") |> 
   janitor::clean_names() |> 
   filter(statistical_base_code %in% c("Mean", "Maximum", "Minimum")) |>  # filtering to stats of interest
@@ -98,7 +98,7 @@ all_wqx_temp_data_clean |>
 
 
   #### water data table ----
-temperature_wxq <- all_wqx_temp_data |> 
+temperature_wxq <- all_wqx_temp_data_clean |> 
   mutate(gage_id = monitoring_location_identifier,
          gage_name = monitoring_location_name,
          variable_name = characteristic_name,
@@ -110,7 +110,7 @@ temperature_wxq <- all_wqx_temp_data |>
   glimpse()
 
   #### monitoring site table ----
-gage_wqx <- all_wqx_temp_data |> 
+gage_wqx <- all_wqx_temp_data_clean |> 
   mutate(gage_name = monitoring_location_name,
          gage_id = monitoring_location_identifier,
          agency = organization_formal_name,
@@ -173,14 +173,29 @@ all_usgs_temp_data_raw |>
   select(station_nm, waterbody_name) |> distinct() |> View()
 
 unique(all_usgs_temp_data_raw$waterbody_name)
-sum(is.na(all_usgs_temp_data_raw$waterbody_name))
 
 # water_names that did not work with the function
-usgs_fix_needed <- all_usgs_temp_data_raw |> 
+all_usgs_temp_data_raw |> 
   filter(is.na(waterbody_name)) |> 
+  select(site_no , station_nm, waterbody_name) |>
+  distinct() |> 
+  mutate(site_no = as.character(site_no)) |> 
   view()
 
-unique(usgs_fix_needed$station_nm)
+# fixing names
+all_usgs_temp_data_raw_clean <- all_usgs_temp_data_raw |> 
+  mutate(waterbody_name = case_when(station_nm %in% c("Upper Klamath Lake at Howard Bay, or", "Mid-Trench - Lower   -  Mdtl",
+                                                      "Mid-Trench - Upper   - Mdtu", "Mid-North - Lower  - Mdnl", 
+                                                      "Mid-North - Upper  - Mdnu", "Rattlesnake Point  -  Rpt") ~ "Upper Klamath Lake",
+                                    station_nm == "Shoalwater Bay - Shb" ~ "Shoalwater Bay",
+                                    T ~ waterbody_name)) |> 
+           glimpse()
+
+all_usgs_temp_data_raw_clean |> 
+  select(site_no , station_nm, waterbody_name) |> # there are two gages remaining that I am on sure on how no name
+  distinct() |> 
+  view()
+         
 
 #### water data table ----
 temperature_usgs <- all_usgs_temp_data_raw |> 
@@ -197,14 +212,28 @@ gage_usgs <- all_usgs_temp_data_raw |>
          latitude = dec_lat_va,
          longitude = dec_long_va,
          river_mile = NA,
-         huc8 = huc_cd
-         # stream = waterbody_name
+         huc8 = huc_cd,
+         stream = waterbody_name
          ) |> 
-  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8
-         #, stream
-         ) |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
   glimpse()
 
 
 ### saves clean data to aws 
+wq_processed_data<- pins::board_s3(
+  bucket = "klamath-sdm",
+  access_key = Sys.getenv("aws_access_key_id"),
+  secret_access_key = Sys.getenv("aws_secret_access_key"),
+  session_token = Sys.getenv("aws_session_token"),
+  region = "us-east-1",
+  prefix = "water_quality/processed-data/")
 
+# temp data
+wq_processed_data |> pins::pin_write(temperature_processed_data,
+                               type = "csv",
+                               title = "temperature_processed_data")
+
+# gage data 
+wq_processed_data |> pins::pin_write(gage_processed_data,
+                                     type = "csv",
+                                     title = "gage_processed_data")
