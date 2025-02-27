@@ -29,12 +29,12 @@ wqx_data_raw <- wq_data_board |>
 
 
 # GAGE data
-wqx_gage_raw <- wq_data_raw |> 
+wqx_gage_raw <- wq_data_board |> 
   pins::pin_read("water_quality/data-raw/wqx_gage_data") |> 
   janitor::clean_names() |> 
   filter(monitoring_location_type_name %in% c("River/Stream", "Lake", "Stream",
-                                              "Reservoir", "Lake, Reservoir, Impoundment",  
-                                              "Spring", "Estuary")) |> 
+                                              "Reservoir", "Lake, Reservoir, Impoundment",
+                                              "Spring", "Estuary")) |>
   glimpse()
 
 # JOIN - station data with temp data
@@ -98,7 +98,7 @@ all_wqx_temp_data_clean |>
 
 
   #### water data table ----
-temperature_wxq <- all_wqx_temp_data_clean |> 
+temperature_processed_data_wqx <- all_wqx_temp_data_clean |> 
   mutate(gage_id = monitoring_location_identifier,
          gage_name = monitoring_location_name,
          variable_name = characteristic_name,
@@ -110,7 +110,7 @@ temperature_wxq <- all_wqx_temp_data_clean |>
   glimpse()
 
   #### monitoring site table ----
-gage_wqx <- all_wqx_temp_data_clean |> 
+gage_processed_data_wqx <- all_wqx_temp_data_clean |> 
   mutate(gage_name = monitoring_location_name,
          gage_id = monitoring_location_identifier,
          agency = organization_formal_name,
@@ -122,13 +122,31 @@ gage_wqx <- all_wqx_temp_data_clean |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
   glimpse()
 
+  #### saves clean data to aws ----
+wq_processed_data<- pins::board_s3(
+  bucket = "klamath-sdm",
+  access_key = Sys.getenv("aws_access_key_id"),
+  secret_access_key = Sys.getenv("aws_secret_access_key"),
+  session_token = Sys.getenv("aws_session_token"),
+  region = "us-east-1",
+  prefix = "water_quality/processed-data/")
+
+# temp data
+wq_processed_data |> pins::pin_write(temperature_processed_data_wqx,
+                                     type = "csv",
+                                     title = "temperature_processed_data_usgs")
+
+# gage data 
+wq_processed_data |> pins::pin_write(gage_processed_data_wqx,
+                                     type = "csv",
+                                     title = "gage_processed_data")
 
 
 ### USGS ----
 
 # pulling raw data
 # TEMPERATURE data
-usgs_data_raw <- wq_data_raw |> 
+usgs_data_raw <- wq_data_board |> 
   pins::pin_read("water_quality/data-raw/usgs_temp_data") |> 
   janitor::clean_names() |>
   glimpse()
@@ -153,7 +171,7 @@ usgs_data_raw_clean <- usgs_data_raw |>
   glimpse()
 
 # GAGE data
-usgs_gage_raw <- wq_data_raw |> 
+usgs_gage_raw <- wq_data_board |> 
   pins::pin_read("water_quality/data-raw/usgs_gage_data") |> 
   janitor::clean_names() |> 
   mutate(station_nm = tools::toTitleCase(tolower(station_nm))) |> 
@@ -198,14 +216,14 @@ all_usgs_temp_data_raw_clean |>
          
 
 #### water data table ----
-temperature_usgs <- all_usgs_temp_data_raw |> 
+temperature_processed_data_usgs <- all_usgs_temp_data_raw |> 
   mutate(gage_id = site_no,
          gage_name = station_nm) |> 
   select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
 #### monitoring site table ----
-gage_usgs <- all_usgs_temp_data_raw |> 
+gage_processed_data_usgs <- all_usgs_temp_data_raw |> 
   mutate(gage_name = station_nm,
          gage_id = site_no,
          agency = agency_cd.x,
@@ -229,11 +247,11 @@ wq_processed_data<- pins::board_s3(
   prefix = "water_quality/processed-data/")
 
 # temp data
-wq_processed_data |> pins::pin_write(temperature_processed_data,
+wq_processed_data |> pins::pin_write(temperature_processed_data_usgs,
                                type = "csv",
-                               title = "temperature_processed_data")
+                               title = "temperature_processed_data_usgs")
 
 # gage data 
-wq_processed_data |> pins::pin_write(gage_processed_data,
+wq_processed_data |> pins::pin_write(gage_processed_data_usgs,
                                      type = "csv",
                                      title = "gage_processed_data")
