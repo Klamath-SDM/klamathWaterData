@@ -23,7 +23,7 @@ wq_data_raw <- pins::board_s3(
 huc_code <- "180102" # huc code for Klamath basin
 
 # flow data
-wqx_do_data <- readWQPdata(huc = huc_code,                       
+wqx_flow_data <- readWQPdata(huc = huc_code,                       
                          characteristicName = "Flow",
                          startDateLo = "2014-01-01",               
                          startDateHi = "2025-01-01") 
@@ -85,3 +85,8 @@ usgs_flow_data <- usgs_flow_data |>
 wq_data_raw |> pins::pin_write(usgs_flow_data,
                                type = "csv",
                                title = "usgs_flow")
+### WQX
+# flow data
+wq_data_raw |> pins::pin_write(wqx_flow_data,
+                               type = "csv",
+                               title = "wqx_flow")
