@@ -46,21 +46,56 @@ all_wqx_temp_data <- all_wqx_temp_data |>
   mutate(waterbody_name = extract_waterbody(monitoring_location_name)) # testing function
 
 # check
-sum(is.na(all_wqx_temp_data$monitoring_location_name))
-
-sum(is.na(all_wqx_temp_data$waterbody_name)) # lots of na introduced
-
-missing_names_wqx <- all_wqx_temp_data |> 
-  filter(is.na(waterbody_name)) 
+missing_names_wqx <- all_wqx_temp_data |>
+  filter(is.na(waterbody_name))
 
 table(missing_names_wqx$monitoring_location_name) # only 8 names that did not catch on function. This a source for checking those names https://www.waterqualitydata.us/provider/STORET/HVTEPA_WQX/
  #test comparing original vs new names to aviod wrong designation (when two rivers/streams are mentioned on the name)
 
+# check for naming assigned 
 all_wqx_temp_data |> 
   select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |> 
   distinct() |> 
   view()
+
 # fix "HOBO at Confluence of Klamath and Trinity Rivers" - this is on Klamath River
+# fixing stream names manually
+all_wqx_temp_data_clean <- all_wqx_temp_data |> 
+  mutate(waterbody_name = case_when(
+    monitoring_location_name %in% c("HOBO at Confluence of Klamath and Trinity Rivers", "CDR and Nutrients at Saints Rest Bar") ~ "Klamath River",
+    monitoring_location_name %in% c("CDR at Red Rock", "CDR at South Boundary", 
+                                    "HOBO  A at TR_NORTON", "HOBO at North Boundary", 
+                                    "HOBO at South Boundary", "HOBO B  at TR_NORTON") ~ "Trinity River",
+    monitoring_location_identifier == "323-02-I|Paradise|R6|Fremont-Winema|Paisley" ~ "Paradise Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ01" ~ "Cavern Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ02" ~ "Sun Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ03" ~ "Sun Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ05" ~ "Wheeler Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ06" ~ "Munson Creek",
+    # monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ07" ~ "?",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ09" ~ "Lost Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ10" ~ "Middle Fork Annie Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ13" ~ "Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ14" ~ "Annie Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ17" ~ "Sand Creek",
+    # monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ21" ~ " ?Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ22" ~ "Annie Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ26" ~ "Munson Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ29" ~ "Sand Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ30" ~ "Sun Creek",
+    # monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ31" ~ "? Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ33" ~ "Sand Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ34" ~ "Munson Creek",
+    # monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ37" ~ "? Creek",
+    TRUE ~ waterbody_name)) |> 
+  glimpse()
+
+all_wqx_temp_data_clean |> 
+  select(waterbody_name, monitoring_location_name, monitoring_location_identifier, provider_name, organization_identifier) |>
+  distinct() |>
+  view()
+
+
 
   #### water data table ----
 temperature_wxq <- all_wqx_temp_data |> 
