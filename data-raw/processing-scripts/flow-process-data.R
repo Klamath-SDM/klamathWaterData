@@ -79,3 +79,26 @@ flow_processed_data_wqx <- all_wqx_flow_data_clean |>
   select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
+#### saves clean data to aws ----
+
+# call right folder in the bucket
+wq_processed_data<- pins::board_s3(
+  bucket = "klamath-sdm",
+  access_key = Sys.getenv("aws_access_key_id"),
+  secret_access_key = Sys.getenv("aws_secret_access_key"),
+  session_token = Sys.getenv("aws_session_token"),
+  region = "us-east-1",
+  prefix = "water_quality/processed-data/")
+# save data
+wq_processed_data |> pins::pin_write(flow_processed_data_wqx,
+                                     type = "csv",
+                                     title = "flow_processed_data_wqx")
+
+
+### USGS ----
+# pulling raw data
+# FLOW data
+usgs_data_raw <- wq_data_board |> 
+  pins::pin_read("water_quality/data-raw/usgs_flow_data") |> 
+  janitor::clean_names() |>
+  glimpse()
