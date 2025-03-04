@@ -5,7 +5,7 @@ library(tidyr)
 library(purrr)
 library(pins)
 
-# raw data will be pulled from S3 bucket. These data is originally retrieved on temperature-data-pull.R
+# raw data will be pulled from S3 bucket. These data is originally retrieved on flow-data-pull.R
 
 # setting up aws bucket
 wq_data_board <- pins::board_s3(
@@ -67,7 +67,7 @@ all_wqx_flow_data_clean |>
   distinct() |> 
   view()
 
-#### water data table ----
+#### Flow data table ----
 flow_processed_data_wqx <- all_wqx_flow_data_clean |> 
   mutate(gage_id = monitoring_location_identifier,
          gage_name = monitoring_location_name,
@@ -90,9 +90,9 @@ wq_processed_data<- pins::board_s3(
   region = "us-east-1",
   prefix = "water_quality/processed-data/")
 # save data
-wq_processed_data |> pins::pin_write(flow_processed_data_wqx,
-                                     type = "csv",
-                                     title = "flow_processed_data_wqx")
+# wq_processed_data |> pins::pin_write(flow_processed_data_wqx,
+#                                      type = "csv",
+#                                      title = "flow_processed_data_wqx")
 
 
 ### USGS ----
@@ -102,3 +102,35 @@ usgs_data_raw <- wq_data_board |>
   pins::pin_read("water_quality/data-raw/usgs_flow_data") |> 
   janitor::clean_names() |>
   glimpse()
+
+usgs_data_raw_clean <- usgs_data_raw |> 
+  mutate(gage_id = site_no,
+         date = as.Date(date),
+         variable_name = "flow",
+         value = x_00060_00003,
+         unit = "cfs",
+         statistic = "mean") |>
+  select(date, agency_cd, gage_id, variable_name, value, unit, site_no, statistic)
+
+# since stream names are in the gage data, we are pulling in it in and binding 
+usgs_gage_raw <- wq_data_board |> 
+  pins::pin_read("water_quality/data-raw/usgs_gage_data") |>  #pulling gage data
+  janitor::clean_names() |>
+  # select(site_no, station_nm) |> 
+  glimpse()
+
+#### Flow data table ----
+flow_processed_data_usgs <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by = "site_no") |> 
+  mutate(waterbody_name = extract_waterbody(station_nm)) |> # function
+  mutate(waterbody_name = tools::toTitleCase(tolower(waterbody_name)),
+         gage_name = station_nm) |>
+  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+  glimpse()
+
+# save data
+# wq_processed_data |> pins::pin_write(flow_processed_data_usgs,
+#                                      type = "csv",
+#                                      title = "flow_processed_data_usgs")
+
+
+
