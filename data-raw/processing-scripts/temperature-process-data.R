@@ -8,12 +8,7 @@ library(pins)
 # raw data will be pulled from S3 bucket. These data is originally retrieved on temperature-data-pull.R
 
 # setting up aws bucket
-wq_data_board <- pins::board_s3(
-  bucket = "klamath-sdm",
-  access_key = Sys.getenv("aws_access_key_id"),
-  secret_access_key = Sys.getenv("aws_secret_access_key"),
-  session_token = Sys.getenv("aws_session_token"),
-  region = "us-east-1")
+wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
 
 source(here::here('data-raw', 'processing-scripts', 'utils.R'))
 
@@ -122,14 +117,8 @@ gage_processed_data_wqx <- all_wqx_temp_data_clean |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
   glimpse()
 
-  #### saves clean data to aws ----
-wq_processed_data<- pins::board_s3(
-  bucket = "klamath-sdm",
-  access_key = Sys.getenv("aws_access_key_id"),
-  secret_access_key = Sys.getenv("aws_secret_access_key"),
-  session_token = Sys.getenv("aws_session_token"),
-  region = "us-east-1",
-  prefix = "water_quality/processed-data/")
+#### saves clean data to aws ----
+wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
 
 # temp data
 wq_processed_data |> pins::pin_write(temperature_processed_data_wqx,
@@ -172,7 +161,7 @@ usgs_data_raw_clean <- usgs_data_raw |>
 
 # GAGE data
 usgs_gage_raw <- wq_data_board |> 
-  pins::pin_read("water_quality/data-raw/usgs_gage_data") |> 
+  pins::pin_read("water_quality/data-raw/usgs_temp_gage_data") |> 
   janitor::clean_names() |> 
   mutate(station_nm = tools::toTitleCase(tolower(station_nm))) |> 
   glimpse()
@@ -238,13 +227,6 @@ gage_processed_data_usgs <- all_usgs_temp_data_raw |>
 
 
 ### saves clean data to aws 
-wq_processed_data<- pins::board_s3(
-  bucket = "klamath-sdm",
-  access_key = Sys.getenv("aws_access_key_id"),
-  secret_access_key = Sys.getenv("aws_secret_access_key"),
-  session_token = Sys.getenv("aws_session_token"),
-  region = "us-east-1",
-  prefix = "water_quality/processed-data/")
 
 # temp data
 wq_processed_data |> pins::pin_write(temperature_processed_data_usgs,
