@@ -127,6 +127,11 @@ flow_processed_data_usgs <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by =
   select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
+flow_processed_data_usgs |>  #checking function
+  select(gage_name, waterbody_name) |> distinct() |> view() #TODO check the two names that did not work on function
+
+unique(all_usgs_temp_data_raw$waterbody_name)
+
 # save data
 # wq_processed_data |> pins::pin_write(flow_processed_data_usgs,
 #                                      type = "csv",
