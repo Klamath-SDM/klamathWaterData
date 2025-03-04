@@ -22,7 +22,7 @@ wq_data_raw <- pins::board_s3(
 
 huc_code <- "180102" # huc code for Klamath basin
 
-# flow data
+#### flow data pull----
 wqx_flow_data <- readWQPdata(huc = huc_code,                       
                          characteristicName = "Flow",
                          startDateLo = "2014-01-01",               
@@ -31,10 +31,9 @@ wqx_flow_data <- readWQPdata(huc = huc_code,
 # wqx_gage_data <- whatWQPsites(huc = huc_code) 
 
 
+### USGS data pull -----
 
-### USGS data pull ---- TODO pull gage data
-
-# flow data ----
+#### flow data pull----
 usgs_gages <- c("11509500", "11510700", "11516530", "11520500", "11523000", "11530500", "11528700", "11530000", "11523200",
                 "11525500", "11525655", "11525854", "11526250", "11526400", "11527000",
                 "11519500", "11517000", "11517500", "11522500", "11501000", "11525670", "11521500", "11507500", "11502500",
@@ -69,17 +68,16 @@ usgs_flow_data <- usgs_flow_data |>
   glimpse()
 
 
-# gage data ----
+#### gage data pull----
 # it has already been pulled on temperature data-pull and it has been stored on "klamath-sdm" bucket water_quality/data-raw/usgs_gage_data
+# however it was specific to those gages that had temp data. We might want to check if we want to pull all klamath basin gages
+# or if we pull in gage data specific to the parameter
+huc_code <- "180102"
+usgs_gage_data <- whatNWISsites(huc = "18010201")
+
 
 ##### save raw data into aws bucket water-quality/data-raw/
-
-### WQX
-# flow data
-# wq_data_raw |> pins::pin_write(wqx_flow_data,
-#                                type = "csv",
-#                                title = "wqx_flow")
-
+                             
 ### USGS 
 # flow data
 wq_data_raw |> pins::pin_write(usgs_flow_data,
