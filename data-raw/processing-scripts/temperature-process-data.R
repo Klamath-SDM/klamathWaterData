@@ -91,9 +91,8 @@ all_wqx_temp_data_clean |>
   view()
 
 
-
   #### water data table ----
-temperature_processed_data_wqx <- all_wqx_temp_data_clean |> 
+temperature_wqx <- all_wqx_temp_data_clean |> 
   mutate(gage_id = monitoring_location_identifier,
          gage_name = monitoring_location_name,
          variable_name = characteristic_name,
@@ -105,7 +104,7 @@ temperature_processed_data_wqx <- all_wqx_temp_data_clean |>
   glimpse()
 
   #### monitoring site table ----
-gage_processed_data_wqx <- all_wqx_temp_data_clean |> 
+gage_temperature_wqx <- all_wqx_temp_data_clean |> 
   mutate(gage_name = monitoring_location_name,
          gage_id = monitoring_location_identifier,
          agency = organization_formal_name,
@@ -121,12 +120,12 @@ gage_processed_data_wqx <- all_wqx_temp_data_clean |>
 wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
 
 # temp data
-wq_processed_data |> pins::pin_write(temperature_processed_data_wqx,
+wq_processed_data |> pins::pin_write(temperature_wqx,
                                      type = "csv",
                                      title = "temperature_processed_data_usgs")
 
 # gage data 
-wq_processed_data |> pins::pin_write(gage_processed_data_wqx,
+wq_processed_data |> pins::pin_write(gage_temperature_wqx,
                                      type = "csv",
                                      title = "gage_processed_data")
 
@@ -205,14 +204,14 @@ all_usgs_temp_data_raw_clean |>
          
 
 #### water data table ----
-temperature_processed_data_usgs <- all_usgs_temp_data_raw |> 
+temperature_usgs <- all_usgs_temp_data_raw |> 
   mutate(gage_id = site_no,
          gage_name = station_nm) |> 
   select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
 #### monitoring site table ----
-gage_processed_data_usgs <- all_usgs_temp_data_raw |> 
+gage_temperature_usgs <- all_usgs_temp_data_raw |> 
   mutate(gage_name = station_nm,
          gage_id = site_no,
          agency = agency_cd.x,
@@ -229,11 +228,11 @@ gage_processed_data_usgs <- all_usgs_temp_data_raw |>
 ### saves clean data to aws 
 
 # temp data
-wq_processed_data |> pins::pin_write(temperature_processed_data_usgs,
+wq_processed_data |> pins::pin_write(temperature_usgs,
                                type = "csv",
                                title = "temperature_processed_data_usgs")
 
 # gage data 
-wq_processed_data |> pins::pin_write(gage_processed_data_usgs,
+wq_processed_data |> pins::pin_write(gage_temperature_usgs,
                                      type = "csv",
-                                     title = "gage_processed_data")
+                                     title = "temperature_gage_processed_data")

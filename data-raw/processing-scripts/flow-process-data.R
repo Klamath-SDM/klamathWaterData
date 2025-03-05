@@ -5,15 +5,14 @@ library(tidyr)
 library(purrr)
 library(pins)
 
+#notes and questions: 
+#	WQX There is one site that does not seem to be located on a stream “QVIR-SRES (Shackleford at Reservation)”. Waterbody_name function did not work 
+#	USGS some flow sites are in canals. Do we want to keep them?
 # raw data will be pulled from S3 bucket. These data is originally retrieved on flow-data-pull.R
 
 # setting up aws bucket
-wq_data_board <- pins::board_s3(
-  bucket = "klamath-sdm",
-  access_key = Sys.getenv("aws_access_key_id"),
-  secret_access_key = Sys.getenv("aws_secret_access_key"),
-  session_token = Sys.getenv("aws_session_token"),
-  region = "us-east-1")
+wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
+
 
 source(here::here('data-raw', 'processing-scripts', 'utils.R'))
 
@@ -68,7 +67,7 @@ all_wqx_flow_data_clean |>
   view()
 
 #### Flow data table ----
-flow_processed_data_wqx <- all_wqx_flow_data_clean |> 
+flow_wqx <- all_wqx_flow_data_clean |> 
   mutate(gage_id = monitoring_location_identifier,
          gage_name = monitoring_location_name,
          variable_name = characteristic_name,
@@ -79,20 +78,40 @@ flow_processed_data_wqx <- all_wqx_flow_data_clean |>
   select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
-#### saves clean data to aws ----
+#### monitoring site table ----
+wqx_gage_raw <- wq_data_board |> 
+  pins::pin_read("water_quality/data-raw/wqx_gage_data") |> 
+  janitor::clean_names() |> 
+  rename(gage_id = monitoring_location_identifier) |> 
+  glimpse()
 
-# call right folder in the bucket
-wq_processed_data<- pins::board_s3(
-  bucket = "klamath-sdm",
-  access_key = Sys.getenv("aws_access_key_id"),
-  secret_access_key = Sys.getenv("aws_secret_access_key"),
-  session_token = Sys.getenv("aws_session_token"),
-  region = "us-east-1",
-  prefix = "water_quality/processed-data/")
+gage_flow_wqx <- flow_wqx |> left_join(wqx_gage_raw, by = "gage_id") |> 
+  mutate(gage_name = monitoring_location_name,
+         agency = organization_formal_name,
+         latitude = latitude_measure,
+         longitude = longitude_measure,
+         river_mile = NA,
+         huc8 = huc_eight_digit_code,
+         stream = waterbody_name) |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  glimpse()
+
+#### saves clean data to aws ----
+# open processed-data folder
+wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
+
 # save data
-# wq_processed_data |> pins::pin_write(flow_processed_data_wqx,
-#                                      type = "csv",
-#                                      title = "flow_processed_data_wqx")
+# monitoring data - flow
+wq_processed_data |> pins::pin_write(flow_wqx,
+                                     type = "csv",
+                                     title = "flow_processed_data_wqx")
+# gage data - flow
+wq_processed_data |> pins::pin_write(gage_flow_wqx,
+                                     type = "csv",
+                                     title = "gage_flow_processed_data_wqx")
+
+
+
 
 
 ### USGS ----
@@ -113,29 +132,57 @@ usgs_data_raw_clean <- usgs_data_raw |>
   select(date, agency_cd, gage_id, variable_name, value, unit, site_no, statistic)
 
 # since stream names are in the gage data, we are pulling in it in and binding 
-usgs_gage_raw <- wq_data_board |> 
-  pins::pin_read("water_quality/data-raw/usgs_gage_data") |>  #pulling gage data
+usgs_gage_raw <- wq_data_board |>
+  pins::pin_read("water_quality/data-raw/usgs_gage_flow_data") |>  #pulling gage data
   janitor::clean_names() |>
-  # select(site_no, station_nm) |> 
+  # select(site_no, station_nm) |>
   glimpse()
 
-#### Flow data table ----
+
+#### water data table ----
 flow_processed_data_usgs <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by = "site_no") |> 
   mutate(waterbody_name = extract_waterbody(station_nm)) |> # function
   mutate(waterbody_name = tools::toTitleCase(tolower(waterbody_name)),
          gage_name = station_nm) |>
-  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
 flow_processed_data_usgs |>  #checking function
-  select(gage_name, waterbody_name) |> distinct() |> view() #TODO check the two names that did not work on function
+  select(gage_name, waterbody_name) |> distinct() |> view() 
 
-unique(all_usgs_temp_data_raw$waterbody_name)
+# fixing names
+flow_processed_data_usgs_clean <- flow_processed_data_usgs |> 
+  mutate(waterbody_name = case_when(gage_name %in% c("INDIAN C NR DOUGLAS CITY CA", "INDIAN C NR HAPPY CAMP CA") ~ "Indian Creek",
+                                    T ~ waterbody_name)) |> 
+  glimpse()
+
+flow_usgs <- flow_processed_data_usgs_clean |> 
+  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
+  glimpse()
+
+
+#### monitoring site table ----
+gage_flow_usgs <- flow_processed_data_usgs_clean |> 
+  mutate(gage_name = station_nm,
+         gage_id = site_no,
+         agency = agency_cd.x,
+         latitude = dec_lat_va,
+         longitude = dec_long_va,
+         river_mile = NA,
+         huc8 = huc_cd,
+         stream = waterbody_name
+  ) |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  glimpse()
+
+
+
 
 # save data
-# wq_processed_data |> pins::pin_write(flow_processed_data_usgs,
+# wq_processed_data |> pins::pin_write(flow_usgs,
 #                                      type = "csv",
 #                                      title = "flow_processed_data_usgs")
 
-
+# wq_processed_data |> pins::pin_write(gage_flow_usgs,
+#                                      type = "csv",
+#                                      title = "gage_flow_processed_data_usgs")
 
