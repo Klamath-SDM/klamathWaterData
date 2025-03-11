@@ -7,6 +7,8 @@ library(pins)
 
 #notes and questions: 
 # WQX - There is one site that does not seem to be located on a stream “QVIR-SRES (Shackleford at Reservation)”. Waterbody_name function did not work 
+# USGS dies not have mean pH data. For now we just have max and min
+# USGS - there are two sites at "Klamath Straits, leavinh waterbody_name as NA for now till we decide if we want to keep them
 
 # raw data will be pulled from S3 bucket. These data is originally retrieved on ph-data-pull.R
 
@@ -33,7 +35,7 @@ wqx_gage_raw <- wq_data_board |>
   janitor::clean_names() |> 
   glimpse()
 
-# JOIN - station data with flow data
+# JOIN - station data with pH data
 all_wqx_ph_data <- wqx_data_raw |> left_join(wqx_gage_raw) |> 
   glimpse()
 
@@ -61,7 +63,7 @@ ph_wqx <- all_wqx_ph_data_clean |>
          variable_name = characteristic_name,
          value = result_measure_value,
          unit = result_measure_measure_unit_code,
-         statistic = statistical_base_code,
+         statistic = statistical_base_code, # check if we want to add this manually
          date = activity_start_date) |> 
   select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
@@ -82,7 +84,7 @@ gage_ph_wqx <- all_wqx_ph_data_clean |>
 #### saves clean data to aws ----
 wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
 
-# temp data
+# pH data
 wq_processed_data |> pins::pin_write(ph_wqx,
                                      type = "csv",
                                      title = "ph_processed_data_usgs")
@@ -94,3 +96,94 @@ wq_processed_data |> pins::pin_write(gage_ph_wqx,
 
 
 ### USGS ----
+# pulling raw data
+# pH data
+usgs_data_raw <- wq_data_board |> 
+  pins::pin_read("water_quality/data-raw/usgs_ph_data") |> 
+  janitor::clean_names() |>
+  glimpse()
+
+usgs_data_raw_clean <- usgs_data_raw |> 
+  mutate(gage_id = site_no,
+         date = as.Date(date),
+         max_ph = x_00400_00001 ,
+         min_ph = x_00400_00002,
+         # mean_ph = x_00010_00003 # no mean available
+         ) |> 
+  select(-c(x_00400_00001 , x_00400_00001_cd, x_00400_00002, x_00400_00002_cd, date_time, tz_cd)) |>
+  pivot_longer(cols = c(max_ph, min_ph),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |> 
+  mutate(statistic = case_when(
+    statistic == "max_ph" ~ "maximum",
+    statistic == "min_ph" ~ "minimum",
+    # statistic == "mean_temp" ~ "mean"
+    ),
+    variable_name = "pH",
+    unit = "std unit") |> # pH standard unit
+  select(agency_cd, gage_id, date, value, statistic, variable_name, unit, site_no) |> 
+  glimpse()
+
+
+# GAGE data
+usgs_gage_raw <- wq_data_board |> 
+  pins::pin_read("water_quality/data-raw/usgs_gage_ph_data") |> 
+  janitor::clean_names() |> 
+  mutate(station_nm = tools::toTitleCase(tolower(station_nm))) |> 
+  glimpse()
+
+# JOIN - station data with temp data
+all_usgs_ph_data_raw <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by = "site_no") |> 
+  select(c(agency_cd.x, site_no, date, gage_id, statistic, value, variable_name, 
+           unit, station_nm, dec_lat_va, dec_long_va, huc_cd)) |> 
+  glimpse()
+
+#cleaning data
+all_usgs_ph_data_raw <- all_usgs_ph_data_raw |> 
+  mutate(waterbody_name = extract_waterbody(station_nm)) # testing function
+
+all_usgs_ph_data_raw |> 
+  select(station_nm, waterbody_name) |> distinct() |> View()
+
+all_usgs_ph_data_raw <- all_usgs_ph_data_raw |> 
+mutate(waterbody_name = case_when(station_nm %in% c("Upper Klamath Lake at Howard Bay, or", "Mid-Trench - Lower   -  Mdtl",
+                                                    "Mid-Trench - Upper   - Mdtu", "Mid-North - Lower  - Mdnl", 
+                                                    "Mid-North - Upper  - Mdnu", "Rattlesnake Point  -  Rpt",
+                                                    "Fish Banks West - Fbw") ~ "Upper Klamath Lake",
+                                  station_nm == "Shoalwater Bay - Shb" ~ "Shoalwater Bay",
+                                  T ~ waterbody_name)) |> 
+  glimpse()
+
+#### water data table ----
+ph_usgs <- all_usgs_ph_data_raw |> 
+  mutate(gage_id = site_no,
+         gage_name = station_nm) |> 
+  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+  glimpse()
+
+#### monitoring site table ----
+gage_ph_usgs <- all_usgs_ph_data_raw |> 
+  mutate(gage_name = station_nm,
+         gage_id = site_no,
+         agency = agency_cd.x,
+         latitude = dec_lat_va,
+         longitude = dec_long_va,
+         river_mile = NA,
+         huc8 = huc_cd,
+         stream = waterbody_name
+  ) |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  glimpse()
+
+### saves clean data to aws 
+
+# temp data
+wq_processed_data |> pins::pin_write(ph_usgs,
+                                     type = "csv",
+                                     title = "ph_processed_data_usgs")
+
+# gage data 
+wq_processed_data |> pins::pin_write(gage_ph_usgs,
+                                     type = "csv",
+                                     title = "ph_gage_processed_data")
