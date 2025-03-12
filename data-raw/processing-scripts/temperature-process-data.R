@@ -99,8 +99,9 @@ temperature_wqx <- all_wqx_temp_data_clean |>
          value = result_measure_value,
          unit = result_measure_measure_unit_code,
          statistic = statistical_base_code,
-         date = activity_start_date) |> 
-  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+         date = activity_start_date,
+         stream = waterbody_name) |> 
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
   #### monitoring site table ----
@@ -114,6 +115,7 @@ gage_temperature_wqx <- all_wqx_temp_data_clean |>
          huc8 = huc_eight_digit_code,
          stream = waterbody_name) |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  distinct() |>
   glimpse()
 
 #### saves clean data to aws ----
@@ -206,8 +208,9 @@ all_usgs_temp_data_raw_clean |>
 #### water data table ----
 temperature_usgs <- all_usgs_temp_data_raw |> 
   mutate(gage_id = site_no,
-         gage_name = station_nm) |> 
-  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+         gage_name = station_nm,
+         stream = waterbody_name) |> 
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
 #### monitoring site table ----
@@ -222,6 +225,7 @@ gage_temperature_usgs <- all_usgs_temp_data_raw |>
          stream = waterbody_name
          ) |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  distinct() |> 
   glimpse()
 
 
