@@ -7,6 +7,9 @@ library(pins)
 
 #notes and questions: 
 # WQX - There is one site that does not seem to be located on a stream “QVIR-SRES (Shackleford at Reservation)”. Waterbody_name function did not work 
+# OREGONDEQ data entries taht did not work for waterbody_name are located on a weird spot
+# USBR_WQX are on a Prairie Canal
+
 # USGS dies not have mean pH data. For now we just have max and min
 # USGS - there are two sites at "Klamath Straits, leavinh waterbody_name as NA for now till we decide if we want to keep them
 
@@ -29,14 +32,15 @@ wqx_data_raw <- wq_data_board |>
 # GAGE data
 wqx_gage_raw <- wq_data_board |> 
   pins::pin_read("water_quality/data-raw/wqx_gage_data") |> 
+  janitor::clean_names() |> 
   filter(monitoring_location_type_name %in% c("River/Stream", "Lake", "Stream",
                                               "Reservoir", "Lake, Reservoir, Impoundment",
                                               "Spring", "Estuary")) |>
-  janitor::clean_names() |> 
   glimpse()
 
 # JOIN - station data with pH data
-all_wqx_ph_data <- wqx_data_raw |> left_join(wqx_gage_raw) |> 
+all_wqx_ph_data <- wqx_data_raw |> left_join(wqx_gage_raw, 
+                             by = c("monitoring_location_identifier", "organization_formal_name", "organization_identifier")) |> 
   glimpse()
 
 
@@ -51,10 +55,50 @@ all_wqx_ph_data |>
   distinct() |> 
   view()
 
-all_wqx_ph_data_clean <- all_wqx_ph_data |> 
+wqx_ph_data <- all_wqx_ph_data |> 
+  filter(!str_detect(monitoring_location_identifier, "^USGS"), # Keep NAs & remove "USGS"
+         (is.na(activity_media_subdivision_name) | activity_media_subdivision_name == "Surface Water" )) |> 
+  glimpse()
+  
+all_wqx_ph_data_clean <- wqx_ph_data |> 
 mutate(waterbody_name = case_when(
   monitoring_location_name == "Townsends Gulch" ~ "Scott River",
-  TRUE ~ waterbody_name))
+    monitoring_location_name %in% c("HOBO at Confluence of Klamath and Trinity Rivers", "CDR and Nutrients at Saints Rest Bar") ~ "Klamath River",
+    monitoring_location_name %in% c("CDR at Red Rock", "CDR at South Boundary", 
+                                    "HOBO  A at TR_NORTON", "HOBO at North Boundary", 
+                                    "HOBO at South Boundary", "HOBO B  at TR_NORTON") ~ "Trinity River",
+    monitoring_location_identifier == "323-02-I|Paradise|R6|Fremont-Winema|Paisley" ~ "Paradise Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ01" ~ "Cavern Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ02" ~ "Sun Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ03" ~ "Sun Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ05" ~ "Wheeler Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ06" ~ "Munson Creek",
+    # monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ07" ~ "?",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ09" ~ "Lost Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ10" ~ "Middle Fork Annie Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ13" ~ "Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ14" ~ "Annie Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ17" ~ "Sand Creek",
+    # monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ21" ~ " ?Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ22" ~ "Annie Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ26" ~ "Munson Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ29" ~ "Sand Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ30" ~ "Sun Creek",
+    # monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ31" ~ "? Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ33" ~ "Sand Creek",
+    monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ34" ~ "Munson Creek",
+    # monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ37" ~ "? Creek",
+  str_detect(monitoring_location_name, "UPPER KLAMATH LAKE") ~ "Upper Klamath Lake", 
+  monitoring_location_identifier %in% c("KLAMATHTRIBES_WQX-KL0010", "KLAMATHTRIBES_WQX-KL0011") ~ "Agency Lake"
+    TRUE ~ waterbody_name)) |> 
+    glimpse()
+  #TODO continue to clean locations that do not have explicit name
+# resoruce: https://www.waterqualitydata.us/provider/STORET/
+
+all_wqx_ph_data_clean |>  # check
+  select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |> 
+  distinct() |>  #TODO figure out why we still have well data
+  view()
 
 #### water data table ----
 ph_wqx <- all_wqx_ph_data_clean |> 
