@@ -94,6 +94,7 @@ gage_flow_wqx <- flow_wqx |> left_join(wqx_gage_raw, by = "gage_id") |>
          huc8 = huc_eight_digit_code,
          stream = waterbody_name) |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  distinct() |>
   glimpse()
 
 #### saves clean data to aws ----
@@ -159,6 +160,15 @@ flow_usgs <- flow_processed_data_usgs_clean |>
   select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
   glimpse()
 
+flow_processed_data_usgs_clean |>  #check
+  select(gage_name, waterbody_name) |> distinct() |> view() 
+
+flow_usgs <- flow_processed_data_usgs_clean |> 
+  mutate(gage_id = site_no,
+         gage_name = station_nm,
+         stream = waterbody_name) |> 
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+  glimpse()
 
 #### monitoring site table ----
 gage_flow_usgs <- flow_processed_data_usgs_clean |> 
@@ -169,20 +179,20 @@ gage_flow_usgs <- flow_processed_data_usgs_clean |>
          longitude = dec_long_va,
          river_mile = NA,
          huc8 = huc_cd,
-         stream = waterbody_name
-  ) |> 
+         stream = waterbody_name) |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  distinct() |>
   glimpse()
 
 
 
 
 # save data
-# wq_processed_data |> pins::pin_write(flow_usgs,
-#                                      type = "csv",
-#                                      title = "flow_processed_data_usgs")
+wq_processed_data |> pins::pin_write(flow_usgs,
+                                     type = "csv",
+                                     title = "flow_processed_data_usgs")
 
-# wq_processed_data |> pins::pin_write(gage_flow_usgs,
-#                                      type = "csv",
-#                                      title = "gage_flow_processed_data_usgs")
+wq_processed_data |> pins::pin_write(gage_flow_usgs,
+                                     type = "csv",
+                                     title = "gage_flow_processed_data_usgs")
 
