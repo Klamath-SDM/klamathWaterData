@@ -94,8 +94,9 @@ do_wqx <- all_wqx_do_data_clean |>
          value = as.numeric(result_measure_value),
          unit = result_measure_measure_unit_code,
          statistic = statistical_base_code,
-         date = as.Date(activity_start_date)) |> 
-  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+         date = as.Date(activity_start_date),
+         stream = waterbody_name) |> 
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
 #### monitoring site table ----
@@ -202,8 +203,9 @@ all_usgs_do_raw_clean |>
 #### water data table ----
 do_usgs <- all_usgs_do_raw_clean |> 
   mutate(gage_id = site_no,
-         gage_name = station_nm) |> 
-  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+         gage_name = station_nm,
+         stream = waterbody_name) |> 
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
 #### monitoring site table ----
