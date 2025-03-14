@@ -4,6 +4,8 @@ library(dataRetrieval)
 library(tidyr)
 library(purrr)
 library(pins)
+library(rivermile)
+library(sf)
 
 #notes and questions: 
 # wqx - there are 4 NPS locations that dont seem to be at a stream. They are comment out below 

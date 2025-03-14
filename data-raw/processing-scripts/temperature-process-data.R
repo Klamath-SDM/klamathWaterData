@@ -4,6 +4,8 @@ library(dataRetrieval)
 library(tidyr)
 library(purrr)
 library(pins)
+library(rivermile)
+library(sf)
 
 # raw data will be pulled from S3 bucket. These data is originally retrieved on temperature-data-pull.R
 
@@ -105,7 +107,7 @@ temperature_wqx <- all_wqx_temp_data_clean |>
   glimpse()
 
   #### monitoring site table ----
-gage_temperature_wqx <- all_wqx_temp_data_clean |> 
+gage_temperature_wqx_clean <- all_wqx_temp_data_clean |> 
   mutate(gage_name = monitoring_location_name,
          gage_id = monitoring_location_identifier,
          agency = organization_formal_name,
@@ -116,6 +118,16 @@ gage_temperature_wqx <- all_wqx_temp_data_clean |>
          stream = waterbody_name) |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
   distinct() |>
+  gage_data_format(filter_streams = FALSE) |>
+  glimpse()
+
+#note that all NPSWRD_WQX gages do not have lat/long so they are getting filtered out
+
+gage_temperature_wqx <- rivermile::find_nearest_river_miles(gage_temperature_wqx_clean) |> 
+  mutate(longitude = st_coordinates(gage_temperature_wqx_clean)[, 1],
+         latitude = st_coordinates(gage_temperature_wqx_clean)[, 2]) |> 
+  st_drop_geometry() |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
   glimpse()
 
 #### saves clean data to aws ----
@@ -214,7 +226,7 @@ temperature_usgs <- all_usgs_temp_data_raw |>
   glimpse()
 
 #### monitoring site table ----
-gage_temperature_usgs <- all_usgs_temp_data_raw |> 
+gage_temperature_usgs_clean <- all_usgs_temp_data_raw |> 
   mutate(gage_name = station_nm,
          gage_id = site_no,
          agency = agency_cd.x,
@@ -226,8 +238,15 @@ gage_temperature_usgs <- all_usgs_temp_data_raw |>
          ) |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
   distinct() |> 
+  gage_data_format(filter_streams = FALSE) |>
   glimpse()
 
+gage_temperature_usgs <- rivermile::find_nearest_river_miles(gage_temperature_usgs_clean) |> 
+  mutate(longitude = st_coordinates(gage_temperature_usgs_clean)[, 1],
+         latitude = st_coordinates(gage_temperature_usgs_clean)[, 2]) |> 
+  st_drop_geometry() |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  glimpse()
 
 ### saves clean data to aws 
 
