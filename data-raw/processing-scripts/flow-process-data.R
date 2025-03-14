@@ -4,6 +4,8 @@ library(dataRetrieval)
 library(tidyr)
 library(purrr)
 library(pins)
+library(rivermile)
+library(sf)
 
 #notes and questions: 
 #	WQX There is one site that does not seem to be located on a stream “QVIR-SRES (Shackleford at Reservation)”. Waterbody_name function did not work 
@@ -29,6 +31,8 @@ wqx_data_raw <- wq_data_board |>
 wqx_gage_raw <- wq_data_board |> 
   pins::pin_read("water_quality/data-raw/wqx_gage_data") |> 
   janitor::clean_names() |> 
+  
+  mutate(gage_id = monitoring_location_identifier) |>
   glimpse()
 
 # JOIN - station data with flow data
@@ -74,28 +78,37 @@ flow_wqx <- all_wqx_flow_data_clean |>
          value = result_measure_value,
          unit = result_measure_measure_unit_code,
          statistic = "mean",
-         date = activity_start_date) |> 
-  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+         date = activity_start_date,
+         stream = waterbody_name) |> 
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
 #### monitoring site table ----
-wqx_gage_raw <- wq_data_board |> 
-  pins::pin_read("water_quality/data-raw/wqx_gage_data") |> 
-  janitor::clean_names() |> 
-  rename(gage_id = monitoring_location_identifier) |> 
-  glimpse()
+# wqx_gage_raw <- wq_data_board |> 
+#   pins::pin_read("water_quality/data-raw/wqx_gage_data") |> 
+#   janitor::clean_names() |> 
+#   rename(gage_id = monitoring_location_identifier) |> 
+#   glimpse()
 
-gage_flow_wqx <- flow_wqx |> left_join(wqx_gage_raw, by = "gage_id") |> 
+gage_flow_wqx_clean <- flow_wqx |> left_join(wqx_gage_raw, by = "gage_id") |> 
   mutate(gage_name = monitoring_location_name,
          agency = organization_formal_name,
          latitude = latitude_measure,
          longitude = longitude_measure,
          river_mile = NA,
-         huc8 = huc_eight_digit_code,
-         stream = waterbody_name) |> 
+         huc8 = huc_eight_digit_code) |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
-  distinct() |>
+  distinct() |> 
+  gage_data_format(filter_streams = FALSE) |> 
   glimpse()
+
+gage_flow_wqx <- rivermile::find_nearest_river_miles(gage_flow_wqx_clean) |> 
+  mutate(longitude = st_coordinates(gage_flow_wqx_clean)[, 1],
+         latitude = st_coordinates(gage_flow_wqx_clean)[, 2]) |> 
+  st_drop_geometry() |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  glimpse()
+
 
 #### saves clean data to aws ----
 # open processed-data folder
@@ -110,9 +123,6 @@ wq_processed_data |> pins::pin_write(flow_wqx,
 wq_processed_data |> pins::pin_write(gage_flow_wqx,
                                      type = "csv",
                                      title = "gage_flow_processed_data_wqx")
-
-
-
 
 
 ### USGS ----
@@ -171,7 +181,7 @@ flow_usgs <- flow_processed_data_usgs_clean |>
   glimpse()
 
 #### monitoring site table ----
-gage_flow_usgs <- flow_processed_data_usgs_clean |> 
+gage_flow_usgs_clean <- flow_processed_data_usgs_clean |> 
   mutate(gage_name = station_nm,
          gage_id = site_no,
          agency = agency_cd.x,
@@ -181,10 +191,16 @@ gage_flow_usgs <- flow_processed_data_usgs_clean |>
          huc8 = huc_cd,
          stream = waterbody_name) |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
-  distinct() |>
+  distinct() |> 
+  gage_data_format(filter_streams = FALSE) |> 
   glimpse()
 
-
+gage_flow_usgs <- rivermile::find_nearest_river_miles(gage_flow_usgs_clean) |> 
+  mutate(longitude = st_coordinates(gage_flow_usgs_clean)[, 1],
+         latitude = st_coordinates(gage_flow_usgs_clean)[, 2]) |> 
+  st_drop_geometry() |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  glimpse()
 
 
 # save data

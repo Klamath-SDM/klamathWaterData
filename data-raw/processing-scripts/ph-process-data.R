@@ -4,6 +4,8 @@ library(dataRetrieval)
 library(tidyr)
 library(purrr)
 library(pins)
+library(rivermile)
+library(sf)
 
 #notes and questions: 
 # WQX - There is one site that does not seem to be located on a stream “QVIR-SRES (Shackleford at Reservation)”. Waterbody_name function did not work 
@@ -113,16 +115,25 @@ ph_wqx <- all_wqx_ph_data_clean |>
   select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
+
 #### monitoring site table ----
-gage_ph_wqx <- all_wqx_ph_data_clean |> 
+gage_ph_wqx_clean <- all_wqx_ph_data_clean |> 
   mutate(gage_name = monitoring_location_name,
          gage_id = monitoring_location_identifier,
          agency = organization_formal_name,
          latitude = latitude_measure,
          longitude = longitude_measure,
-         river_mile = NA,
+         river_mile = NA, #10784
          huc8 = huc_eight_digit_code,
          stream = waterbody_name) |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
+  distinct() |> 
+  gage_data_format(filter_streams = FALSE) |> glimpse()
+
+gage_ph_wqx <- rivermile::find_nearest_river_miles(gage_ph_wqx_clean) |> 
+  mutate(longitude = st_coordinates(gage_ph_wqx_clean)[, 1],
+    latitude = st_coordinates(gage_ph_wqx_clean)[, 2]) |> 
+  st_drop_geometry() |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
   glimpse()
 
@@ -208,7 +219,7 @@ ph_usgs <- all_usgs_ph_data_raw |>
   glimpse()
 
 #### monitoring site table ----
-gage_ph_usgs <- all_usgs_ph_data_raw |> 
+gage_ph_usgs_clean <- all_usgs_ph_data_raw |> 
   mutate(gage_name = station_nm,
          gage_id = site_no,
          agency = agency_cd.x,
@@ -216,10 +227,19 @@ gage_ph_usgs <- all_usgs_ph_data_raw |>
          longitude = dec_long_va,
          river_mile = NA,
          huc8 = huc_cd,
-         stream = waterbody_name
-  ) |> 
+         stream = waterbody_name) |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  distinct() |> 
+  gage_data_format(filter_streams = FALSE) |> 
+  glimpse()
+
+gage_ph_usgs <- rivermile::find_nearest_river_miles(gage_ph_usgs_clean) |>
+  mutate(longitude = st_coordinates(gage_ph_usgs_clean)[, 1],
+         latitude = st_coordinates(gage_ph_usgs_clean)[, 2]) |>
+  st_drop_geometry() |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
   glimpse()
+
 
 ### saves clean data to aws 
 
