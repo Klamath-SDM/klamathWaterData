@@ -214,8 +214,9 @@ mutate(waterbody_name = case_when(station_nm %in% c("Upper Klamath Lake at Howar
 #### water data table ----
 ph_usgs <- all_usgs_ph_data_raw |> 
   mutate(gage_id = site_no,
-         gage_name = station_nm) |> 
-  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+         gage_name = station_nm,
+         stream = waterbody_name) |> 
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
 #### monitoring site table ----
