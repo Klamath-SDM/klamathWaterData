@@ -89,7 +89,7 @@ mutate(waterbody_name = case_when(
     monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ34" ~ "Munson Creek",
     # monitoring_location_identifier == "11NPSWRD_WQX-CRLA_WQ37" ~ "? Creek",
   str_detect(monitoring_location_name, "UPPER KLAMATH LAKE") ~ "Upper Klamath Lake", 
-  monitoring_location_identifier %in% c("KLAMATHTRIBES_WQX-KL0010", "KLAMATHTRIBES_WQX-KL0011") ~ "Agency Lake"
+  monitoring_location_identifier %in% c("KLAMATHTRIBES_WQX-KL0010", "KLAMATHTRIBES_WQX-KL0011") ~ "Agency Lake",
     TRUE ~ waterbody_name)) |> 
     glimpse()
   #TODO continue to clean locations that do not have explicit name
@@ -108,8 +108,9 @@ ph_wqx <- all_wqx_ph_data_clean |>
          value = result_measure_value,
          unit = result_measure_measure_unit_code,
          statistic = statistical_base_code, # check if we want to add this manually
-         date = activity_start_date) |> 
-  select(waterbody_name, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
+         date = activity_start_date,
+         stream = waterbody_name) |> 
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |> 
   glimpse()
 
 #### monitoring site table ----
