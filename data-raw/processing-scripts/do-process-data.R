@@ -8,6 +8,7 @@ library(pins)
 #notes and questions: 
 # wqx - there are 4 NPS locations that dont seem to be at a stream. They are comment out below 
 # USGS - there are two sites at "Klamath Straits, leavinf waterbody_name as NA for now till we decide if we want to keep them
+# # note that there a data entries that do not have lat/long. maybe discuss if we want to add them manually
 # raw data will be pulled from S3 bucket. These data is originally retrieved on do-data-pull.R
 
 # setting up aws bucket
@@ -100,17 +101,27 @@ do_wqx <- all_wqx_do_data_clean |>
   glimpse()
 
 #### monitoring site table ----
-gage_do_wqx <- all_wqx_do_data_clean |> 
+gage_do_wqx_clean <- all_wqx_do_data_clean |> 
   mutate(gage_name = monitoring_location_name,
          gage_id = monitoring_location_identifier,
          agency = organization_formal_name,
-         latitude = latitude_measure,
-         longitude = longitude_measure,
+         latitude = latitude_measure, # note that there a data entries that do not have lat/long
+         longitude = longitude_measure, # maybe discuss if we want to add them manually
          river_mile = NA,
          huc8 = huc_eight_digit_code,
          stream = waterbody_name) |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  distinct() |> 
+  gage_data_format(filter_streams = FALSE) |> 
   glimpse()
+
+gage_do_wqx <- rivermile::find_nearest_river_miles(gage_do_wqx_clean) |> 
+  mutate(longitude = st_coordinates(gage_do_wqx_clean)[, 1],
+         latitude = st_coordinates(gage_do_wqx_clean)[, 2]) |> 
+  st_drop_geometry() |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  glimpse()
+
 
 #### saves clean data to aws ----
 wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
@@ -209,7 +220,7 @@ do_usgs <- all_usgs_do_raw_clean |>
   glimpse()
 
 #### monitoring site table ----
-gage_do_usgs <- all_usgs_do_raw_clean |> 
+gage_do_usgs_clean <- all_usgs_do_raw_clean |> 
   mutate(gage_name = station_nm,
          gage_id = site_no,
          agency = agency_cd.x,
@@ -218,6 +229,15 @@ gage_do_usgs <- all_usgs_do_raw_clean |>
          river_mile = NA,
          huc8 = huc_cd,
          stream = waterbody_name) |> 
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
+  distinct() |> 
+  gage_data_format(filter_streams = FALSE) |> 
+  glimpse()
+
+gage_do_usgs <- rivermile::find_nearest_river_miles(gage_do_usgs_clean) |> 
+  mutate(longitude = st_coordinates(gage_do_usgs_clean)[, 1],
+         latitude = st_coordinates(gage_do_usgs_clean)[, 2]) |> 
+  st_drop_geometry() |> 
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |> 
   glimpse()
 
