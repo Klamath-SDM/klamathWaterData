@@ -99,7 +99,23 @@ mutate(waterbody_name = case_when(
 
 all_wqx_ph_data_clean |>  # check
   select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |> 
-  distinct() |>  #TODO figure out why we still have well data
+  distinct() |>  
+  view()
+# All Resighini Rancheria (RREPA_WQX)gages are either at a pond or at named stream 
+# TRINITY R A LEWISTON, "TRINITY R SF A SANDY BAR NR WILL, TRINITY R A HOOPA, TRINITY R A WEITCHPEC
+# CALWR_WQX-F3109500 and CALWR_WQX-F3410000 are located at a small unknown stream
+# NARS_WQX-NWC_CA-10246 is a wetland
+all_wqx_ph_data_clean <- all_wqx_ph_data_clean |> 
+mutate(waterbody_name = case_when(
+  monitoring_location_identifier %in% c("CALWR_WQX-F4164000", "CALWR_WQX-F4410000", "CALWR_WQX-F4108000", "CALWR_WQX-F4100000")  ~ "Trinity River",
+  monitoring_location_identifier %in% c("CALWR_WQX-F3122001", "KARUKDNR_WQX-WA", "KARUKDNR_WQX-HC") ~ "Klamath River", # "KLAMATH R A ORLEANS" , "Walker Bridge", "Happy Camp"
+  monitoring_location_identifier == "NARS_WQX-CASS-1313" ~ "Digger Creek",
+  TRUE ~ waterbody_name)) |> 
+  glimpse()
+  
+all_wqx_ph_data_clean |>  
+  select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |> 
+  distinct() |>
   view()
 
 #### water data table ----
