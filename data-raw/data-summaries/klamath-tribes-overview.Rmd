@@ -41,7 +41,7 @@ When data is downloaded from portal it is in an excel file format.
 ### Dataset 
 
 ```{r, include=FALSE}
-klamath_tribes_data <- read.csv("data-raw/all_klamath_wqx_data.csv")
+klamath_tribes_data <- read.csv("data-raw/data-summaries/all_klamath_wqx_data.csv")
 ```
 
  - Title: Klamath Tribes Water Quality Portal Data
