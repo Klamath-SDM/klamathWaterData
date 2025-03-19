@@ -2,7 +2,7 @@
 % Please edit documentation in R/test.R
 \name{test}
 \alias{test}
-\title{test}
+\title{this is a name}
 \usage{
 test(x)
 }
