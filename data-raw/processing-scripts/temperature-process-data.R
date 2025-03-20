@@ -26,6 +26,7 @@ wqx_data_raw <- wq_data_board |>
 wqx_gage_raw <- wq_data_board |>
   pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
   janitor::clean_names() |>
+  # TODO: could include this as a function call
   filter(monitoring_location_type_name %in% c("River/Stream", "Lake", "Stream",
                                               "Reservoir", "Lake, Reservoir, Impoundment",
                                               "Spring", "Estuary")) |>
@@ -91,7 +92,7 @@ all_wqx_temp_data_clean |>
 
 
   #### water data table ----
-temperature_wqx <- all_wqx_temp_data_clean |>
+temperature_data_wqx <- all_wqx_temp_data_clean |>
   mutate(gage_id = monitoring_location_identifier,
          gage_name = monitoring_location_name,
          variable_name = characteristic_name,
@@ -120,29 +121,12 @@ gage_temperature_wqx_clean <- all_wqx_temp_data_clean |>
 
 #note that all NPSWRD_WQX gages do not have lat/long so they are getting filtered out
 
-gage_temperature_wqx <- rivermile::find_nearest_river_miles(gage_temperature_wqx_clean) |>
+temperature_gage_wqx <- rivermile::find_nearest_river_miles(gage_temperature_wqx_clean) |>
   mutate(longitude = st_coordinates(gage_temperature_wqx_clean)[, 1],
          latitude = st_coordinates(gage_temperature_wqx_clean)[, 2]) |>
   st_drop_geometry() |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
   glimpse()
-
-#### saves clean data to aws ----
-wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
-
-# temp data
-wq_processed_data |> pins::pin_write(temperature_wqx,
-                                     type = "csv",
-                                     title = "temperature_processed_data_usgs")
-
-# gage data
-wq_processed_data |> pins::pin_write(gage_temperature_wqx,
-                                     type = "csv",
-                                     title = "gage_processed_data")
-
-# save Rdata files
-usethis::use_data(temperature_wqx, overwrite = TRUE)
-usethis::use_data(gage_temperature_wqx, overwrite = TRUE)
 
 ### USGS ----
 
@@ -218,7 +202,7 @@ all_usgs_temp_data_raw_clean |>
 
 
 #### water data table ----
-temperature_usgs <- all_usgs_temp_data_raw |>
+temperature_data_usgs <- all_usgs_temp_data_raw |>
   mutate(gage_id = site_no,
          gage_name = station_nm,
          stream = waterbody_name) |>
@@ -241,21 +225,41 @@ gage_temperature_usgs_clean <- all_usgs_temp_data_raw |>
   gage_data_format(filter_streams = FALSE) |>
   glimpse()
 
-gage_temperature_usgs <- rivermile::find_nearest_river_miles(gage_temperature_usgs_clean) |>
+temperature_gage_usgs <- rivermile::find_nearest_river_miles(gage_temperature_usgs_clean) |>
   mutate(longitude = st_coordinates(gage_temperature_usgs_clean)[, 1],
          latitude = st_coordinates(gage_temperature_usgs_clean)[, 2]) |>
   st_drop_geometry() |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
   glimpse()
 
+
+
+# combine gage and data files ---------------------------------------------
+temperature_data <- temperature_data_wqx |>
+  mutate(variable_name = "temperature",
+         statistic = tolower(statistic),
+         unit = "celsius",
+         value = as.numeric(value),
+         date = as.Date(date)) |>
+  bind_rows(temperature_data_usgs |>
+              mutate(gage_id = as.character(gage_id)))
+
+temperature_gage <- temperature_gage_usgs |>
+  mutate(gage_id = as.character(gage_id)) |>
+  bind_rows(temperature_gage_wqx) |>
+  glimpse()
+
 ### saves clean data to aws
 
 # temp data
-wq_processed_data |> pins::pin_write(temperature_usgs,
-                               type = "csv",
-                               title = "temperature_processed_data_usgs")
+wq_processed_data |> pins::pin_write(temperature_data,
+                               type = "csv")
 
 # gage data
-wq_processed_data |> pins::pin_write(gage_temperature_usgs,
-                                     type = "csv",
-                                     title = "temperature_gage_processed_data")
+wq_processed_data |> pins::pin_write(temperature_gage,
+                                     type = "csv")
+
+# save rda files
+usethis::use_data(temperature_data, overwrite = TRUE)
+usethis::use_data(temperature_gage, overwrite = TRUE)
+

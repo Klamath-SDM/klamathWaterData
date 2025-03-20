@@ -1,11 +1,11 @@
-#' @name gage_temperature_wqx
-#' @title Temperature Gages for WQX data
+#' @name temperature_gage
+#' @title Temperature gages in the Klamath Basin watershed (HUC8 18010204)
 #' @examples
-#' gage_temperature_wqx |> pillar::glimpse()
-"gage_temperature_wqx"
+#' temperature_gage |> pillar::glimpse()
+"temperature_gage"
 
-#' @name temperature_wqx
-#' @title All temperature data from WQX
+#' @name temperature_data
+#' @title Publicly available temperature data in the Klamath Basin watershed (HUC8 18010204)
 #' @examples
-#' temperature_wqx |> pillar::glimpse()
-"temperature_wqx"
+#' temperature_data |> pillar::glimpse()
+"temperature_data"
