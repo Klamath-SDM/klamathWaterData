@@ -251,3 +251,6 @@ wq_processed_data |> pins::pin_write(do_data,
 
 wq_processed_data |> pins::pin_write(do_gage,
                                      type = "csv")
+# save rda files
+usethis::use_data(do_data, overwrite = TRUE)
+usethis::use_data(do_gage, overwrite = TRUE)
