@@ -22,3 +22,26 @@
 #' ph_data |> pillar::glimpse()
 "ph_data"
 
+#' @name flow_gage
+#' @title Flow gages in the Klamath Basin watershed (HUC8 18010204)
+#' @examples
+#' flow_gage |> pillar::glimpse()
+"flow_gage"
+
+#' @name flow_data
+#' @title Publicly available flow data in the Klamath Basin watershed (HUC8 18010204)
+#' @examples
+#' flow_data |> pillar::glimpse()
+"flow_data"
+
+#' @name do_gage
+#' @title Dissolved oxygen gages in the Klamath Basin watershed (HUC8 18010204)
+#' @examples
+#' do_gage |> pillar::glimpse()
+"do_gage"
+
+#' @name do_data
+#' @title Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC8 18010204)
+#' @examples
+#' do_gage |> pillar::glimpse()
+"do_gage"
