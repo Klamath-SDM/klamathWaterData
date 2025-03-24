@@ -250,6 +250,7 @@ temperature_gage <- temperature_gage_usgs |>
   glimpse()
 
 ### saves clean data to aws
+wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
 
 # temp data
 wq_processed_data |> pins::pin_write(temperature_data,

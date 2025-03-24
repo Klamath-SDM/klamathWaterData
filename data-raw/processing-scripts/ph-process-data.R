@@ -274,6 +274,7 @@ ph_gage <- gage_ph_usgs |>
   glimpse()
 
 ### saves clean data to aws
+wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
 
 # # pH data
 wq_processed_data |> pins::pin_write(ph_data,
