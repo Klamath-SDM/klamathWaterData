@@ -1,0 +1,898 @@
+---
+title: "Klamath Basin Flow Gage Exploration"
+author: "Badhia Yunes Katz - FlowWest"
+output: 
+  github_document
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  warning = FALSE, 
+  message = FALSE,
+  comment = "#>", 
+  fig.width=8, fig.height=5)
+library(tidyverse)
+library(lubridate)
+library(sf)
+library(leaflet)
+
+colors_full <-  c("#9A8822", "#F5CDB4", "#F8AFA8", "#FDDDA0", "#74A089", #Royal 2
+                  "#899DA4", "#C93312", "#DC863B", # royal 1 (- 3)
+                  "#F1BB7B", "#FD6467", "#5B1A18", # Grand Budapest 1 (-4)
+                  "#D8B70A", "#02401B", "#A2A475", # Cavalcanti 1
+                  "#E6A0C4", "#C6CDF7", "#D8A499", "#7294D4", #Grand Budapest 2
+                  "#9986A5", "#EAD3BF", "#AA9486", "#B6854D", "#798E87" # Isle of dogs 2 altered slightly
+)
+```
+
+The goal of this markdown is to explore USGS gages within the Klamath Basin, understand their geographic and temporal coverage.
+
+USGS flow gage exploration - Klamath River Basin
+
+## Pull Gage Data  
+
+
+## Main stream Klamath
+  - 11509500 - Klamath River at Keno Or
+  - 11510700 - Klamath River Below John C Boyle Powerplant
+  - 11516530 - Klamath River Below Iorngate Dam 
+  - 11520500 - Klamath River Nr Seiad Valley CA
+  - 11523000 - Klamath River A Orleans 
+  - 11530500 - Klamath River Near Klamath (Furthest Downstream)
+  
+```{r, include=FALSE}
+kr_at_keno_or <- dataRetrieval::readNWISdv(11509500, "00060", startDate = "1950-01-01") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "klamath river", # add additional columns for stream, gage info, and parameter 
+         # order = 1,
+         gage_agency = "USGS",
+         gage_number = "11509500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11509500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11509500")$dec_long_va # directly add lon
+         )
+kr_blw_powerplant <- dataRetrieval::readNWISdv(11510700, "00060", startDate = "1995-01-01") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "klamath river", # add additional columns for stream, gage info, and parameter 
+         # order = 2,
+         gage_agency = "USGS",
+         gage_number = "11510700",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+                  latitude = dataRetrieval::readNWISsite("11510700")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11510700")$dec_long_va # directly add lon
+         ) 
+kr_blw_iorngage <- dataRetrieval::readNWISdv(11516530, "00060", startDate = "1950-01-01") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "klamath river", # add additional columns for stream, gage info, and parameter 
+         # order = 3,
+         gage_agency = "USGS",
+         gage_number = "11516530",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11516530")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11516530")$dec_long_va # directly add lon
+         ) 
+kr_nr_seiad_valley <- dataRetrieval::readNWISdv(11520500, "00060", startDate = "1950-01-01") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "klamath river", # add additional columns for stream, gage info, and parameter 
+         # order = 4,
+         gage_agency = "USGS",
+         gage_number = "11520500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11520500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11520500")$dec_long_va # directly add lon
+         ) 
+kr_at_orleans <- dataRetrieval::readNWISdv(11523000, "00060", startDate = "1950-01-01") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "klamath river", # add additional columns for stream, gage info, and parameter 
+         # order = 5,
+         gage_agency = "USGS",
+         gage_number = "11523000",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11523000")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11523000")$dec_long_va # directly add lon
+         ) 
+kr_nr_klamath <- dataRetrieval::readNWISdv(11530500, "00060", startDate = "1950-01-01") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "klamath river", # add additional columns for stream, gage info, and parameter 
+         # order = 6,
+         gage_agency = "USGS",
+         gage_number = "11530500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11530500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11530500")$dec_long_va # directly add lon
+         )
+
+all_kalamth_usgs_gages <- bind_rows(kr_at_keno_or, kr_blw_powerplant, kr_blw_iorngage, kr_nr_seiad_valley, 
+                                    kr_at_orleans, kr_nr_klamath) |> 
+  glimpse()
+```
+
+
+```{r include=FALSE}
+### Map Plot Klamath USGS Gages
+# Filter to keep only one unique gage per location
+klmath_gage_dates <- all_kalamth_usgs_gages |> 
+  group_by(gage_number) |> 
+  summarise(min_date = min(date), max_date = max(date))
+
+unique_gage_data_kl <- all_kalamth_usgs_gages |> 
+  distinct(gage_number, latitude, longitude, .keep_all = TRUE) |> 
+  left_join(klmath_gage_dates, by = "gage_number")
+
+unique_gage_sf <- unique_gage_data_kl |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+leaflet(unique_gage_sf) |> 
+  addTiles() |> 
+  addCircleMarkers(popup = ~paste0("Stream name: ", stream, "<br>Gage Number: ", gage_number, "<br>Max Date: ", max_date, "<br>Min Date: ", min_date))
+```
+
+### Date coverage
+
+```{r, echo=FALSE}
+all_kalamth_usgs_gages |> ggplot(aes(x = date, y = value, color = as.character(gage_number))) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  facet_wrap(~gage_number) +
+  theme_minimal() +
+  labs(title = "Flow vs Date by Gage Number",
+       y = "Flow")
+
+
+all_kalamth_usgs_gages |> 
+  ggplot(aes(x = date, y = value, color = gage_number)) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  theme_minimal() +
+  labs(title = "Flow vs Date - all Gages",
+       y = "Flow")
+```
+
+### Date range summary
+
+```{r, echo=FALSE}
+date_range_summary <- all_kalamth_usgs_gages |> 
+  group_by(gage_number) |> 
+  summarize(
+    min_date = min(date),  
+    max_date = max(date),  
+    record_count = n()) |> 
+  ungroup()  |> 
+  glimpse()
+```
+
+
+
+```{r, include=FALSE}
+# looking for date gaps
+kr_at_keno_or |> 
+  ggplot(aes(date, value)) +
+  geom_line()
+
+kr_blw_powerplant |> 
+  ggplot(aes(date, value)) +
+  geom_line()
+
+kr_blw_iorngage |> 
+  ggplot(aes(date, value)) +
+  geom_line()
+
+kr_nr_seiad_valley |> 
+  ggplot(aes(date, value)) +
+  geom_line()
+
+kr_at_orleans |> 
+  ggplot(aes(date, value)) +
+  geom_line()
+
+kr_nr_klamath |> 
+  ggplot(aes(date, value)) +
+  geom_line()
+
+
+# date_gaps_per_gage <- all_kalamth_usgs_gages %>%
+#   group_by(gage_number) %>%
+#   summarize(
+#     min_date = min(date, na.rm = TRUE),
+#     max_date = max(date, na.rm = TRUE)
+#   ) %>%
+#   rowwise() %>%
+#   mutate(
+#     full_date_range = list(seq.Date(from = min_date, to = max_date, by = "day"))
+#   ) %>%
+#   unnest(full_date_range) %>%
+#   rename(date = full_date_range) %>%
+#   select(gage_number, date)
+# 
+
+#creating a map to show temporal coverage
+
+temp_coverage <- all_kalamth_usgs_gages |> 
+  mutate(min_date = min(date),
+         max_date = max(date))
+
+```
+
+## Trinity 
+
+Potential gages
+
+  - 11528700 SF TRINITY R BL HYAMPOM CA - South fork
+  - 11530000 TRINITY R A HOOPA CA
+  - 11523200 TRINITY R AB COFFEE C NR TRINITY CENTER CA
+  - 11525500 TRINITY R A LEWISTON CA
+  - 11525655 TRINITY R BL LIMEKILN GULCH NR DOUGLAS CITY CA
+  - 11525854 TRINITY R A DOUGLAS CITY CA
+  - 11526250 TRINITY R A JUNCTION CITY CA
+  - 11526400 TRINITY R AB NF TRINITY R NR HELENA CA
+  - 11527000 TRINITY R NR BURNT RANCH CA
+  
+```{r, include=FALSE}
+tr_sf <- dataRetrieval::readNWISdv(11528700, "00060") |>  # 1965/10/01 - 2024/09/03
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "trinity river - south fork", # south fork
+         gage_agency = "USGS",
+         gage_number = "11528700",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11528700")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11528700")$dec_long_va # directly add lon
+         ) 
+tr_hoopa <- dataRetrieval::readNWISdv(11530000, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "trinity river",
+         gage_agency = "USGS",
+         gage_number = "11530000",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11530000")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11530000")$dec_long_va # directly add lon
+         ) 
+tr_ab_coffee <- dataRetrieval::readNWISdv(11523200, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "trinity river",
+         gage_agency = "USGS",
+         gage_number = "11523200",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11523200")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11523200")$dec_long_va # directly add lon
+         ) 
+tr_lewiston <- dataRetrieval::readNWISdv(11525500, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "trinity river",
+         gage_agency = "USGS",
+         gage_number = "11525500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11525500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11525500")$dec_long_va # directly add lon
+         ) 
+tr_douglas <- dataRetrieval::readNWISdv(11525655, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "trinity river",
+         gage_agency = "USGS",
+         gage_number = "11525655",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11525655")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11525655")$dec_long_va # directly add lon
+         ) 
+tr_dgcity <- dataRetrieval::readNWISdv(11525854, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "trinity river",
+         gage_agency = "USGS",
+         gage_number = "11525854",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11525854")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11525854")$dec_long_va # directly add lon
+         ) 
+tr_city <- dataRetrieval::readNWISdv(11526250, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "trinity river",
+         gage_agency = "USGS",
+         gage_number = "11526250",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11526250")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11526250")$dec_long_va # directly add lon
+         ) 
+tr_helena <- dataRetrieval::readNWISdv(11526400, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "trinity river",
+         gage_agency = "USGS",
+         gage_number = "11526400",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11526400")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11526400")$dec_long_va # directly add lon
+         ) 
+tr_brun <- dataRetrieval::readNWISdv(11527000, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "trinity river",
+         gage_agency = "USGS",
+         gage_number = "11527000",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11527000")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11527000")$dec_long_va # directly add lon
+         ) 
+
+all_trinity_usgs_gages <- bind_rows(tr_sf, tr_hoopa, tr_ab_coffee, tr_lewiston, tr_douglas, tr_dgcity, tr_city, tr_helena, tr_brun) |>
+  glimpse()
+```
+
+
+
+```{r, include=FALSE}
+### Map Plot Trinity USGS Gages
+# Filter to keep only one unique gage per location
+
+gage_dates <- all_trinity_usgs_gages |> 
+  group_by(gage_number) |> 
+  summarise(min_date = min(date), max_date = max(date))
+
+# Add the date information to the unique gages
+unique_gage_trinity <- all_trinity_usgs_gages |> 
+  distinct(gage_number, latitude, longitude, .keep_all = TRUE) |> 
+  left_join(gage_dates, by = "gage_number")
+
+unique_gage_tr <- unique_gage_trinity |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+leaflet(unique_gage_tr) |> 
+  addTiles() |> 
+    addCircleMarkers(
+    popup = ~paste0("Stream name: ", stream, "<br>Gage Number: ", gage_number, "<br>Max Date: ", max_date, "<br>Min Date: ", min_date)
+  )
+```
+
+### Date coverage per gage
+
+```{r, echo=FALSE}
+all_trinity_usgs_gages |> ggplot(aes(x = year(date), y = value, color = gage_number)) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  facet_wrap(~gage_number) +
+  theme_minimal()
+```
+  
+### Date range summary
+
+```{r, echo=FALSE}
+date_range_summary_trinity <- all_trinity_usgs_gages |> 
+  group_by(gage_number) |> 
+  summarize(
+    min_date = min(date),  
+    max_date = max(date),  
+    record_count = n()) |> 
+  ungroup()  |> 
+  glimpse()
+```
+
+## Scott
+
+  - 11519500 SCOTT R NR FORT JONES CA
+```{r, include=FALSE}
+scott <- dataRetrieval::readNWISdv(11519500, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "scott river",
+         gage_agency = "USGS",
+         gage_number = "11519500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11519500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11519500")$dec_long_va # directly add lon
+         ) 
+
+```
+
+
+```{r, echo=FALSE}
+scott_usgs_dates <- scott |> 
+  group_by(gage_number) |> 
+  summarise(min_date = min(date), max_date = max(date))
+
+# Add the date information to the unique gages
+unique_gage_scott<- scott |> 
+  distinct(gage_number, latitude, longitude, .keep_all = TRUE) |> 
+  left_join(scott_usgs_dates, by = "gage_number")
+
+unique_gage_scott_sf <- unique_gage_scott |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+### Map Plot Scott USGS
+leaflet(unique_gage_scott_sf) |> 
+  addTiles() |> 
+    addCircleMarkers(
+    popup = ~paste0("Stream name: ", stream, "<br>Gage Number: ", gage_number, "<br>Max Date: ", max_date, "<br>Min Date: ", min_date)
+  )
+```
+  
+## Shasta
+
+  - Shasta R NR Montague CA - 11517000
+  - Shasta R NR Yreka CA - 11517500
+  
+```{r, include=FALSE}
+shasta_mont <- dataRetrieval::readNWISdv(11517000, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "shasta river",
+         gage_agency = "USGS",
+         gage_number = "11517000",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11517000")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11517000")$dec_long_va # directly add lon
+         ) 
+
+shasta_yreka <- dataRetrieval::readNWISdv(11517500, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "shasta river",
+         gage_agency = "USGS",
+         gage_number = "11517500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11517500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11517500")$dec_long_va # directly add lon
+         ) 
+
+all_usgs_shasta <- bind_rows(shasta_mont, shasta_yreka) |> 
+  glimpse()
+```
+
+
+
+```{r, include=FALSE}
+shasta_usgs_dates <- all_usgs_shasta |> 
+  group_by(gage_number) |> 
+  summarise(min_date = min(date), max_date = max(date))
+
+# Add the date information to the unique gages
+unique_gage_shasta<- all_usgs_shasta |> 
+  distinct(gage_number, latitude, longitude, .keep_all = TRUE) |> 
+  left_join(shasta_usgs_dates, by = "gage_number")
+
+unique_gage_shas_sf <- unique_gage_shasta |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+### Map Plot Shasta USGS
+leaflet(unique_gage_shas_sf) |> 
+  addTiles() |> 
+    addCircleMarkers(
+    popup = ~paste0("Stream name: ", stream, "<br>Gage Number: ", gage_number, "<br>Max Date: ", max_date, "<br>Min Date: ", min_date)
+  )
+```
+
+### Date coverage plot
+
+```{r, echo=FALSE}
+all_usgs_shasta |> ggplot(aes(x = year(date), y = value, color = gage_number)) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  facet_wrap(~gage_number) +
+  theme_minimal()
+```
+
+### Date range summary
+
+```{r, echo=FALSE}
+date_range_summary_shasta <- all_usgs_shasta |> 
+  group_by(gage_number) |> 
+  summarize(
+    min_date = min(date),  
+    max_date = max(date),  
+    record_count = n()) |> 
+  ungroup()  |> 
+  glimpse()
+```
+
+## Salmon
+
+  - 11522500 SALMON R A SOMES BAR CA
+  
+```{r, include=FALSE}
+salmon_usgs_gage <- dataRetrieval::readNWISdv(11522500, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "shasta river",
+         gage_agency = "USGS",
+         gage_number = "11522500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11522500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11522500")$dec_long_va # directly add lon
+         )
+```
+
+
+```{r, include=FALSE, message=FALSE}
+salmon_gage_dates <- salmon_usgs_gage |> 
+  group_by(gage_number) |> 
+  summarise(min_date = min(date), max_date = max(date))
+
+unique_gage_data_salmon <- salmon_usgs_gage |> 
+  distinct(gage_number, latitude, longitude, .keep_all = TRUE) |> 
+  left_join(salmon_gage_dates, by = "gage_number")
+
+unique_gage_data_salmon_sf <- unique_gage_data_salmon |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+### Map Plot Salmon USGS
+leaflet(unique_gage_data_salmon_sf) |> 
+  addTiles() |> 
+  addCircleMarkers(popup = ~paste0("Stream name: ", stream, "<br>Gage Number: ", gage_number, "<br>Max Date: ", max_date, "<br>Min Date: ", min_date))
+```
+
+### Date coverage plot
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+salmon_usgs_gage |> ggplot(aes(x = year(date), y = value)) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) 
+  theme_minimal()
+```
+
+### Date range summary
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+date_range_summary_salmon <- salmon_usgs_gage |> 
+  group_by(gage_number) |> 
+  summarize(
+    min_date = min(date),  
+    max_date = max(date),  
+    record_count = n()) |> 
+  ungroup()  |> 
+  glimpse()
+```
+
+## Sprague 
+
+  * Sprague River Near Chiloquin, OR - 11501000
+
+```{r, include=FALSE}
+sprague_usgs_gage <- dataRetrieval::readNWISdv(11501000, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "sprague river",
+         gage_agency = "USGS",
+         gage_number = "11501000",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11501000")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11501000")$dec_long_va # directly add lon
+         )
+```
+
+```{r, include=FALSE}
+sprague_gage_dates <- sprague_usgs_gage |> 
+  group_by(gage_number) |> 
+  summarise(min_date = min(date), max_date = max(date))
+
+unique_gage_data_sprague <- sprague_usgs_gage |> 
+  distinct(gage_number, latitude, longitude, .keep_all = TRUE) |> 
+  left_join(sprague_gage_dates, by = "gage_number")
+
+unique_gage_data_sprague_sf <- unique_gage_data_sprague |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+### Map plot Sprague
+leaflet(unique_gage_data_sprague_sf) |> 
+  addTiles() |> 
+  addCircleMarkers(popup = ~paste0("Stream name: ", stream, "<br>Gage Number: ", gage_number, "<br>Max Date: ", max_date, "<br>Min Date: ", min_date))
+```
+
+### Date coverage plot
+
+```{r echo=FALSE}
+sprague_usgs_gage |> ggplot(aes(x = year(date), y = value)) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) 
+  theme_minimal()
+```
+
+### Date range summary
+
+```{r echo=FALSE}
+date_range_summary_sprague <- sprague_usgs_gage |> 
+  group_by(gage_number) |> 
+  summarize(
+    min_date = min(date),  
+    max_date = max(date),  
+    record_count = n()) |> 
+  ungroup()  |> 
+  glimpse()
+```
+
+## Indian Creek
+
+List of USGS gages in Klamath watershed: 
+
+  - Indian C NR Douglas City CA - 11525670
+  - Indian C NR Happy Camp CA - 11521500
+  
+```{r, include=FALSE}
+indian_usgs_doug <- dataRetrieval::readNWISdv(11525670, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "indian creek",
+         gage_agency = "USGS",
+         gage_number = "11525670",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11525670")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11525670")$dec_long_va # directly add lon
+         )
+indian_usgs_happy <- dataRetrieval::readNWISdv(11521500, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "indian creek",
+         gage_agency = "USGS",
+         gage_number = "11521500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11521500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11521500")$dec_long_va # directly add lon
+         )
+
+all_indian_usgs_gages <- bind_rows(indian_usgs_doug, indian_usgs_happy) |>
+  glimpse()
+```
+
+
+```{r, echo=FALSE}
+# Filter to keep only one unique gage per location
+indian_gage_dates <- all_indian_usgs_gages |> 
+  group_by(gage_number) |> 
+  summarise(min_date = min(date), max_date = max(date))
+
+unique_gage_data_indian <- all_indian_usgs_gages |> 
+  distinct(gage_number, latitude, longitude, .keep_all = TRUE) |> 
+  left_join(indian_gage_dates, by = "gage_number")
+
+unique_gage_indian <- unique_gage_data_indian |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+### Map Plot Klamath USGS Gages - TODO check on location of this stream 
+leaflet(unique_gage_indian) |> 
+  addTiles() |> 
+  addCircleMarkers(popup = ~paste0("Stream name: ", stream, "<br>Gage Number: ", gage_number, "<br>Max Date: ", max_date, "<br>Min Date: ", min_date))
+```
+
+### Date coverage
+
+```{r, echo=FALSE}
+all_indian_usgs_gages |> ggplot(aes(x = date, y = value, color = gage_number)) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  facet_wrap(~gage_number) +
+  theme_minimal()
+```
+
+## Other streams - Oregon
+
+  - Klamath Straits Drain Near Worden, OR - 11509340
+  - Ady Canal Above Lower Klamath Nwr, Near Worden, OR - 11509250
+  - North Canal at Highway 97, Near Midland, OR - 11509105
+  - Link River at Klamath Falls, OR - 11507500
+  - Williamson River Blw Sprague River NR Chiloquin,or - 11502500
+  - Crystal Creek Near Rocky Point, OR - 11504270 - NODATA
+  - Fourmile Canal Near Klamath Agency, OR - 11504260
+  - Sevenmile Cnl at Dike RD Br, NR Klamath Agency, OR - 11504290
+
+```{r, include=FALSE}
+other_usgs_or1 <- dataRetrieval::readNWISdv(11509340, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "other",
+         gage_agency = "USGS",
+         gage_number = "11509340",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11509340")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11509340")$dec_long_va # directly add lon
+         )
+other_usgs_or2 <- dataRetrieval::readNWISdv(11509250, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "other",
+         gage_agency = "USGS",
+         gage_number = "11509250",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11509250")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11509250")$dec_long_va # directly add lon
+         )
+other_usgs_or3 <- dataRetrieval::readNWISdv(11509105, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "other",
+         gage_agency = "USGS",
+         gage_number = "11509105",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11509105")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11509105")$dec_long_va # directly add lon
+         )
+other_usgs_or4 <- dataRetrieval::readNWISdv(11507500, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "other",
+         gage_agency = "USGS",
+         gage_number = "11507500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11507500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11507500")$dec_long_va # directly add lon
+         )
+other_usgs_or5 <- dataRetrieval::readNWISdv(11502500, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "other",
+         gage_agency = "USGS",
+         gage_number = "11502500",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11502500")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11502500")$dec_long_va # directly add lon
+         )
+
+other_usgs_or6 <- dataRetrieval::readNWISdv(11504260, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "other",
+         gage_agency = "USGS",
+         gage_number = "11504260",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11504260")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11504260")$dec_long_va # directly add lon
+         )
+other_usgs_or7 <- dataRetrieval::readNWISdv(11504290, "00060") |> 
+  select(date = Date, value =  X_00060_00003) |>  # rename to value
+  as_tibble() |> 
+  mutate(stream = "other",
+         gage_agency = "USGS",
+         gage_number = "11504290",
+         parameter = "flow",
+         statistic = "mean", # if query returns instantaneous data then report a min, mean, and max
+         latitude = dataRetrieval::readNWISsite("11504290")$dec_lat_va, # directly add lat
+         longitude = dataRetrieval::readNWISsite("11504290")$dec_long_va # directly add lon
+         )
+
+all_or_usgs_gages <- bind_rows(other_usgs_or1, other_usgs_or2, other_usgs_or3, other_usgs_or4, other_usgs_or5, other_usgs_or6, other_usgs_or7) |>
+  glimpse()
+```
+
+```{r, echo=FALSE}
+# Filter to keep only one unique gage per location
+
+gage_dates_or <- all_or_usgs_gages |> 
+  group_by(gage_number) |> 
+  summarise(min_date = min(date), max_date = max(date))
+
+# Add the date information to the unique gages
+unique_gage_or <- all_or_usgs_gages |> 
+  distinct(gage_number, latitude, longitude, .keep_all = TRUE) |> 
+  left_join(gage_dates_or, by = "gage_number")
+
+unique_gage_or_sf <- unique_gage_or |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+### Map Plot Trinity USGS Gages
+leaflet(unique_gage_or_sf) |> 
+  addTiles() |> 
+    addCircleMarkers(
+    popup = ~paste0("Stream name: ", stream, "<br>Gage Number: ", gage_number, "<br>Max Date: ", max_date, "<br>Min Date: ", min_date)
+  )
+```
+
+### Date coverage
+
+```{r, echo=FALSE}
+all_or_usgs_gages |> ggplot(aes(x = date, y = value, color = gage_number)) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  facet_wrap(~gage_number) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+### Date range summary
+
+```{r, echo=FALSE}
+date_range_summary_or <- all_or_usgs_gages |> 
+  group_by(gage_number) |> 
+  summarize(
+    min_date = min(date),  
+    max_date = max(date),  
+    record_count = n()) |> 
+  ungroup()  |> 
+  glimpse()
+```
+
+
+
+```{r, include=FALSE}
+## Combing all streams 
+kl_basin <- bind_rows(unique_gage_data_kl, unique_gage_trinity, unique_gage_scott, unique_gage_shasta, unique_gage_data_salmon, unique_gage_data_sprague, unique_gage_data_indian, unique_gage_or)
+
+#clean field names
+kl_basin_table <- kl_basin |> 
+  mutate(mean_flow_cfs = value,
+         data_source = gage_agency,
+         earliest_data = min_date,
+         latest_data = max_date) |> 
+  select(c(mean_flow_cfs, data_source, gage_number, stream, earliest_data, latest_data, latitude, longitude)) |> 
+  glimpse()
+
+```
+
+```{r eval=FALSE, include=FALSE}
+kl_basin_sf <- kl_basin_table |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+leaflet(kl_basin_sf) |> 
+  addTiles() |> 
+    addCircleMarkers(
+    popup = ~paste0("Stream name: ", stream, "<br>Gage Number: ", gage_number, "<br>Latest Date: ", latest_data, "<br>Earliest Date: ", earliest_data)
+  )
+```
+
+
+
+```{r, include=FALSE}
+#Save clean table
+# write.csv(kl_basin_table, "data/
+```
+
+
