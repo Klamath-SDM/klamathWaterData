@@ -29,6 +29,8 @@ colors_full <-  c("#9A8822", "#F5CDB4", "#F8AFA8", "#FDDDA0", "#74A089", #Royal 
 
 USGS Temperature gage exploration - Klamath River Basin
 
+The goal of this markdown is to explore USGS temperature gages within the Klamath Basin, understand their geographic and temporal coverage.
+
 
 ### Klamath Main Steam
 
