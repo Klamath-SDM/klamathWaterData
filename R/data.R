@@ -45,3 +45,13 @@
 #' @examples
 #' do_gage |> pillar::glimpse()
 "do_gage"
+
+#' @name usgs_dam_removal_monitoring_layers
+#' @title Spatial layers from USGS dam removal monitoring in the Klamath Basin
+#' @description
+#' A named list of spatial (`sf`) layers pulled from the Klamath Dam Removal Monitoring Web Map hosted on ArcGIS Online.
+#' Each element represents a layer of interest, such as reservoir footprints, sediment monitoring points, or dam sites.
+#' @examples
+#' names(usgs_dam_removal_monitoring_layers)
+#' usgs_dam_removal_monitoring_layers$geomorphic_reaches |> sf::st_geometry() |> plot()
+"usgs_dam_removal_monitoring_layers"
