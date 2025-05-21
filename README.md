@@ -17,7 +17,7 @@ To install the `klamathWaterData` data package, please use the remotes package t
 
 ``` r
 #install.packages("remotes")
-remotes::install_github("flowwest/klamathWaterData")
+remotes::install_github("Klamath-SDM/klamathWaterData")
 ```
 
 # Usage
