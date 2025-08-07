@@ -1,0 +1,190 @@
+---
+title: "HAB data Exploration "
+author: "Badhia Yunes Katz"
+date: "August 2025"
+# output: rmarkdown::github_document
+---
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(dataRetrieval)
+library(leaflet)
+library(janitor)
+library(dplyr)
+library(ggplot2)
+library(DT)         
+library(tidyr)
+library(scales)
+library(leaflet)
+```
+
+
+Pulling data from WQX of those parameters that are associated with HABs - last 10 years
+
+We focus on parameters associated with **harmful algal blooms (HABs)**:
+
+- **Microcystin** — WHO recreational threshold: ≥ 8 µg/L  
+- **Phycocyanin** — cyanobacterial pigment, spikes indicate blooms  
+- **Chlorophyll a** — ≥ 30 µg/L often indicates bloom conditions  
+- **Cyanobacteria** — ≥ 100,000 cells/mL indicates a bloom  
+
+The workflow:
+
+1. Query WQP for relevant parameters  
+2. Summarize maximum values per year and site  
+3. Identify likely bloom events  
+4. Map bloom locations and provide a summary table  
+
+
+```{r }
+# Define Klamath Basin HUC8 codes
+huc_code <- "180102"
+
+hab_characteristics <- c("Phycocyanin", "Chlorophyll a","Microcystin","Cyanobacteria")
+
+# Set date range
+start_date <- "2014-01-01"
+end_date <- "2025-12-31"
+```
+
+
+```{r echo=FALSE}
+all_results <- data.frame()
+
+for (char_name in hab_characteristics) {
+  message("Querying for: ", char_name)
+  
+  result <- tryCatch({
+    readWQPdata(
+      huc = huc_code,
+      characteristicName = char_name,
+      startDate = start_date,
+      endDate = end_date,
+      sampleMedia = "Water"
+    )
+  }, error = function(e) {
+    warning(paste("Error retrieving", char_name, ":", e$message))
+    return(NULL)
+  })
+  
+  if (!is.null(result) && nrow(result) > 0) {
+    all_results <- rbind(all_results, result)
+  }
+}
+
+# cleaning column names
+all_results <- all_results |> 
+  clean_names()
+```
+
+### Summary of Annual Maximum Values
+
+```{r include=FALSE}
+# exploring high values
+summary_table <- all_results |> 
+  mutate(Year = year(ActivityStartDate)) |> 
+  group_by(MonitoringLocationIdentifier, CharacteristicName, Year) |> 
+  summarize(
+    Samples = n(),
+    MaxValue = max(as.numeric(ResultMeasureValue), na.rm = TRUE),
+    .groups = "drop") |> 
+  arrange(desc(MaxValue))
+
+head(summary_table, 10)  # highest 10
+```
+
+
+### Likely Bloom Events
+
+```{r echo=FALSE}
+# likely bloom conditions based on research
+likely_blooms <- summary_table |> 
+  filter((CharacteristicName == "Microcystin" & MaxValue >= 8) |
+           (CharacteristicName == "Chlorophyll a" & MaxValue >= 30) |
+           (CharacteristicName == "Cyanobacteria" & MaxValue >= 100000))
+
+ggplot(summary_table, aes(x = Year, y = MaxValue, color = CharacteristicName)) +
+  geom_point() +
+  facet_wrap(~ CharacteristicName, scales = "free_y") +
+  labs(title = "Maximum HAB-Related Values by Year",
+       y = "Max Value",
+       x = "Year")
+
+```
+
+### Likely HAB Events with Location
+
+```{r echo=FALSE}
+# pulling site info 
+site_info <- whatWQPsites(huc = "180102")
+
+# join site info to data
+all_results_with_sites <- left_join(all_results, site_info,
+                                    by = "MonitoringLocationIdentifier")
+
+all_results_with_sites <- all_results_with_sites |> 
+  clean_names() |> 
+  mutate(latitude_measure = as.numeric(latitude_measure),
+         longitude_measure = as.numeric(longitude_measure)) |>
+  glimpse()
+  
+
+hab_events <- all_results_with_sites |> 
+  filter(characteristic_name %in% c("Microcystin", "Chlorophyll a", "Phycocyanin", "Cyanobacteria")) |> 
+  mutate(value = as.numeric(result_measure_value),
+         date = as.Date(activity_start_date),
+         hab_likely = case_when(
+           characteristic_name == "Microcystin" & value >= 8 ~ TRUE,
+           characteristic_name == "Chlorophyll a" & value >= 30 ~ TRUE,
+           characteristic_name == "Cyanobacteria" & value >= 100000 ~ TRUE,
+           characteristic_name == "Phycocyanin" & value >= quantile(value, 0.90, na.rm = TRUE) ~ TRUE,
+           TRUE ~ FALSE)) |> 
+  filter(hab_likely == TRUE) |> 
+  select(date, characteristic_name, value, result_depth_height_measure_measure_unit_code,
+         monitoring_location_name, latitude_measure, longitude_measure)
+
+habs_palette <- colorFactor(
+  palette = c("darkred", "darkgreen", "blue", "orange"),
+  domain = hab_events$characteristic_name)
+
+hab_events_clean <- hab_events |> 
+   mutate(latitude_measure = jitter(latitude_measure, factor = .07), #TODO figure out jitter
+         longitude_measure = jitter(longitude_measure, factor = .07))
+
+leaflet(hab_events_clean) |> 
+  addTiles() |> 
+  addCircleMarkers(lng = ~longitude_measure,
+                   lat = ~latitude_measure,
+                   color = ~habs_palette(characteristic_name),
+                   label = ~paste0(monitoring_location_name,
+                                  "<br><b>Date:</b>", date,
+                                  "<br><b>", characteristic_name, ":</b> ", value,
+                                  result_depth_height_measure_measure_unit_code),
+                   radius = 6,
+                   fillOpacity = 0.8) |> 
+    addLegend("bottomright",
+              pal = habs_palette,
+              values = ~characteristic_name,
+              title = "HAB Type")
+```
+
+### Summary Table of HAB Events
+
+```{r echo=FALSE}
+# summary table
+hab_summary_table <- hab_events |> 
+  mutate(
+    hab_type = characteristic_name,
+    site = monitoring_location_name,
+    value = round(value, 2),
+    units = result_depth_height_measure_measure_unit_code,
+    latitude = latitude_measure,
+    longitude = longitude_measure) |> 
+  select(date, site, hab_type, value) |> 
+  arrange(desc(date))
+
+hab_summary_table
+
+```
+
