@@ -20,14 +20,81 @@ library(leaflet)
 ```
 
 
-Pulling data from WQX of those parameters that are associated with HABs - last 10 years
 
-We focus on parameters associated with **harmful algal blooms (HABs)**:
 
-- **Microcystin** — WHO recreational threshold: ≥ 8 µg/L  
-- **Phycocyanin** — cyanobacterial pigment, spikes indicate blooms  
-- **Chlorophyll a** — ≥ 30 µg/L often indicates bloom conditions  
-- **Cyanobacteria** — ≥ 100,000 cells/mL indicates a bloom  
+## Context 
+HAB concerns include **planktonic blooms** (e.g., *Microcystis*) and **benthic cyanobacterial mats** (e.g., *Microcoleus*) that can produce **anatoxin-a**, especially in river reaches. Key management actions (advisories, impairment listings, and dam removals) reflect a long history of **cyanotoxins** and **elevated biomass** during warm seasons.
+
+**Useful context sources**  
+- OHA HAB program: advisories, criteria, and program logic  https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/Pages/index.aspx
+- USGS Klamath studies overview (Oregon Water Science Center)  
+  https://www.usgs.gov/centers/oregon-water-science-center/science/upper-klamath-basin-studies-and-data-collection
+
+---
+
+## Literature-backed thresholds used
+These thresholds are widely cited for **recreational** decision-making and surveillance. 
+
+| Parameter | Threshold | Source |
+|---|---:|---|
+| **Microcystin** | ≥ 8 µg/L | [EPA 2019 Recreational Criteria (PDF)](https://www.epa.gov/sites/default/files/2019-05/documents/hh-rec-criteria-habs-document-2019.pdf); [OHA 2024 Guidance (PDF)](https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Documents/Advisory%20Guidelines%20for%20Harmful%20Cyanobacteria%20Blooms%20in%20Recreational%20Waters.2024_Final.pdf) |
+| **Cylindrospermopsin** | ≥ 15 µg/L | [EPA 2019 Recreational Criteria (PDF)](https://www.epa.gov/sites/default/files/2019-05/documents/hh-rec-criteria-habs-document-2019.pdf) |
+| **Anatoxin-a** | ≥ 15 µg/L | [OHA 2024 Guidance (PDF)](https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Documents/Advisory%20Guidelines%20for%20Harmful%20Cyanobacteria%20Blooms%20in%20Recreational%20Waters.2024_Final.pdf) |
+| **Saxitoxin** | ≥ 8 µg/L | [OHA 2024 Guidance (PDF)](https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Documents/Advisory%20Guidelines%20for%20Harmful%20Cyanobacteria%20Blooms%20in%20Recreational%20Waters.2024_Final.pdf) |
+| **Cyanobacteria (cells)** | ≥ 100,000 cells/mL (alert level) | WHO 2021 [*Toxic Cyanobacteria in Water*, 2nd ed., Ch. 11](https://www.who.int/publications/m/item/toxic-cyanobacteria-in-water---second-edition) ([Open-access PDF](https://library.oapen.org/bitstream/20.500.12657/47047/1/9781000262025.pdf)) |
+| **Chlorophyll a** | ≈ 20–50 µg/L (cyano-dominated; we use ≥ 30 µg/L) | WHO 2021, Ch. 5 ([Open PDF](https://library.oapen.org/bitstream/20.500.12657/47047/1/9781000262025.pdf)) |
+| **Phycocyanin** | Site-specific (use high percentiles locally) | [EPA 2019 Guidance (PDF)](https://www.epa.gov/sites/default/files/2019-09/documents/recommend-cyano-rec-water-2019-update.pdf); [Almuhtaram et al., 2021](https://www.sciencedirect.com/science/article/pii/S1470160X21011079) |
+
+**Benthic vs planktonic note**  
+Benthic mats (e.g., *Microcoleus*) can drive **anatoxin-a** even when the water column looks clear. For Klamath River, see:  
+Genzoli et al. 2024, *Freshwater Science*: “Benthic cyanobacterial proliferations drive anatoxin production…” (journal page/PDF often available via journal or authors’ sites).
+
+---
+
+## “HAB event” (operational rules)
+
+1. **Toxic HAB event (primary evidence)**  
+   - Any sample with **Microcystin ≥ 8 µg/L**, or other cyanotoxin above state/EPA thresholds.  
+   - Optionally consider EPA’s **10-day assessment window**.
+
+2. **Bloom evidence (supporting)**  
+   - **Cyanobacteria ≥ 100,000 cells/mL** (WHO alert level), and/or  
+   - **Chlorophyll-a ≥ 30–50 µg/L** when cyanobacteria dominate (use ≥ 30 µg/L), and/or  
+   - **Phycocyanin** in top decile (≥ 90th percentile) of site-specific history.
+
+3. **Benthic risk context**  
+   - Presence of benthic mats or mat toxins (anatoxin-a) in tributaries/river reaches—even if water column is low.
+
+---
+
+## Other data sources
+- **Water Quality Portal (WQX/NWIS/STORET):** https://www.waterqualitydata.us/  
+- **OHA Advisory Archive:** https://www.oregon.gov/OHA/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Pages/Blue-GreenAlgaeAdvisories.aspx  
+- **Klamath Basin Monitoring Program (KBMP) — Blue-Green Algae Tracker:** https://kbmp.net/maps-and-data  
+- **CyAN (EPA/NOAA/USGS):** https://experience.arcgis.com/experience/01f798892ecb48d8ac99ef9b4ebe37c8  
+- **USGS Klamath studies & data releases:** https://www.usgs.gov/centers/oregon-water-science-center/science/upper-klamath-basin-studies-and-data-collection
+
+
+---
+
+## Interpreting results
+- **Microcystin ≥ 8 µg/L** → toxic HAB, cite EPA/OHA guidance.  
+- **Cyanobacteria ≥ 100,000 cells/mL** or **Chl-a ≥ 30–50 µg/L** → bloom conditions (WHO framework).  
+- **Phycocyanin** → indicator; highlight spikes.  
+- **Anatoxin-a in mats** → cite Genzoli et al. 2024 for benthic hazard.
+
+---
+
+## Links 
+- [EPA 2019 Recreational Criteria (PDF)](https://www.epa.gov/sites/default/files/2019-05/documents/hh-rec-criteria-habs-document-2019.pdf)  
+- [EPA 2019 Implementation Guidance (PDF)](https://www.epa.gov/sites/default/files/2019-09/documents/recommend-cyano-rec-water-2019-update.pdf)  
+- [OHA 2024 Recreational Guidance (PDF)](https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Documents/Advisory%20Guidelines%20for%20Harmful%20Cyanobacteria%20Blooms%20in%20Recreational%20Waters.2024_Final.pdf)  
+- [WHO 2021 *Toxic Cyanobacteria in Water* — Open-access PDF](https://library.oapen.org/bitstream/20.500.12657/47047/1/9781000262025.pdf)  
+- [Water Quality Portal](https://www.waterqualitydata.us/)  
+- [OHA HAB advisories](https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Pages/Blue-GreenAlgaeAdvisories.aspx)  
+- [KBMP — Maps & Data](https://kbmp.net/maps-and-data)  
+- [USGS Klamath studies](https://www.usgs.gov/centers/oregon-water-science-center/science/upper-klamath-basin-studies-and-data-collection)
+
 
 The workflow:
 
@@ -41,7 +108,7 @@ The workflow:
 # Define Klamath Basin HUC8 codes
 huc_code <- "180102"
 
-hab_characteristics <- c("Phycocyanin", "Chlorophyll a","Microcystin","Cyanobacteria")
+hab_characteristics <- c("Phycocyanin", "Chlorophyll a","Microcystin","Cyanobacteria", "Anatoxin-A", "Saxitoxin", "Cylindrospermopsin")
 
 # Set date range
 start_date <- "2014-01-01"
@@ -54,7 +121,7 @@ all_results <- data.frame()
 
 for (char_name in hab_characteristics) {
   message("Querying for: ", char_name)
-  
+
   result <- tryCatch({
     readWQPdata(
       huc = huc_code,
@@ -67,31 +134,82 @@ for (char_name in hab_characteristics) {
     warning(paste("Error retrieving", char_name, ":", e$message))
     return(NULL)
   })
-  
+
   if (!is.null(result) && nrow(result) > 0) {
     all_results <- rbind(all_results, result)
   }
 }
 
 # cleaning column names
-all_results <- all_results |> 
+all_results <- all_results |>
   clean_names()
 ```
+
+```{r}
+site_info <- whatWQPsites(huc = huc_code) |> clean_names()
+
+data <- all_results |>
+  left_join(site_info, by = "monitoring_location_identifier") |>
+  mutate(
+    date = as.Date(activity_start_date),
+    value_num = as.numeric(result_measure_value),
+    latitude_measure  = as.numeric(latitude_measure),
+    longitude_measure = as.numeric(longitude_measure))
+
+summary_table <- data |>
+  mutate(year = year(date)) |>
+  group_by(monitoring_location_identifier, monitoring_location_name,
+           characteristic_name, year) |>
+  summarise(
+    samples   = n(),
+    max_value = max(value_num, na.rm = TRUE),
+    units = result_measure_measure_unit_code,
+    .groups = "drop") |>
+  arrange(desc(max_value))
+
+head(summary_table, 10)
+
+```
+
+```{r}
+# Toxin thresholds (EPA 2019 / OHA 2024)
+thr_microcystin      <- 8    # µg/L
+thr_cylindrospermopsin <- 15 # µg/L
+thr_anatoxin_a       <- 15   # µg/L (OHA RUV)
+thr_saxitoxin        <- 8    # µg/L (OHA RUV)
+
+# Supporting indicators (WHO / literature)
+thr_cyano_cells <- 100000    # cells/mL
+thr_chla <- 30        # µg/L (screening, conservative)
+
+# Phycocyanin local "elevated" signal = 90th percentile (across dataset).
+pc90 <- data |>
+  filter(characteristic_name == "Phycocyanin") |>
+  summarise(pc90 = quantile(value_num, 0.90, na.rm = TRUE)) |>
+  pull(pc90)
+if (length(pc90) == 0 || is.na(pc90)) pc90 <- Inf
+
+# Helper: unit-safe string
+unit_safe <- function(x) ifelse(is.na(x) | x=="", "", x)
+
+```
+
+
 
 ### Summary of Annual Maximum Values
 
 ```{r include=FALSE}
 # exploring high values
-summary_table <- all_results |> 
-  mutate(Year = year(ActivityStartDate)) |> 
-  group_by(MonitoringLocationIdentifier, CharacteristicName, Year) |> 
-  summarize(
-    Samples = n(),
-    MaxValue = max(as.numeric(ResultMeasureValue), na.rm = TRUE),
-    .groups = "drop") |> 
-  arrange(desc(MaxValue))
-
-head(summary_table, 10)  # highest 10
+# summary_table <- all_results |> 
+#   mutate(Year = year(ActivityStartDate)) |> 
+#   group_by(MonitoringLocationIdentifier, CharacteristicName, Year) |> 
+#   summarize(
+#     Samples = n(),
+#     MaxValue = max(as.numeric(ResultMeasureValue), na.rm = TRUE),
+#     .groups = "drop") |> 
+#   arrange(desc(MaxValue))
+# 
+# head(summary_table, 10)  # highest 10
 ```
 
 
@@ -99,23 +217,23 @@ head(summary_table, 10)  # highest 10
 
 ```{r echo=FALSE}
 # likely bloom conditions based on research
-likely_blooms <- summary_table |> 
-  filter((CharacteristicName == "Microcystin" & MaxValue >= 8) |
-           (CharacteristicName == "Chlorophyll a" & MaxValue >= 30) |
-           (CharacteristicName == "Cyanobacteria" & MaxValue >= 100000))
-
-ggplot(summary_table, aes(x = Year, y = MaxValue, color = CharacteristicName)) +
-  geom_point() +
-  facet_wrap(~ CharacteristicName, scales = "free_y") +
-  labs(title = "Maximum HAB-Related Values by Year",
-       y = "Max Value",
-       x = "Year")
+# likely_blooms <- summary_table |> 
+#   filter((CharacteristicName == "Microcystin" & MaxValue >= 8) |
+#            (CharacteristicName == "Chlorophyll a" & MaxValue >= 30) |
+#            (CharacteristicName == "Cyanobacteria" & MaxValue >= 100000))
+# 
+# ggplot(summary_table, aes(x = Year, y = MaxValue, color = CharacteristicName)) +
+#   geom_point() +
+#   facet_wrap(~ CharacteristicName, scales = "free_y") +
+#   labs(title = "Maximum HAB-Related Values by Year",
+#        y = "Max Value",
+#        x = "Year")
 
 ```
 
 ### Likely HAB Events with Location
 
-```{r echo=FALSE}
+```{r eval=FALSE, include=FALSE}
 # pulling site info 
 site_info <- whatWQPsites(huc = "180102")
 
@@ -171,7 +289,7 @@ leaflet(hab_events_clean) |>
 
 ### Summary Table of HAB Events
 
-```{r echo=FALSE}
+```{r eval=FALSE, include=FALSE}
 # summary table
 hab_summary_table <- hab_events |> 
   mutate(
