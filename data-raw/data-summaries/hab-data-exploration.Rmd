@@ -17,65 +17,61 @@ library(DT)
 library(tidyr)
 library(scales)
 library(leaflet)
+library(htmltools)
 ```
 
 
-This report is a **one-stop overview** of harmful algal bloom (HAB) data and practice in the **Klamath Basin** (southern Oregon & northern California). It covers:
+This report is has an overview of harmful algal bloom (HAB) data and practice in the Klamath Basin (southern Oregon & northern California). It covers:
 
-- **What HAB parameters matter** and the **thresholds** used in health guidance (with links to sources)
-- **What data exists** in the **Water Quality Portal (WQX)** for the basin
-- A **reproducible R workflow** to pull those data for the last ~10 years, flag likely HAB events, and map them
-- **Caveats** and tips for interpreting results
+- What HAB parameters matter and the thresholds used in health guidance (with links to sources)
+- What data exists in the Water Quality Portal (WQX) for the basin
+- Data pull those data for the last ~10 years, flag likely HAB events, and map them
+- Caveats for interpreting results
 
-The goal: let any reader understand the **what/why** and **see the data**.
 
----
+# 2. Basin context
 
-# 2. Basin context (very brief)
+The Klamath system includes Upper Klamath Lake, the Klamath River, and major tributaries. 
+HABs occur as:
 
-The Klamath system includes **Upper Klamath Lake**, the **Klamath River**, and major tributaries. HABs occur as:
+- Planktonic blooms (e.g., Microcystis) → often produce microcystins (toxin)
+- Benthic cyanobacterial mats (e.g., Microcoleus) → can produce anatoxin-a, especially in river reaches
 
-- **Planktonic blooms** (e.g., *Microcystis*) → often produce **microcystins** (toxin)
-- **Benthic cyanobacterial mats** (e.g., *Microcoleus*) → can produce **anatoxin-a**, especially in river reaches
+**Resources**  
+- [Oregon Health Authority (OHA) HAB program (advisories, criteria, program logic)](https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Pages/index.aspx)
+- [USGS Klamath studies overview](https://www.usgs.gov/centers/oregon-water-science-center/science/upper-klamath-basin-studies-and-data-collection)
 
-**Context resources**  
-- Oregon Health Authority (OHA) HAB program (advisories, criteria, program logic):  
-  https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Pages/
-- USGS Klamath studies overview:  
-  https://www.usgs.gov/centers/oregon-water-science-center/science/upper-klamath-basin-studies-and-data-collection
 
----
+# 3. HAB parameters (thresholds & sources)
 
-# 3. HAB parameters and **why** they matter (with thresholds & sources)
-
-These are the most decision-relevant parameters for **recreational waters**. We use them to classify **toxic events** and **bloom evidence**.
+These are the most decision-relevant parameters for recreational waters. We use them to classify toxic events and bloom evidence.
 
 | Parameter | Threshold (recreation context) | Why it matters | Sources (working links) |
 |---|---:|---|---|
-| **Microcystin** | **≥ 8 µg/L** | Most common cyanotoxin; core basis for advisories | EPA 2019 Criteria (PDF): https://www.epa.gov/sites/default/files/2019-05/documents/hh-rec-criteria-habs-document-2019.pdf ; OHA 2024 Guidance (PDF): https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Documents/Advisory%20Guidelines%20for%20Harmful%20Cyanobacteria%20Blooms%20in%20Recreational%20Waters.2024_Final.pdf |
-| **Cylindrospermopsin** | **≥ 15 µg/L** | Cyanotoxin; used in EPA/OHA frameworks | EPA 2019 Criteria (PDF): https://www.epa.gov/sites/default/files/2019-05/documents/hh-rec-criteria-habs-document-2019.pdf |
-| **Anatoxin-a** | **≥ 15 µg/L** | Neurotoxin; common in **benthic mats** | OHA 2024 Guidance (PDF): https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Documents/Advisory%20Guidelines%20for%20Harmful%20Cyanobacteria%20Blooms%20in%20Recreational%20Waters.2024_Final.pdf |
+| **Microcystin** | **≥ 8 µg/L** | Most common cyanotoxin; core basis for advisories | [EPA 2019 Criteria (PDF)](https://www.epa.gov/sites/default/files/2019-05/documents/hh-rec-criteria-habs-document-2019.pdf) ; [OHA 2024 Guidance (PDF)](https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Documents/Advisory%20Guidelines%20for%20Harmful%20Cyanobacteria%20Blooms%20in%20Recreational%20Waters.2024_Final.pdf) |
+| **Cylindrospermopsin** | **≥ 15 µg/L** | Cyanotoxin; used in EPA/OHA frameworks | [EPA 2019 Criteria (PDF)](https://www.epa.gov/sites/default/files/2019-05/documents/hh-rec-criteria-habs-document-2019.pdf) |
+| **Anatoxin-a** | **≥ 15 µg/L** | Neurotoxin; common in benthic mats | [OHA 2024 Guidance (PDF)][https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Documents/Advisory%20Guidelines%20for%20Harmful%20Cyanobacteria%20Blooms%20in%20Recreational%20Waters.2024_Final.pdf] |
 | **Saxitoxin** | **≥ 8 µg/L** | Neurotoxin; advisory value | OHA 2024 Guidance (PDF): link above |
-| **Cyanobacteria (cells)** | **≥ 100,000 cells/mL** | WHO alert-level trigger; risk management | WHO 2nd ed. *Toxic Cyanobacteria in Water* (landing): https://www.who.int/publications/m/item/toxic-cyanobacteria-in-water---second-edition ; Full open PDF: https://library.oapen.org/bitstream/20.500.12657/47047/1/9781000262025.pdf |
+| **Cyanobacteria (cells)** | **≥ 100,000 cells/mL** | WHO alert-level trigger; risk management | [WHO 2nd ed. *Toxic Cyanobacteria in Water* (landing)](https://www.who.int/publications/m/item/toxic-cyanobacteria-in-water---second-edition); [Full open PDF](https://library.oapen.org/bitstream/20.500.12657/47047/1/9781000262025.pdf) |
 | **Chlorophyll a** | **≈ 20–50 µg/L** when cyano-dominated; **use ≥ 30 µg/L** for conservative screening | Biomass proxy; supports bloom identification | WHO 2nd ed., Ch. 5 (open PDF): link above |
-| **Phycocyanin** | **Site-specific (no universal cut-point)**; use **local 90th percentile** as screening | Cyanobacteria pigment (sensor reading); good early warning when calibrated to cells/toxins | EPA 2019 Monitoring Guidance (PDF): https://www.epa.gov/sites/default/files/2019-09/documents/recommend-cyano-rec-water-2019-update.pdf ; Review: Almuhtaram et al., 2021 (overview of sensors and variability) https://www.sciencedirect.com/science/article/pii/S1470160X21011079 |
+| **Phycocyanin** | **Site-specific (no universal cut-point)**; use **local 90th percentile** as screening | Cyanobacteria pigment (sensor reading); good early warning when calibrated to cells/toxins | [EPA 2019 Monitoring Guidance (PDF)](https://www.epa.gov/sites/default/files/2019-09/documents/recommend-cyano-rec-water-2019-update.pdf); Review: [Almuhtaram et al., 2021 (overview of sensors and variability)](https://www.sciencedirect.com/science/article/pii/S1470160X21011079) |
 
-> **Benthic vs planktonic:** In the Klamath River, **benthic mats** can drive **anatoxin-a** even when the water column seems clear—plan monitoring accordingly (see e.g., Genzoli et al., 2024, *Freshwater Science*).
+
+Benthic vs planktonic: In the Klamath River, benthic mats can drive anatoxin-a even when the water column seems clear—plan monitoring accordingly (see e.g., Genzoli et al., 2024, Freshwater Science).
 
 ---
 
-# 4. What data is available (and where)
+# 4. What data is available
 
 - **Water Quality Portal (WQX/NWIS/STORET):** In-situ measurements reported by agencies/tribes/utilities. We will pull the 7 parameters above for the Klamath Basin. https://www.waterqualitydata.us/
 - **OHA HAB advisories (issue/lift dates):** Official public-health decisions for Oregon waters. https://www.oregon.gov/oha/PH/HEALTHYENVIRONMENTS/RECREATION/HARMFULALGAEBLOOMS/Pages/Blue-GreenAlgaeAdvisories.aspx
 - **KBMP (Klamath Basin Monitoring Program) Blue-Green Algae Tracker:** Reach-level flags where thresholds are exceeded; useful spatial context. https://kbmp.net/maps-and-data
 - **CyAN (EPA/NOAA/USGS) satellite index:** Weekly cyanobacteria index for large waters (e.g., Upper Klamath Lake). Public viewer: https://experience.arcgis.com/experience/01f798892ecb48d8ac99ef9b4ebe37c8
 
-This report **focuses on WQX** and provides a defensible way to call events.
+This markdown focuses on pulling data from WQX.
 
----
 
-# 5. How we’ll classify “events” in this report
+# 5. Toxic “events”
 
 - **Toxic HAB event (primary evidence):** any sample with **Microcystin ≥ 8 µg/L** (or other cyanotoxin ≥ its threshold).
 - **Bloom evidence (supporting):** **Cyanobacteria ≥ 100,000 cells/mL**, **Chlorophyll-a ≥ 30 µg/L** (screening), or **Phycocyanin ≥ 90th percentile** locally.
@@ -83,10 +79,7 @@ This report **focuses on WQX** and provides a defensible way to call events.
 
 ---
 
-# 6. Reproducible analysis (pulling WQX, flagging, mapping)
-
-> This code pulls the last ~10 years for **Klamath Basin (HUC2 = 180102)**. You can change the dates if needed.
-
+# 6. Pulling WQX data (last ~10 years for Klamath Basin (HUC2 = 180102))
 
 
 The workflow:
@@ -97,7 +90,7 @@ The workflow:
 4. Map bloom locations and provide a summary table  
 
 
-```{r }
+```{r include=FALSE}
 # Define Klamath Basin HUC8 codes
 huc_code <- "180102"
 
@@ -108,7 +101,7 @@ start_date <- "2014-01-01"
 end_date <- "2025-12-31"
 ```
 
-```{r}
+```{r include=FALSE}
 # Pull result data
 wqx_results <- map(hab_characteristics, function(cn) {
   message("Querying WQP for: ", cn)
@@ -167,8 +160,7 @@ all_results <- all_results |>
     date      = as.Date(activity_start_date),
     value_num = suppressWarnings(readr::parse_number(result_measure_value)),
     latitude_measure  = suppressWarnings(as.numeric(latitude_measure)),
-    longitude_measure = suppressWarnings(as.numeric(longitude_measure))
-  )
+    longitude_measure = suppressWarnings(as.numeric(longitude_measure)))
 
 # Pull site metadata to get names and coordinates
 site_info <- whatWQPsites(huc = huc_code) |> clean_names()
@@ -178,10 +170,9 @@ dat <- all_results |>
   left_join(site_info, by = "monitoring_location_identifier")
 
 glimpse(dat)
-
 ```
 
-```{r}
+```{r echo=FALSE}
 # Toxins (EPA 2019; OHA 2024)
 thr_microcystin        <- 8    # µg/L
 thr_cylindrospermopsin <- 15   # µg/L
@@ -214,46 +205,27 @@ is_cells_ml <- function(u) grepl("cells\\s*/\\s*mL", u, ignore.case = TRUE)
 
 
 hab_events <- dat |>
-  dplyr::mutate(
-    # Toxins: only compare when reported in µg/L
-    toxic_event = dplyr::case_when(
-      characteristic_name == "Microcystin" &
-        is_ugL(result_measure_measure_unit_code) &
-        value_num >= thr_microcystin ~ TRUE,
-      characteristic_name == "Cylindrospermopsin" &
-        is_ugL(result_measure_measure_unit_code) &
-        value_num >= thr_cylindrospermopsin ~ TRUE,
-      characteristic_name == "Anatoxin-a" &
-        is_ugL(result_measure_measure_unit_code) &
-        value_num >= thr_anatoxin_a ~ TRUE,
-      characteristic_name == "Saxitoxin" &
-        is_ugL(result_measure_measure_unit_code) &
-        value_num >= thr_saxitoxin ~ TRUE,
-      TRUE ~ FALSE
-    ),
-    # Supporting indicators with unit guards
+  dplyr::mutate(toxic_event = dplyr::case_when(
+    characteristic_name == "Microcystin" & is_ugL(result_measure_measure_unit_code) & value_num >= thr_microcystin ~ TRUE,
+    characteristic_name == "Cylindrospermopsin" & is_ugL(result_measure_measure_unit_code) & value_num >= thr_cylindrospermopsin ~ TRUE,
+    characteristic_name == "Anatoxin-a" & is_ugL(result_measure_measure_unit_code) & value_num >= thr_anatoxin_a ~ TRUE,
+    characteristic_name == "Saxitoxin" & is_ugL(result_measure_measure_unit_code) & value_num >= thr_saxitoxin ~ TRUE,
+    TRUE ~ FALSE),
+    # Supporting indicators 
     bloom_support = dplyr::case_when(
-      characteristic_name == "Cyanobacteria" &
-        is_cells_ml(result_measure_measure_unit_code) &
-        value_num >= thr_cyano_cells ~ TRUE,
-      characteristic_name == "Chlorophyll a" &
-        is_ugL(result_measure_measure_unit_code) &
-        value_num >= thr_chla ~ TRUE,
-      characteristic_name == "Phycocyanin" &
-        is.finite(value_num) & value_num >= pc90 ~ TRUE,
-      TRUE ~ FALSE
-    ),
-    event = toxic_event | bloom_support
-  ) |>
+      characteristic_name == "Cyanobacteria" & is_cells_ml(result_measure_measure_unit_code) & value_num >= thr_cyano_cells ~
+        TRUE,
+      characteristic_name == "Chlorophyll a" & is_ugL(result_measure_measure_unit_code) & value_num >= thr_chla ~ TRUE,
+      characteristic_name == "Phycocyanin" & is.finite(value_num) & value_num >= pc90 ~ TRUE,
+      TRUE ~ FALSE),
+    event = toxic_event | bloom_support) |>
   dplyr::filter(event) |> 
   dplyr::select(
     date, monitoring_location_identifier, 
     monitoring_location_name.y,
     characteristic_name, value_num, result_measure_measure_unit_code,
-    latitude_measure.y, longitude_measure.y, toxic_event, bloom_support
-  )
+    latitude_measure.y, longitude_measure.y, toxic_event, bloom_support)
 
-# Quick preview
 head(hab_events, 10)
 ```
 
@@ -280,228 +252,75 @@ ggplot(summary_table, aes(x = year, y = max_value)) +
   facet_wrap(~ characteristic_name, scales = "free_y") +
   labs(
     title = "Maximum HAB-Related Values by Year (per parameter)",
-    x = "Year", y = "Max value (units vary by parameter)"
-  )
-
+    x = "Year", y = "Max value (units vary by parameter)")
 ```
 
 
-```{r echo=FALSE}
+```{r eval=FALSE, include=FALSE}
 pal <- colorFactor(
   palette = c("darkred","darkgreen","blue","orange","purple","brown","goldenrod"),
-  domain  = hab_events$characteristic_name
-)
+  domain  = hab_events$characteristic_name)
 
-# leaflet(hab_events) |> 
-#   addTiles() |> 
-#   addCircleMarkers(
-#     lng   = ~longitude_measure.y + runif(n(), -0.0005, 0.0005),  # small jitter
-#     lat   = ~latitude_measure.y  + runif(n(), -0.0005, 0.0005),
-#     color = ~pal(characteristic_name),
-#     label = ~HTML(sprintf(
-#       "<b>%s</b><br><b>Date:</b> %s<br><b>%s:</b> %s %s",
-#       htmlEscape(monitoring_location_name.y),
-#       format(date, "%Y-%m-%d"),
-#       htmlEscape(characteristic_name),
-#       number(value_num, accuracy = 0.01),
-#       htmlEscape(unit_safe(result_measure_measure_unit_code))
-#     )),
-#     radius = 6, fillOpacity = 0.8
-#   ) |> 
-#   addLegend("bottomright", pal = pal, values = ~characteristic_name, title = "HAB Parameter")
+hab_events <- hab_events |> 
+  mutate(latitude_measure.y = as.numeric(latitude_measure.y),
+         longitude_measure.y = as.numeric(longitude_measure.y))
 
-```
-
-
-old code below
-
-```{r eval=FALSE, include=FALSE}
-all_results <- data.frame()
-
-for (char_name in hab_characteristics) {
-  message("Querying for: ", char_name)
-
-  result <- tryCatch({
-    readWQPdata(
-      huc = huc_code,
-      characteristicName = char_name,
-      startDate = start_date,
-      endDate = end_date,
-      sampleMedia = "Water"
-    )
-  }, error = function(e) {
-    warning(paste("Error retrieving", char_name, ":", e$message))
-    return(NULL)
-  })
-
-  if (!is.null(result) && nrow(result) > 0) {
-    all_results <- rbind(all_results, result)
-  }
-}
-
-# cleaning column names
-all_results <- all_results |>
-  clean_names()
-```
-
-```{r eval=FALSE, include=FALSE}
-site_info <- whatWQPsites(huc = huc_code) |> clean_names()
-
-data <- all_results |>
-  left_join(site_info, by = "monitoring_location_identifier") |>
-  mutate(
-    date = as.Date(activity_start_date),
-    value_num = as.numeric(result_measure_value),
-    latitude_measure  = as.numeric(latitude_measure),
-    longitude_measure = as.numeric(longitude_measure))
-
-summary_table <- data |>
-  mutate(year = year(date)) |>
-  group_by(monitoring_location_identifier, monitoring_location_name,
-           characteristic_name, year) |>
-  summarise(
-    samples   = n(),
-    max_value = max(value_num, na.rm = TRUE),
-    units = result_measure_measure_unit_code,
-    .groups = "drop") |>
-  arrange(desc(max_value))
-
-head(summary_table, 10)
-
-```
-
-```{r eval=FALSE, include=FALSE}
-# Toxin thresholds (EPA 2019 / OHA 2024)
-thr_microcystin      <- 8    # µg/L
-thr_cylindrospermopsin <- 15 # µg/L
-thr_anatoxin_a       <- 15   # µg/L (OHA RUV)
-thr_saxitoxin        <- 8    # µg/L (OHA RUV)
-
-# Supporting indicators (WHO / literature)
-thr_cyano_cells <- 100000    # cells/mL
-thr_chla <- 30        # µg/L (screening, conservative)
-
-# Phycocyanin local "elevated" signal = 90th percentile (across dataset).
-pc90 <- data |>
-  filter(characteristic_name == "Phycocyanin") |>
-  summarise(pc90 = quantile(value_num, 0.90, na.rm = TRUE)) |>
-  pull(pc90)
-if (length(pc90) == 0 || is.na(pc90)) pc90 <- Inf
-
-# Helper: unit-safe string
-unit_safe <- function(x) ifelse(is.na(x) | x=="", "", x)
+leaflet(hab_events) |> 
+  addTiles() |> 
+  addCircleMarkers(lng = ~longitude_measure.y,  # small jitter
+                   lat = ~latitude_measure.y,
+    color = ~pal(characteristic_name),
+    label = ~paste0(sprintf(
+      "<b>%s</b><br><b>Date:</b> %s<br><b>%s:</b> %s %s",
+      htmlEscape(monitoring_location_name.y),
+      format(date, "%Y-%m-%d"),
+      htmlEscape(characteristic_name),
+      number(value_num, accuracy = 0.01),
+      htmlEscape(unit_safe(result_measure_measure_unit_code)))),
+    radius = 6, fillOpacity = 0.8) |> 
+  addLegend("bottomright", pal = pal, values = ~characteristic_name, title = "HAB Parameter")
 
 ```
 
 
-
-### Summary of Annual Maximum Values
-
-```{r include=FALSE}
-# exploring high values
-# summary_table <- all_results |> 
-#   mutate(Year = year(ActivityStartDate)) |> 
-#   group_by(MonitoringLocationIdentifier, CharacteristicName, Year) |> 
-#   summarize(
-#     Samples = n(),
-#     MaxValue = max(as.numeric(ResultMeasureValue), na.rm = TRUE),
-#     .groups = "drop") |> 
-#   arrange(desc(MaxValue))
-# 
-# head(summary_table, 10)  # highest 10
-```
-
-
-### Likely Bloom Events
 
 ```{r echo=FALSE}
-# likely bloom conditions based on research
-# likely_blooms <- summary_table |> 
-#   filter((CharacteristicName == "Microcystin" & MaxValue >= 8) |
-#            (CharacteristicName == "Chlorophyll a" & MaxValue >= 30) |
-#            (CharacteristicName == "Cyanobacteria" & MaxValue >= 100000))
-# 
-# ggplot(summary_table, aes(x = Year, y = MaxValue, color = CharacteristicName)) +
-#   geom_point() +
-#   facet_wrap(~ CharacteristicName, scales = "free_y") +
-#   labs(title = "Maximum HAB-Related Values by Year",
-#        y = "Max Value",
-#        x = "Year")
+# color by risk category
+hab_events <- hab_events |> 
+  mutate(latitude_measure.y  = suppressWarnings(as.numeric(latitude_measure.y)),  
+         longitude_measure.y = suppressWarnings(as.numeric(longitude_measure.y)),
+         event_type = case_when(
+           isTRUE(toxic_event) ~ "Toxic event", # derive event category from flags
+           !isTRUE(toxic_event) & isTRUE(bloom_support) ~ "Bloom-support",
+           TRUE ~ "Other")) |> 
+  # keep only rows with valid coordinates
+  filter(is.finite(latitude_measure.y), is.finite(longitude_measure.y))
 
-```
+etype_pal <- colorFactor(
+  palette = c("Toxic event" = "red", "Bloom-support" = "goldenrod", "Other" = "gray50"),
+  domain  = c("Toxic event", "Bloom-support", "Other"))
 
-### Likely HAB Events with Location
+hab_events <- hab_events |> 
+  mutate(popup_html = sprintf(
+    "<b>%s</b><br/><b>Date:</b> %s<br/><b>Parameter:</b> %s<br/><b>Value:</b> %s %s<br/><b>Type:</b> %s",
+    htmlEscape(monitoring_location_name.y),
+    format(date, "%Y-%m-%d"),
+    htmlEscape(characteristic_name),
+    number(value_num, accuracy = 0.01),
+    htmlEscape(unit_safe(result_measure_measure_unit_code)),
+    event_type))
 
-```{r eval=FALSE, include=FALSE}
-# pulling site info 
-site_info <- whatWQPsites(huc = "180102")
 
-# join site info to data
-all_results_with_sites <- left_join(all_results, site_info,
-                                    by = "MonitoringLocationIdentifier")
-
-all_results_with_sites <- all_results_with_sites |> 
-  clean_names() |> 
-  mutate(latitude_measure = as.numeric(latitude_measure),
-         longitude_measure = as.numeric(longitude_measure)) |>
-  glimpse()
-  
-
-hab_events <- all_results_with_sites |> 
-  filter(characteristic_name %in% c("Microcystin", "Chlorophyll a", "Phycocyanin", "Cyanobacteria")) |> 
-  mutate(value = as.numeric(result_measure_value),
-         date = as.Date(activity_start_date),
-         hab_likely = case_when(
-           characteristic_name == "Microcystin" & value >= 8 ~ TRUE,
-           characteristic_name == "Chlorophyll a" & value >= 30 ~ TRUE,
-           characteristic_name == "Cyanobacteria" & value >= 100000 ~ TRUE,
-           characteristic_name == "Phycocyanin" & value >= quantile(value, 0.90, na.rm = TRUE) ~ TRUE,
-           TRUE ~ FALSE)) |> 
-  filter(hab_likely == TRUE) |> 
-  select(date, characteristic_name, value, result_depth_height_measure_measure_unit_code,
-         monitoring_location_name, latitude_measure, longitude_measure)
-
-habs_palette <- colorFactor(
-  palette = c("darkred", "darkgreen", "blue", "orange"),
-  domain = hab_events$characteristic_name)
-
-hab_events_clean <- hab_events |> 
-   mutate(latitude_measure = jitter(latitude_measure, factor = .07), #TODO figure out jitter
-         longitude_measure = jitter(longitude_measure, factor = .07))
-
-leaflet(hab_events_clean) |> 
+leaflet(hab_events) |> 
   addTiles() |> 
-  addCircleMarkers(lng = ~longitude_measure,
-                   lat = ~latitude_measure,
-                   color = ~habs_palette(characteristic_name),
-                   label = ~paste0(monitoring_location_name,
-                                  "<br><b>Date:</b>", date,
-                                  "<br><b>", characteristic_name, ":</b> ", value,
-                                  result_depth_height_measure_measure_unit_code),
-                   radius = 6,
-                   fillOpacity = 0.8) |> 
-    addLegend("bottomright",
-              pal = habs_palette,
-              values = ~characteristic_name,
-              title = "HAB Type")
-```
-
-### Summary Table of HAB Events
-
-```{r eval=FALSE, include=FALSE}
-# summary table
-hab_summary_table <- hab_events |> 
-  mutate(
-    hab_type = characteristic_name,
-    site = monitoring_location_name,
-    value = round(value, 2),
-    units = result_depth_height_measure_measure_unit_code,
-    latitude = latitude_measure,
-    longitude = longitude_measure) |> 
-  select(date, site, hab_type, value) |> 
-  arrange(desc(date))
-
-hab_summary_table
+  addCircleMarkers(lng = ~longitude_measure.y,
+                   lat   = ~latitude_measure.y,
+                   color = ~etype_pal(event_type),
+                   radius = 6, fillOpacity = 0.85, stroke = TRUE, weight = 1,
+                   popup  = ~popup_html) |> 
+  addLegend("bottomright",
+            pal = etype_pal,
+            values = ~event_type,
+            title = "Event type")
 
 ```
-
