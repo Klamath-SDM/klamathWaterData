@@ -1326,16 +1326,6 @@ ukl_levels_cropped |> ggplot(aes(x = date, y = value, color = as.character(gage_
   theme_minimal() +
   labs(title = "Lake Elevation vs Date by Gage Number",
        y = "ft")
-
-
-ukl_levels_cropped |> 
-  ggplot(aes(x = date, y = value, color = gage_number)) + 
-  geom_line() + 
-  scale_color_manual(values = colors_full) +
-  theme_minimal() +
-  labs(title = "Lake Elevation vs Date - all Gages",
-       y = "ft")
-
 ```
 
 ##### Date range summary - original data, not cropped
