@@ -19,6 +19,7 @@ library(dataRetrieval)
 library(leaflet)
 library(janitor)
 library(dplyr)
+library(sf)
 
 colors_full <-  c("#9A8822", "#F5CDB4", "#F8AFA8", "#FDDDA0", "#74A089", #Royal 2
                   "#899DA4", "#C93312", "#DC863B", # royal 1 (- 3)
@@ -1201,3 +1202,142 @@ other_points |>
   ungroup()  |> 
   print()
 ```
+
+
+### USGS - Lake Levels elevation in ft {.tabset .tabset-fade .tabset-pills}
+
+#### Upper Klamath Lake
+
+```{r, include=FALSE}
+ukl_levels_1 <- dataRetrieval::readNWISdv(11505900, parameterCd = "72275") |> 
+  select(date = Date, value =  X_72275_00003) |>
+  as_tibble() |> 
+  mutate(stream = "upper klamath river",
+         gage_agency = "USGS",
+         gage_number = "11505900",
+         parameter = "lake level",
+         statistic = "daily",
+         latitude = dataRetrieval::readNWISsite("11505900")$dec_lat_va, 
+         longitude = dataRetrieval::readNWISsite("11505900")$dec_long_va)
+
+ukl_levels_2 <- dataRetrieval::readNWISdv(11504300, parameterCd = "72275") |> 
+  select(date = Date, value =  X_72275_00003) |>
+  as_tibble() |> 
+  mutate(stream = "upper klamath river",
+         gage_agency = "USGS",
+         gage_number = "11504300",
+         parameter = "lake level",
+         statistic = "daily",
+         latitude = dataRetrieval::readNWISsite("11504300")$dec_lat_va, 
+         longitude = dataRetrieval::readNWISsite("11504300")$dec_long_va)
+
+ukl_levels_3 <- dataRetrieval::readNWISdv(11505800, parameterCd = "72275") |> 
+  select(date = Date, value =  X_72275_00003) |>
+  as_tibble() |> 
+  mutate(stream = "upper klamath river",
+         gage_agency = "USGS",
+         gage_number = "11505800",
+         parameter = "lake level",
+         statistic = "daily",
+         latitude = dataRetrieval::readNWISsite("11505800")$dec_lat_va, 
+         longitude = dataRetrieval::readNWISsite("11505800")$dec_long_va)
+
+ukl_levels_4 <- dataRetrieval::readNWISdv(11507001, parameterCd = "72275") |> 
+  select(date = Date, value =  X_72275_00003) |>
+  as_tibble() |> 
+  mutate(stream = "upper klamath river",
+         gage_agency = "USGS",
+         gage_number = "11507001",
+         parameter = "lake level",
+         statistic = "daily",
+         latitude = dataRetrieval::readNWISsite("11507001")$dec_lat_va, 
+         longitude = dataRetrieval::readNWISsite("11507001")$dec_long_va)
+
+ukl_levels <- bind_rows(ukl_levels_1, ukl_levels_2, ukl_levels_3, ukl_levels_4)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+# verifying location of gages
+ukl_levels_dates <- ukl_levels |> 
+  group_by(gage_number) |> 
+  summarise(min_date = min(date), max_date = max(date))
+
+unique_gage_data_kl <- ukl_levels |> 
+  distinct(gage_number, latitude, longitude, .keep_all = TRUE) |> 
+  left_join(ukl_levels_dates, by = "gage_number")
+
+unique_gage_sf <- unique_gage_data_kl |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+### Date coverage
+
+Note that there are two gages (11505900 and 11505800) that have significantly lower lake levels pre September 1986. Look at raw script for more details. 
+
+```{r, echo=FALSE}
+ukl_levels |> ggplot(aes(x = date, y = value, color = as.character(gage_number))) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  facet_wrap(~gage_number, scale = "free") +
+  theme_minimal() +
+  labs(title = "Lake Elevation vs Date by Gage Number",
+       y = "ft")
+```
+
+Filtering years after Sept 1986 for the two gages
+
+```{r include=FALSE}
+ukl_levels |> 
+  filter(gage_number == "11505900",
+         date > "1986-09-30") |> 
+  ggplot(aes(x = date, y = value, color = gage_number)) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  theme_minimal() +
+  labs(title = "Lake Elevation vs Date - all Gages",
+       y = "ft")
+
+ukl_levels |> 
+  filter(gage_number == "11505800",
+         date > "1986-09-30") |> 
+  ggplot(aes(x = date, y = value, color = gage_number)) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  theme_minimal() +
+  labs(title = "Lake Elevation vs Date - all Gages",
+       y = "ft")
+
+ukl_levels_1_cropped <- ukl_levels_1 |> 
+  filter(date > "1986-09-30") 
+
+ukl_levels_3_cropped <- ukl_levels_3 |> 
+  filter(date > "1986-09-30") 
+
+ukl_levels_cropped <- bind_rows(ukl_levels_1_cropped, ukl_levels_2, ukl_levels_3_cropped, ukl_levels_4)
+  
+```
+
+```{r, echo=FALSE}
+ukl_levels_cropped |> ggplot(aes(x = date, y = value, color = as.character(gage_number))) + 
+  geom_line() + 
+  scale_color_manual(values = colors_full) +
+  facet_wrap(~gage_number) +
+  theme_minimal() +
+  labs(title = "Lake Elevation vs Date by Gage Number",
+       y = "ft")
+```
+
+##### Date range summary - original data, not cropped
+
+```{r, echo=FALSE}
+ukl_levels |> 
+  group_by(gage_number) |> 
+  summarize(
+    min_date = min(date),  
+    max_date = max(date),  
+    record_count = n()) |> 
+  ungroup()  |> 
+  print()
+```
+
