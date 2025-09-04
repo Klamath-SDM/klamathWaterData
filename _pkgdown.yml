@@ -1,0 +1,53 @@
+title: klamathWaterData
+url: https://klamath-sdm.github.io/klamathWaterData
+template:
+  bootswatch: flatly
+
+
+home:
+  links:
+  - text:
+    href:
+
+reference:
+- title: Water Datasets
+  desc: Klamath Basin water quality data used and processed
+- subtitle: Monitoring Gages Dataset
+  desc: Water Quality data from monitoring gages sources form USGS and WQX
+- contents:
+  - temperature_data
+  - temperature_gage
+  - flow_data
+  - flow_gage
+  - ph_data
+  - ph_gage
+  - do_data
+  - do_gage
+- subtitle: USGS Dam Removal Monitoring Data
+  desc: description
+- contents:
+  - usgs_dam_removal_monitoring_layer
+
+
+- title: Helper Functions
+  desc: Functions used to generate water quality data
+- contents:
+  -
+
+navbar:
+  structure:
+    left:  [home, reference, articles]
+    right: [github]
+  type: default
+  left:
+  - text: 'Reference'
+    href: reference/index.html
+  - text: 'Articles'
+    menu:
+      - text: 'Summary of Data for Modeling '
+        href: vignettes/usgs_data_vignette.html
+
+repo:
+ url:
+  home: https://github.com/Klamath-SDM/klamathWaterData
+  issue: https://github.com/Klamath-SDM/klamathWaterData/issues/
