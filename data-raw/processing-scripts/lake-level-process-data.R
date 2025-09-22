@@ -6,7 +6,7 @@ library(pins)
 library(rivermile)
 library(sf)
 
-# raw data will be pulled from S3 bucket. These data is originally retrieved on temperature-data-pull.R
+# raw data will be pulled from S3 bucket. These data is originally retrieved on lake-level-data-pull.R
 
 # setting up aws bucket
 wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
