@@ -140,3 +140,45 @@
 #' names(usgs_dam_removal_monitoring_layers)
 #' usgs_dam_removal_monitoring_layers$geomorphic_reaches |> sf::st_geometry() |> plot()
 "usgs_dam_removal_monitoring_layers"
+
+#' @name water_level_data
+#' @title Lake water surface elevation data from four different USGS gages across the Klamath Basin
+#' @description Lake water surface elevation (ft) data from the following gages:
+#' \itemize{
+#'   \item 11505900
+#'   \item 11504300
+#'   \item 11505800
+#'   \item 11507001
+#' @format A tibble with 4 rows and 8 columns
+#' \itemize{
+#'   \item \code{stream}: stream associated where data was collected/where gage is located
+#'   \item \code{gage_name}: name of the gaging station
+#'   \item \code{gage_id}: unique identifier for the gage
+#'   \item \code{variable_name}: variable measured: "water level"
+#'   \item \code{value}: observed value of the temperature (numeric)
+#'   \item \code{unit}: units of measurement: feet
+#'   \item \code{statistic}: summary statistic type: "mean"
+#'   \item \code{date}: date of the observation
+#'   }
+"water_level_data"
+
+#' @name water_level_gage
+#' @title A dataset containing metadata for water level gages located across the Klamath Basin watershed.
+#' Includes location, agency, and hydrologic unit code (HUC8) information for each station.
+#' \itemize{
+#'   \item 11505900
+#'   \item 11504300
+#'   \item 11505800
+#'   \item 11507001
+#' @format A tibble with 4 rows and 8 columns
+#' \itemize{
+#'   \item \code{stream}: stream associated where data was collected/where gage is located
+#'   \item \code{gage_name}: name of the gaging station
+#'   \item \code{gage_id}: unique identifier for the gage
+#'   \item \code{variable_name}: variable measured: "water level"
+#'   \item \code{value}: observed value of the temperature (numeric)
+#'   \item \code{unit}: units of measurement: feet
+#'   \item \code{statistic}: summary statistic type: "mean"
+#'   \item \code{date}: date of the observation
+#'   }
+"water_level_gage"
