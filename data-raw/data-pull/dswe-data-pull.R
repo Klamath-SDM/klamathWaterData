@@ -444,8 +444,8 @@ clear_lake <- extract_dswe_timeseries(
 
 tule_lake <- extract_dswe_timeseries(
   bbox = tule_lake_bbox,
-  start_date = '2016-10-01',
-  end_date = '2020-08-31',
+  start_date = '1995-10-01',
+  end_date = '1996-08-31',
   cloud_cover_threshold = 20,
   output_prefix = "data-raw/dswe/tule_lake",
   create_plots = TRUE,
@@ -482,7 +482,213 @@ klamath_marsh <- extract_dswe_timeseries(
   save_files = TRUE
 )
 
+# summary table for primary review with Jim
+monthly_table <- bind_rows(tule_lake$monthly |>
+                             mutate(area = "Tule Lake"),
+                           clear_lake$monthly |>
+                             mutate(area = "Clear Lake"),
+                           bear_valley$monthly |>
+                             mutate(area = "Bear Valley"),
+                           lower_klamath_sheepy$monthly |>
+                             mutate(area = "Lower Klamath Sheepy")) |>
+  mutate(Year = year(year_month),
+         month = month(year_month)) |>
+  left_join(tibble("month" = 1:12,
+                   "Month" = month.abb),
+            by = "month") |>
+  select(Area = area,
+         Year, Month, `Mean Total Water` = mean_water,
+         `SD Total Water` = sd_water,
+         `Mean Class 1` = mean_class1,
+         `Mean Class 2` = mean_class2,
+         `Mean Class 3` = mean_class3,
+         `n` = n_obs) |>
+  mutate(across(`Mean Total Water`:`Mean Class 3`, \(x) x * 100),
+         across(`Mean Total Water`:`Mean Class 3`, \(x) round(x, 3)))
+
+write_csv(monthly_table, "data-raw/dswe/monthly_summary_all.csv")
+
 # Access results
 # ts_df <- results1$timeseries
 # monthly_stats <- results1$monthly
 # summary <- results1$summary
+
+
+# get metadata ------------------------------------------------------------
+
+# Function to get metadata on available Landsat data
+get_landsat_metadata <- function(bbox,
+                                 start_date = '1984-01-01',
+                                 end_date = Sys.Date(),
+                                 cloud_cover_threshold = 100) {
+
+  cat("============================================================\n")
+  cat("Landsat Data Availability Metadata\n")
+  cat("============================================================\n")
+  cat("Bounding box:", paste(bbox, collapse = ", "), "\n")
+  cat("Date range:", start_date, "to", end_date, "\n\n")
+
+  # Create AOI
+  aoi <- ee$Geometry$Rectangle(bbox)
+
+  # Load all Landsat collections
+  landsat4 <- ee$ImageCollection('LANDSAT/LT04/C02/T1_L2')$
+    filterBounds(aoi)$
+    filterDate(start_date, end_date)$
+    filter(ee$Filter$lt('CLOUD_COVER', cloud_cover_threshold))
+
+  landsat5 <- ee$ImageCollection('LANDSAT/LT05/C02/T1_L2')$
+    filterBounds(aoi)$
+    filterDate(start_date, end_date)$
+    filter(ee$Filter$lt('CLOUD_COVER', cloud_cover_threshold))
+
+  landsat7 <- ee$ImageCollection('LANDSAT/LE07/C02/T1_L2')$
+    filterBounds(aoi)$
+    filterDate(start_date, end_date)$
+    filter(ee$Filter$lt('CLOUD_COVER', cloud_cover_threshold))
+
+  landsat8 <- ee$ImageCollection('LANDSAT/LC08/C02/T1_L2')$
+    filterBounds(aoi)$
+    filterDate(start_date, end_date)$
+    filter(ee$Filter$lt('CLOUD_COVER', cloud_cover_threshold))
+
+  landsat9 <- ee$ImageCollection('LANDSAT/LC09/C02/T1_L2')$
+    filterBounds(aoi)$
+    filterDate(start_date, end_date)$
+    filter(ee$Filter$lt('CLOUD_COVER', cloud_cover_threshold))
+
+  # Get counts
+  n4 <- landsat4$size()$getInfo()
+  n5 <- landsat5$size()$getInfo()
+  n7 <- landsat7$size()$getInfo()
+  n8 <- landsat8$size()$getInfo()
+  n9 <- landsat9$size()$getInfo()
+
+  cat("Images available by satellite:\n")
+  cat("  Landsat 4 (1982-1993):", n4, "images\n")
+  cat("  Landsat 5 (1984-2012):", n5, "images\n")
+  cat("  Landsat 7 (1999-present):", n7, "images\n")
+  cat("  Landsat 8 (2013-present):", n8, "images\n")
+  cat("  Landsat 9 (2021-present):", n9, "images\n")
+  cat("  Total:", n4 + n5 + n7 + n8 + n9, "images\n\n")
+
+  # Merge all collections
+  all_landsat <- landsat4$merge(landsat5)$merge(landsat7)$merge(landsat8)$merge(landsat9)
+
+  # Get date range
+  if (all_landsat$size()$getInfo() > 0) {
+    dates <- all_landsat$aggregate_array('DATE_ACQUIRED')$getInfo()
+    dates_parsed <- as.Date(unlist(dates))
+
+    cat("Date coverage:\n")
+    cat("  First image:", as.character(min(dates_parsed)), "\n")
+    cat("  Last image:", as.character(max(dates_parsed)), "\n")
+    cat("  Time span:", round(as.numeric(difftime(max(dates_parsed), min(dates_parsed), units = "days")) / 365.25, 1), "years\n\n")
+
+    # Images by year
+    years_df <- data.frame(date = dates_parsed) %>%
+      mutate(year = year(date)) %>%
+      count(year) %>%
+      rename(n_images = n)
+
+    cat("Images per year:\n")
+    print(years_df)
+
+    # Plot images per year
+    p <- ggplot(years_df, aes(x = year, y = n_images)) +
+      geom_col(fill = "steelblue") +
+      geom_text(aes(label = n_images), vjust = -0.5, size = 3) +
+      labs(
+        title = "Landsat Image Availability by Year",
+        subtitle = sprintf("Bounding Box: %.3f, %.3f to %.3f, %.3f",
+                           bbox[1], bbox[2], bbox[3], bbox[4]),
+        x = "Year",
+        y = "Number of Images",
+        caption = paste0("Cloud cover < ", cloud_cover_threshold, "%")
+      ) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+    print(p)
+
+    # Get WRS path/row info
+    first_img <- ee$Image(all_landsat$first())
+    path <- first_img$get('WRS_PATH')$getInfo()
+    row <- first_img$get('WRS_ROW')$getInfo()
+
+    cat("\nLandsat WRS-2 Path/Row:\n")
+    cat("  Path:", path, "\n")
+    cat("  Row:", row, "\n")
+    cat("  (This identifies which Landsat scene covers your area)\n\n")
+
+    # Return summary
+    return(list(
+      total_images = n4 + n5 + n7 + n8 + n9,
+      by_satellite = data.frame(
+        satellite = c("Landsat 4", "Landsat 5", "Landsat 7", "Landsat 8", "Landsat 9"),
+        n_images = c(n4, n5, n7, n8, n9)
+      ),
+      by_year = years_df,
+      date_range = c(min(dates_parsed), max(dates_parsed)),
+      wrs_path = path,
+      wrs_row = row
+    ))
+
+  } else {
+    cat("No images found for this bounding box!\n")
+    return(NULL)
+  }
+}
+
+# get metadata
+
+upper_klamath_lake_metadata <- get_landsat_metadata(
+  bbox = upper_klamath_lake_bbox,
+  start_date = '1984-01-01',
+  end_date = '2024-12-31',
+  cloud_cover_threshold = 50  # Set higher to see all images
+)
+
+clear_lake_metadata <- get_landsat_metadata(
+  bbox = clear_lake_bbox,
+  start_date = '1984-01-01',
+  end_date = '2024-12-31',
+  cloud_cover_threshold = 50  # Set higher to see all images
+)
+
+tule_lake_metadata <- get_landsat_metadata(
+  bbox = tule_lake_bbox,
+  start_date = '1984-01-01',
+  end_date = '2024-12-31',
+  cloud_cover_threshold = 50  # Set higher to see all images
+)
+
+bear_valley_metadata <- get_landsat_metadata(
+  bbox = bear_valley_bbox,
+  start_date = '1984-01-01',
+  end_date = '2024-12-31',
+  cloud_cover_threshold = 50  # Set higher to see all images
+)
+
+lower_klamath_sheepy_metadata <- get_landsat_metadata(
+  bbox = lower_klamath_sheepy_bbox,
+  start_date = '1984-01-01',
+  end_date = '2024-12-31',
+  cloud_cover_threshold = 50  # Set higher to see all images
+)
+
+klamath_marsh_metadata <- get_landsat_metadata(
+  bbox = klamath_marsh_bbox,
+  start_date = '1984-01-01',
+  end_date = '2024-12-31',
+  cloud_cover_threshold = 50  # Set higher to see all images
+)
+
+# Access results
+upper_klamath_lake_metadata$date_range
+clear_lake_metadata$date_range
+tule_lake_metadata$date_range
+bear_valley_metadata$date_range
+lower_klamath_sheepy_metadata$date_range
+klamath_marsh_metadata$date_range
+
