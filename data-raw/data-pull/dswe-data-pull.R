@@ -483,7 +483,7 @@ klamath_marsh <- extract_dswe_timeseries(
 )
 
 # summary table for primary review with Jim
-monthly_table <- bind_rows(tule_lake$monthly |>
+dswe_monthly <- bind_rows(tule_lake$monthly |>
                              mutate(area = "Tule Lake"),
                            clear_lake$monthly |>
                              mutate(area = "Clear Lake"),
@@ -496,17 +496,21 @@ monthly_table <- bind_rows(tule_lake$monthly |>
   left_join(tibble("month" = 1:12,
                    "Month" = month.abb),
             by = "month") |>
-  select(Area = area,
-         Year, Month, `Mean Total Water` = mean_water,
-         `SD Total Water` = sd_water,
-         `Mean Class 1` = mean_class1,
-         `Mean Class 2` = mean_class2,
-         `Mean Class 3` = mean_class3,
-         `n` = n_obs) |>
-  mutate(across(`Mean Total Water`:`Mean Class 3`, \(x) x * 100),
-         across(`Mean Total Water`:`Mean Class 3`, \(x) round(x, 3)))
+  select(area,
+         year = Year, month = Month,
+         mean_total_water = mean_water,
+         `sd_total_water` = sd_water,
+         mean_class1,
+         mean_class2,
+         mean_class3,
+         n = n_obs) |>
+  mutate(across(mean_total_water:mean_class3, \(x) x * 100),
+         across(mean_total_water:mean_class3, \(x) round(x, 3)))
 
-write_csv(monthly_table, "data-raw/dswe/monthly_summary_all.csv")
+write_csv(dswe_monthly, "data-raw/dswe/dswe_monthly_summary_all.csv")
+
+# save data
+usethis::use_data(dswe_monthly, overwrite = TRUE)
 
 # Access results
 # ts_df <- results1$timeseries

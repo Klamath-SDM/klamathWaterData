@@ -1,4 +1,4 @@
-Area,Year,Month,Mean Total Water,SD Total Water,Mean Class 1,Mean Class 2,Mean Class 3,n
+area,year,month,mean_total_water,sd_total_water,mean_class1,mean_class2,mean_class3,n
 Tule Lake,2016,Oct,12.624,0.984,0,11.67,0.953,2
 Tule Lake,2016,Nov,12.512,NA,0,11.667,0.845,1
 Tule Lake,2017,Jan,99.988,NA,96.974,0.235,2.78,1
