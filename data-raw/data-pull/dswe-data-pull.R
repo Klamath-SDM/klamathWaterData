@@ -37,7 +37,8 @@ library(lubridate)
 # ============================================================================
 
 # Initialize Earth Engine (replace with your project ID)
-ee_Initialize(project = "ee-fishfakts")
+project_id = "ee-fishfakts" # TODO update with project specific to klamath if necessary
+ee_Initialize(project = project_id)
 
 # ============================================================================
 # MAIN FUNCTION: Extract DSWE Time Series for Any Bounding Box
