@@ -1,0 +1,158 @@
+---
+title: "Dynamic Surface Water Extent (DSWE) Data for the Klamath Basin"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Dynamic Surface Water Extent (DSWE) Data for the Klamath Basin}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Overview
+
+This vignette documents the **Dynamic Surface Water Extent Science (DSWE)** dataset
+for the **Klamath Basin**, derived from the **Landsat Collection 2 Level-3 DSWE
+Science Product** using the official USGS DSWE algorithm.
+
+The dataset summarizes surface water presence across seven wildlife refuges in the
+Klamath Basin using daily Landsat imagery processed through **Google Earth Engine
+(GEE)** and accessed via the R package **rgee**.
+
+The analysis focuses on **water presence classes 1, 2, and 3**, which together
+characterize inundation extent across a range of detection confidence levels.
+
+# DSWE Product Description
+
+The DSWE product provides three interpreted outputs, each with increasing levels of
+filtering:
+
+- **INTR** – Interpreted (raw)
+- **INTSM** – Interpreted with spectral masks
+- **INWAM** – Interpreted with all masks applied
+
+This dataset uses the **INWAM** layer, the most refined DSWE product, which applies
+comprehensive filtering for clouds, cloud shadows, terrain effects, and non-water
+land cover.
+
+# INWAM Pixel Value Interpretation
+
+The INWAM layer classifies each pixel using values from 0–255. Water presence is
+indicated by pixel values **1, 2, and 3**, which are the focus of this dataset.
+
+## Table 1. INWAM Layer Categories
+
+| Pixel Value | Interpretation                      | Water Confidence / Classification |
+|------------|--------------------------------------|----------------------------------|
+| 0          | Not water                            | No water detected or masked      |
+| 1          | Water – high confidence              | 4–5 diagnostic tests true        |
+| 2          | Water – moderate confidence          | 3 diagnostic tests true          |
+| 3          | Partial surface water (conservative) | Conservative wetland detection   |
+| 4          | Partial surface water (aggressive)   | Low confidence detection         |
+| 9          | Cloud / cloud shadow                 | QA-masked                        |
+| 255        | Fill                                 | No data                           |
+
+Only pixel values **1, 2, and 3** are retained in the summarized dataset.
+
+# Study Area: Klamath Basin Water Refuges
+
+Surface water was summarized for the following seven areas, defined using bounding
+boxes.
+
+## Table 2. Refuges and Bounding Boxes
+
+| Refuge Name                 | Bounding Box (lat, lon) |
+|----------------------------|--------------------------|
+| Upper Klamath Lake          | 42.225167, −122.138907 → 42.614644, −121.770893 |
+| Clear Lake                  | 41.781010, −121.289207 → 41.995292, −121.015256 |
+| Tule Lake                   | 41.800411, −121.598288 → 41.995232, −121.347044 |
+| Bear Valley                 | 42.034977, −121.979966 → 42.096687, −121.889353 |
+| Lower Klamath + Sheepy Lake | 41.883384, −121.851156 → 42.033576, −121.591674 |
+| Klamath Marsh               | 42.827148, −121.806202 → 43.072530, −121.517889 |
+| Broad Area (entire basin)   | 41.737336, −122.136971 → 42.677414, −121.012918 |
+
+Bounding boxes were defined using `bboxfinder.com`.
+
+# Data Access Requirements
+
+## Google Earth Engine
+
+Accessing this dataset **requires a Google account** with permission to use
+**Google Earth Engine**.
+
+## Required R Packages
+
+```{r eval=FALSE}
+library(rgee)
+library(dplyr)
+library(lubridate)
+```
+
+Before running any Earth Engine operations, users must authenticate:
+
+```{r eval=FALSE}
+rgee::ee_Initialize()
+```
+
+# Data Processing Workflow
+
+1. Landsat Collection 2 imagery was accessed via Google Earth Engine.
+2. Daily DSWE classifications were computed using the USGS DSWE algorithm.
+3. INWAM pixel values **1, 2, and 3** were extracted.
+4. Cloud-contaminated scenes were excluded.
+5. Daily results were aggregated to monthly summaries.
+6. Percent surface water coverage was calculated per refuge.
+
+## Temporal Coverage
+
+- **Start date:** 2016-10-01  
+- **End date:** 2023-08-31  
+
+Not all months contain observations due to cloud cover and Landsat overpass
+availability.
+
+# Output Structure
+
+The final dataset contains monthly summaries with the following variables:
+
+| Column Name        | Description |
+|--------------------|-------------|
+| area               | Refuge or analysis area |
+| year               | Calendar year |
+| month              | Calendar month |
+| mean_total_water   | Mean % area with Class 1–3 water |
+| sd_total_water     | Standard deviation of total water |
+| mean_class1        | Mean % high-confidence water |
+| mean_class2        | Mean % moderate-confidence water |
+| mean_class3        | Mean % partial surface water |
+| n                  | Number of cloud-free Landsat images |
+
+All percentage values range from **0–100**.
+
+# Results Summary (2017–2020)
+
+Monthly summaries show strong seasonal variability across refuges, with:
+
+- Near-complete inundation during winter months in some years
+- Persistent low-level water presence in summer months
+- High interannual variability driven by hydrology and management practices
+
+These summaries support comparative analyses of wetland extent, seasonal inundation
+patterns, and long-term trends across the Klamath Basin.
+
+# Limitations and Notes
+
+- Only Landsat scenes with minimal cloud cover are included.
+- DSWE Class 4 (aggressive partial water) is excluded to reduce false positives.
+- Bulk USGS DSWE downloads and non-R implementations were not evaluated.
+- Results reflect surface water presence, not depth or volume.
+
+# Citation
+
+Users should cite the USGS DSWE algorithm, Landsat Collection 2, and Google Earth
+Engine when using this dataset.
