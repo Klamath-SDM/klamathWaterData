@@ -5,15 +5,22 @@
 \alias{temperature_data}
 \title{Publicly available temperature data in the Klamath Basin watershed (HUC8 18010204)}
 \format{
-An object of class \code{data.frame} with 348642 rows and 8 columns.
+A tibble with 348,642 rows and 8 columns
+\itemize{
+\item \code{stream}: stream associated where data was collected/where gage is located
+\item \code{gage_name}: name of the gaging station
+\item \code{gage_id}: unique identifier for the gage
+\item \code{variable_name}: variable measured: "Temperature"
+\item \code{value}: observed value of the temperature (numeric)
+\item \code{unit}: units of measurement (e.g., degrees Celsius)
+\item \code{statistic}: summary statistic type: "min", "max", or "mean"
+\item \code{date}: date of the observation
+}
 }
 \usage{
 temperature_data
 }
 \description{
-Publicly available temperature data in the Klamath Basin watershed (HUC8 18010204)
-}
-\examples{
-temperature_data |> pillar::glimpse()
+Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
 }
 \keyword{datasets}

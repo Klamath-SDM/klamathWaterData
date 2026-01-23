@@ -162,7 +162,9 @@ dswe_monthly <- bind_rows(tule_lake$monthly |>
          mean_class3,
          n = n_obs) |>
   mutate(across(mean_total_water:mean_class3, \(x) x * 100),
-         across(mean_total_water:mean_class3, \(x) round(x, 3)))
+         across(mean_total_water:mean_class3, \(x) round(x, 3))) |>
+  rename(month_name = month) |>
+  mutate(month = match(month_name, month.abb)) |> glimpse()
 
 write_csv(dswe_monthly, "data-raw/dswe/dswe_monthly_summary_all.csv")
 
