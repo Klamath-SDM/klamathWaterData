@@ -95,16 +95,6 @@ clear_lake <- extract_dswe_timeseries(
   save_files = TRUE
 )
 
-clear_lake_test <- extract_dswe_timeseries(
-  bbox = clear_lake_bbox,
-  start_date = start_date, #'2016-10-01',
-  end_date = end_date, #'2023-08-31',
-  cloud_cover_threshold = 20,
-  output_prefix = "data-raw/dswe/clear_lake_test",
-  create_plots = FALSE,
-  save_files = FALSE
-)
-
 tule_lake <- extract_dswe_timeseries(
   bbox = tule_lake_bbox,
   start_date = start_date, #'1995-10-01',
