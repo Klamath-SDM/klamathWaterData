@@ -174,6 +174,35 @@ usethis::use_data(dswe_monthly, overwrite = TRUE)
 # monthly_stats <- results1$monthly
 # summary <- results1$summary
 
+month_levels <- c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
+
+dswe_monthly |>
+  mutate(
+    month = factor(month, levels = month_levels),
+    ymin = mean_total_water - sd_total_water,
+    ymax = mean_total_water + sd_total_water
+  ) |>
+  ggplot(aes(x = month, y = mean_total_water, group = year)) +
+  geom_line(aes(color = year), linewidth = 0.6, alpha = 0.7) +
+  geom_point(aes(color = year), size = 1.3, alpha = 0.8) +
+  geom_errorbar(
+    aes(ymin = ymin, ymax = ymax, color = year),
+    width = 0.15,
+    na.rm = TRUE,
+    alpha = 0.5
+  ) +
+  facet_wrap(~ area) +
+  labs(
+    x = "Month",
+    y = "Mean total water (%)",
+    color = "Year",
+    title = "Monthly water extent by area with year-to-year variation",
+    subtitle = "Each line is a year; error bars are mean ± SD (omitted when SD is NA / n = 1)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot2::ggsave("data-raw/dswe/all_areas_timeseries.png", plot = get_last_plot(), width = 12, height = 6, dpi = 300)
 
 # get metadata ------------------------------------------------------------
 
