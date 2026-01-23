@@ -109,8 +109,8 @@ rgee::ee_Initialize()
 
 ## Temporal Coverage
 
-- **Start date:** 2016-10-01  
-- **End date:** 2023-08-31  
+- **Start date:** March, 2013 
+- **End date:** December, 2025
 
 Not all months contain observations due to cloud cover and Landsat overpass
 availability.
@@ -133,7 +133,7 @@ The final dataset contains monthly summaries with the following variables:
 
 All percentage values range from **0–100**.
 
-# Results Summary (2017–2020)
+# Results Summary (2013–2025)
 
 Monthly summaries show strong seasonal variability across refuges, with:
 
@@ -150,7 +150,7 @@ patterns, and long-term trends across the Klamath Basin.
 - DSWE Class 4 (aggressive partial water) is excluded to reduce false positives.
 - Bulk USGS DSWE downloads and non-R implementations were not evaluated.
 - Results reflect surface water presence, not depth or volume.
-- Due to substantial data transfer and processing requirements, the current results are restricted to four of the six wildlife refuges and cover the 2017–2020 period.
+- Due to substantial data transfer and processing requirements, the current results are restricted to four of the six wildlife refuges and cover the 2013–2025 period.
 - This dataset is provided as a representative sample of the full DSWE processing workflow.
 
 # Citation

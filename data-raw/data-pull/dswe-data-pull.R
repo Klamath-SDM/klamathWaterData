@@ -136,7 +136,7 @@ klamath_marsh <- extract_dswe_timeseries(
 )
 
 # summary table for primary review with Jim
-dswe_monthly <- bind_rows(tule_lake$monthly |>
+dswe_monthly_raw <- bind_rows(tule_lake$monthly |>
                              mutate(area = "Tule Lake"),
                            clear_lake$monthly |>
                              mutate(area = "Clear Lake"),
@@ -166,11 +166,6 @@ dswe_monthly <- bind_rows(tule_lake$monthly |>
   rename(month_name = month) |>
   mutate(month = match(month_name, month.abb)) |> glimpse()
 
-write_csv(dswe_monthly, "data-raw/dswe/dswe_monthly_summary_all.csv")
-
-# save data
-usethis::use_data(dswe_monthly, overwrite = TRUE)
-
 # Access results
 # ts_df <- results1$timeseries
 # monthly_stats <- results1$monthly
@@ -178,7 +173,7 @@ usethis::use_data(dswe_monthly, overwrite = TRUE)
 
 month_levels <- c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
 
-dswe_monthly |>
+dswe_monthly_raw |>
   mutate(
     month = factor(month, levels = month_levels),
     ymin = mean_total_water - sd_total_water,
@@ -205,6 +200,16 @@ dswe_monthly |>
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ggplot2::ggsave("data-raw/dswe/all_areas_timeseries.png", plot = get_last_plot(), width = 12, height = 6, dpi = 300)
+
+
+# Save Data ---------------------------------------------------------------
+
+dswe_monthly <- dswe_monthly_raw |> select(-month_name)
+
+write_csv(dswe_monthly, "data-raw/dswe/dswe_monthly_summary_all.csv")
+
+# save data
+usethis::use_data(dswe_monthly, overwrite = TRUE)
 
 # get metadata ------------------------------------------------------------
 
