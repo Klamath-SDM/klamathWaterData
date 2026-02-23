@@ -271,6 +271,10 @@ ph_data <- ph_wqx |>
 ph_gage <- gage_ph_usgs |>
   mutate(gage_id = as.character(gage_id)) |>
   bind_rows(gage_ph_wqx) |>
+  # These two sites didn't overlap the NHD line for the Scott River so marking their RM as NA
+  mutate(river_mile = case_when(gage_name == "Scott River at Gaging Station" ~ NA,
+                                gage_name == "Scott River South Fork" ~ NA,
+                                .default = as.numeric(river_mile))) |>
   glimpse()
 
 ### saves clean data to aws

@@ -3,18 +3,24 @@
 \docType{data}
 \name{do_data}
 \alias{do_data}
-\alias{do_gage}
 \title{Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC8 18010204)}
 \format{
-An object of class \code{tbl_df} (inherits from \code{tbl}, \code{data.frame}) with 28 rows and 8 columns.
+A tibble with 160,456 rows and 8 columns
+\itemize{
+\item \code{stream}: stream associated where data was collected/where gage is located
+\item \code{gage_name}: name of the gaging station
+\item \code{gage_id}: unique identifier for the gage
+\item \code{variable_name}: variable measured: "do"
+\item \code{value}: observed value of the temperature (numeric)
+\item \code{unit}: units of measurement: mg/L
+\item \code{statistic}: summary statistic type: "max, "min, "mean"
+\item \code{date}: date of the observation
+}
 }
 \usage{
-do_gage
+do_data
 }
 \description{
-Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC8 18010204)
-}
-\examples{
-do_gage |> pillar::glimpse()
+Mean, min and max dissolved oxygen data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
 }
 \keyword{datasets}

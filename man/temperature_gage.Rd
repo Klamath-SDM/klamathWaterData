@@ -5,15 +5,24 @@
 \alias{temperature_gage}
 \title{Temperature gages in the Klamath Basin watershed (HUC8 18010204)}
 \format{
-An object of class \code{tbl_df} (inherits from \code{tbl}, \code{data.frame}) with 94 rows and 8 columns.
+A tibble with 94 rows and 8 columns
+\itemize{
+\item{\code{stream}: name of the stream or river where the gage is located
+\item{\code{gage_name}: name of the gaging station
+\item{\code{gage_id}: unique identifier for the gage
+\item{\code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,
+Hoopa Valley Tribe (Tribal), USDA FS PIBO Monitoring Program)
+\item{\code{latitude}: latitude coordinate of the gage location
+\item{\code{longitude: longitude coordinate of the gage location
+\item{\code{river_mile}: closest river mile location relative to river mouth or a reference point
+\item{\code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
+}
 }
 \usage{
 temperature_gage
 }
 \description{
-Temperature gages in the Klamath Basin watershed (HUC8 18010204)
-}
-\examples{
-temperature_gage |> pillar::glimpse()
+A dataset containing metadata for temperature gages located across the Klamath Basin watershed.
+Includes location, agency, and hydrologic unit code (HUC) information for each station.
 }
 \keyword{datasets}
