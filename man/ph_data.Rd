@@ -5,15 +5,22 @@
 \alias{ph_data}
 \title{Publicly available pH data in the Klamath Basin watershed (HUC8 18010204)}
 \format{
-An object of class \code{data.frame} with 111594 rows and 8 columns.
+A tibble with 111,594 rows and 8 columns
+\itemize{
+\item \code{stream}: stream associated where data was collected/where gage is located
+\item \code{gage_name}: name of the gaging station
+\item \code{gage_id}: unique identifier for the gage
+\item \code{variable_name}: variable measured: "pH"
+\item \code{value}: observed value of the temperature (numeric)
+\item \code{unit}: units of measurement: sdt unit
+\item \code{statistic}: summary statistic type: "min", "max", or "mean"
+\item \code{date}: date of the observation
+}
 }
 \usage{
 ph_data
 }
 \description{
-Publicly available pH data in the Klamath Basin watershed (HUC8 18010204)
-}
-\examples{
-ph_data |> pillar::glimpse()
+Mean, min and max pH data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
 }
 \keyword{datasets}

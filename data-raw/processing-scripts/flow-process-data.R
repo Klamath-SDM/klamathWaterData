@@ -16,7 +16,7 @@ library(sf)
 wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
 
 
-source(here::here('data-raw', 'processing-scripts', 'utils.R'))
+#source(here::here('data-raw', 'processing-scripts', 'utils.R'))
 
 
 ### WQX ----
@@ -211,6 +211,10 @@ flow_data <- flow_wqx |>
 
 flow_gage <- gage_flow_wqx |>
   bind_rows(gage_flow_usgs) |>
+  # These two sites didn't overlap the NHD line for the Scott River so marking their RM as NA
+  mutate(river_mile = case_when(gage_name == "Scott River at Gaging Station" ~ NA,
+                                gage_name == "Scott River South Fork" ~ NA,
+                                .default = as.numeric(river_mile))) |>
   glimpse()
 
 
