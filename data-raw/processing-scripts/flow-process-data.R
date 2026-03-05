@@ -207,6 +207,7 @@ flow_data <- flow_wqx |>
   mutate(date = as.Date(date)) |>
   bind_rows(flow_usgs |>
               mutate(gage_id = as.character(gage_id))) |>
+  rename(location = stream) |>
   glimpse()
 
 flow_gage <- gage_flow_wqx |>
@@ -215,6 +216,7 @@ flow_gage <- gage_flow_wqx |>
   mutate(river_mile = case_when(gage_name == "Scott River at Gaging Station" ~ NA,
                                 gage_name == "Scott River South Fork" ~ NA,
                                 .default = as.numeric(river_mile))) |>
+  rename(location = stream) |>
   glimpse()
 
 
