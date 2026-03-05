@@ -266,7 +266,9 @@ ph_data <- ph_wqx |>
   bind_rows(ph_usgs |>
               mutate(gage_id = as.character(gage_id))) |>
   #remove two NAs in value
-  filter(!is.na(value))
+  filter(!is.na(value)) |>
+  rename(location = stream) |>
+  glimpse()
 
 ph_gage <- gage_ph_usgs |>
   mutate(gage_id = as.character(gage_id)) |>
@@ -275,6 +277,7 @@ ph_gage <- gage_ph_usgs |>
   mutate(river_mile = case_when(gage_name == "Scott River at Gaging Station" ~ NA,
                                 gage_name == "Scott River South Fork" ~ NA,
                                 .default = as.numeric(river_mile))) |>
+  rename(location = stream) |>
   glimpse()
 
 ### saves clean data to aws

@@ -37,7 +37,7 @@
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 124 rows and 8 columns
 #' \itemize{
-#'   \item{\code{stream}: name of the stream or river where the gage is located
+#'   \item{\code{location}: location associated where data was collected/where gage is located
 #'   \item{\code{gage_name}: name of the gaging station
 #'   \item{\code{gage_id}: anique identifier for the gage
 #'   \item{\code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,
@@ -55,7 +55,7 @@
 #' @description Mean, min and max pH data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
 #' @format A tibble with 111,594 rows and 8 columns
 #' \itemize{
-#'   \item \code{stream}: stream associated where data was collected/where gage is located
+#'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
 #'   \item \code{gage_id}: unique identifier for the gage
 #'   \item \code{variable_name}: variable measured: "pH"
@@ -151,7 +151,7 @@
 #'   \item 11507001
 #' @format A tibble with 4 rows and 8 columns
 #' \itemize{
-#'   \item \code{stream}: stream associated where data was collected/where gage is located
+#'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
 #'   \item \code{gage_id}: unique identifier for the gage
 #'   \item \code{variable_name}: variable measured: "water level"
@@ -172,7 +172,7 @@
 #'   \item 11507001
 #' @format A tibble with 4 rows and 8 columns
 #' \itemize{
-#'   \item \code{stream}: stream associated where data was collected/where gage is located
+#'   \item{\code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
 #'   \item \code{gage_id}: unique identifier for the gage
 #'   \item \code{variable_name}: variable measured: "water level"
