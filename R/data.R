@@ -4,7 +4,7 @@
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 94 rows and 8 columns
 #' \itemize{
-#'   \item{\code{stream}: name of the stream or river where the gage is located
+#'   \item{\code{location}: location associated where data was collected/where gage is located
 #'   \item{\code{gage_name}: name of the gaging station
 #'   \item{\code{gage_id}: unique identifier for the gage
 #'   \item{\code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,
@@ -21,7 +21,7 @@
 #' @description Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
 #' @format A tibble with 348,642 rows and 8 columns
 #' \itemize{
-#'   \item \code{stream}: stream associated where data was collected/where gage is located
+#'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
 #'   \item \code{gage_id}: unique identifier for the gage
 #'   \item \code{variable_name}: variable measured: "Temperature"
@@ -71,7 +71,7 @@
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 49 rows and 8 columns
 #' \itemize{
-#'   \item{\code{stream}: name of the stream or river where the gage is located
+#'   \item{\code{location}: location associated where data was collected/where gage is located
 #'   \item{\code{gage_name}: name of the gaging station
 #'   \item{\code{gage_id}: unique identifier for the gage
 #'   \item{\code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, Quartz Valley Indian Community of the Quartz Valley Reservation of California (Tribal),
@@ -88,7 +88,7 @@
 #' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
 #' @format A tibble with 114,654 rows and 8 columns
 #' \itemize{
-#'   \item \code{stream}: stream associated where data was collected/where gage is located
+#'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
 #'   \item \code{gage_id}: unique identifier for the gage
 #'   \item \code{variable_name}: variable measured: "flow"
