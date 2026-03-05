@@ -242,11 +242,14 @@ temperature_data <- temperature_data_wqx |>
          value = as.numeric(value),
          date = as.Date(date)) |>
   bind_rows(temperature_data_usgs |>
-              mutate(gage_id = as.character(gage_id)))
+              mutate(gage_id = as.character(gage_id))) |>
+  rename(location = stream) |>
+  glimpse()
 
 temperature_gage <- temperature_gage_usgs |>
   mutate(gage_id = as.character(gage_id)) |>
   bind_rows(temperature_gage_wqx) |>
+  rename(location = stream) |>
   glimpse()
 
 ### saves clean data to aws
