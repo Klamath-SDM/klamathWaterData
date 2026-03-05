@@ -250,6 +250,7 @@ temperature_gage <- temperature_gage_usgs |>
   mutate(gage_id = as.character(gage_id)) |>
   bind_rows(temperature_gage_wqx) |>
   rename(location = stream) |>
+  relocate(location, .before = gage_name) |>
   glimpse()
 
 ### saves clean data to aws

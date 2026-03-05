@@ -278,6 +278,7 @@ ph_gage <- gage_ph_usgs |>
                                 gage_name == "Scott River South Fork" ~ NA,
                                 .default = as.numeric(river_mile))) |>
   rename(location = stream) |>
+  relocate(location, .before = gage_name) |>
   glimpse()
 
 ### saves clean data to aws

@@ -237,15 +237,16 @@ wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1"
 do_data <- do_wqx |>
   mutate(variable_name = "dissolved oxygen",
          statistic = tolower(statistic)) |>
-  rename(location = stream) |>
   bind_rows(do_usgs |>
               mutate(gage_id = as.character(gage_id))) |>
+  rename(location = stream) |>
   glimpse()
 
 do_gage <- gage_do_wqx |>
   bind_rows(gage_do_usgs |>
               mutate(gage_id = as.character(gage_id))) |>
   rename(location = stream) |>
+  relocate(location, .before = gage_name) |>
   glimpse()
 # TODOO - re-write these on aws bucket if modified
 wq_processed_data |> pins::pin_write(do_data,

@@ -71,6 +71,7 @@ water_level_gage <- all_usgs_water_level_raw |>
   # st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
   # gage_data_format(filter_streams = FALSE) |>
   rename(location = stream) |>
+  relocate(location, .before = gage_name) |>
   glimpse()
 
 
