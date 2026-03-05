@@ -182,3 +182,26 @@
 #'   \item \code{date}: date of the observation
 #'   }
 "water_level_gage"
+
+#' @name dswe_monthly
+#' @title Monthly aggregated dynamic surface water extent (DSWE) data
+#' @description Monthly summary statistics for the dynamic surface water extent for wildlife refuges in the Klamath Basin.
+#' Raw data was pulled from the [USGS LandSat Collection](https://www.usgs.gov/landsat-missions/landsat-collection-2-level-3-dynamic-surface-water-extent-science-product)
+#' and processed using a [DSWE algorithm developed by USGS in 2019](https://www.usgs.gov/publications/improved-automated-detection-subpixel-scale-inundation-revised-dynamic-surface-water).
+#' LandSat data were accessed through [Google Earth Engine](https://developers.google.com/earth-engine/datasets/catalog/landsat/) using the R package [rgee](https://r-spatial.github.io/rgee/).
+#' For full documentation on the process, including bounding boxes used for each wildlife refuge,
+#' limitations, and assumptions, please see vignettes/dswe_klamath_basin.Rmd.
+#' Currently the data span `2013-2025`. Though data goes back as far as `1984-2025`, only the data from 2013 to 2025 meets the criteria outlined in the DSWE calculations.
+#' @format A tibble with 139 rows and 9 columns
+#' \itemize{
+#'   \item \code{area}: wildlife refuge area associated with the statistics. Currently one of `Tule Lake`, `Clear Lake`, `Bear Valley`, `Lower Klamath Sheepy`, `Upper Klamath Lake`, and `Klamath Marsh`
+#'   \item \code{year}: calendar year
+#'   \item \code{month}: month for which statistics were calculated, integer
+#'   \item \code{mean_total_water}: mean total water coverage for a given month (shown as percentage of total pixels). Calculated as the sum of mean_class1, mean_class2, and mean_class3.
+#'   \item \code{sd_total_water}: standard deviation of total water coverage for a given month
+#'   \item \code{mean_class1}: mean Class 1 (High Confidence Water) coverage for a given month (shown as percentage of total pixels)
+#'   \item \code{mean_class2}: mean Class 2 (Moderate Confidence Water) coverage for a given month (shown as percentage of total pixels)
+#'   \item \code{mean_class3}: mean Class 3 (Partial Surface Water / Potential Wetland) coverage for a given month (shown as percentage of total pixels)
+#'   \item \code{n}: number of LandSat images available for a given month and year with no cloud coverage
+#'   }
+"dswe_monthly"
