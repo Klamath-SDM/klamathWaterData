@@ -267,7 +267,9 @@ ph_data <- ph_wqx |>
               mutate(gage_id = as.character(gage_id))) |>
   #remove two NAs in value
   filter(!is.na(value)) |>
-  rename(location = stream) |>
+  mutate(location = tolower(stream)) |>
+  relocate(location, .before = gage_name) |>
+  select(-stream) |>
   glimpse()
 
 ph_gage <- gage_ph_usgs |>
@@ -277,9 +279,11 @@ ph_gage <- gage_ph_usgs |>
   mutate(river_mile = case_when(gage_name == "Scott River at Gaging Station" ~ NA,
                                 gage_name == "Scott River South Fork" ~ NA,
                                 .default = as.numeric(river_mile))) |>
-  rename(location = stream) |>
+  mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>
+  select(-stream) |>
   glimpse()
+
 
 ### saves clean data to aws
 wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
