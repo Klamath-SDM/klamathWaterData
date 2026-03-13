@@ -192,6 +192,9 @@ all_usgs_temp_data_raw_clean <- all_usgs_temp_data_raw |>
                                                       "Mid-Trench - Upper   - Mdtu", "Mid-North - Lower  - Mdnl",
                                                       "Mid-North - Upper  - Mdnu", "Rattlesnake Point  -  Rpt") ~ "Upper Klamath Lake",
                                     station_nm == "Shoalwater Bay - Shb" ~ "Shoalwater Bay",
+                                    gage_id %in% c("422042121513100", "421935121551200", "422305121553800", # upper klamath lake gages
+                                                   "422305121553803", "422444121580400", "422622122004000",
+                                                   "422622122004003", "422719121571400","11504290") ~ "upper klamath lake",
                                     T ~ waterbody_name)) |>
            glimpse()
 
@@ -202,7 +205,7 @@ all_usgs_temp_data_raw_clean |>
 
 
 #### water data table ----
-temperature_data_usgs <- all_usgs_temp_data_raw |>
+temperature_data_usgs <- all_usgs_temp_data_raw_clean |>
   mutate(gage_id = site_no,
          gage_name = station_nm,
          stream = waterbody_name) |>
@@ -210,7 +213,7 @@ temperature_data_usgs <- all_usgs_temp_data_raw |>
   glimpse()
 
 #### monitoring site table ----
-gage_temperature_usgs_clean <- all_usgs_temp_data_raw |>
+gage_temperature_usgs_clean <- all_usgs_temp_data_raw_clean |>
   mutate(gage_name = station_nm,
          gage_id = site_no,
          agency = agency_cd.x,
