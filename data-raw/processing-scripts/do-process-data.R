@@ -239,13 +239,21 @@ do_data <- do_wqx |>
          statistic = tolower(statistic)) |>
   bind_rows(do_usgs |>
               mutate(gage_id = as.character(gage_id))) |>
+  mutate(location = tolower(stream)) |>
+  relocate(location, .before = gage_name) |>
+  select(-stream) |>
   glimpse()
+
 
 do_gage <- gage_do_wqx |>
   bind_rows(gage_do_usgs |>
               mutate(gage_id = as.character(gage_id))) |>
+  mutate(location = tolower(stream)) |>
+  relocate(location, .before = gage_name) |>
+  select(-stream) |>
   glimpse()
 
+# TODOO - re-write these on aws bucket if modified
 wq_processed_data |> pins::pin_write(do_data,
                                      type = "csv")
 

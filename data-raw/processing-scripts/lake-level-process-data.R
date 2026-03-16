@@ -53,6 +53,7 @@ water_level_data <- all_usgs_water_level_raw |>
          gage_name = tolower(station_nm),
          stream = waterbody_name) |>
   select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
+  rename(location = stream) |>
   glimpse()
 
 #### monitoring site table ----
@@ -69,6 +70,8 @@ water_level_gage <- all_usgs_water_level_raw |>
   distinct() |>
   # st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
   # gage_data_format(filter_streams = FALSE) |>
+  rename(location = stream) |>
+  relocate(location, .before = gage_name) |>
   glimpse()
 
 
