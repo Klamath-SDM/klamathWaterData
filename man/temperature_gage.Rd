@@ -7,7 +7,7 @@
 \format{
 A tibble with 94 rows and 8 columns
 \itemize{
-\item{\code{stream}: name of the stream or river where the gage is located
+\item{\code{location}: location associated where data was collected/where gage is located
 \item{\code{gage_name}: name of the gaging station
 \item{\code{gage_id}: unique identifier for the gage
 \item{\code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,

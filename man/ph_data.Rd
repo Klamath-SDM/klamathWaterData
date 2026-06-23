@@ -7,7 +7,7 @@
 \format{
 A tibble with 111,594 rows and 8 columns
 \itemize{
-\item \code{stream}: stream associated where data was collected/where gage is located
+\item \code{location}: location associated where data was collected/where gage is located
 \item \code{gage_name}: name of the gaging station
 \item \code{gage_id}: unique identifier for the gage
 \item \code{variable_name}: variable measured: "pH"
