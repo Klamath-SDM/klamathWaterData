@@ -14,10 +14,10 @@ wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", pref
 #### flow data pull----
 huc_code <- "180102" # huc code for Klamath basin
 
-wqx_flow_data <- readWQPdata(huc = huc_code,                       
+wqx_flow_data <- readWQPdata(huc = huc_code,
                          characteristicName = "Flow",
-                         startDateLo = "2014-01-01",               
-                         startDateHi = "2025-01-01") 
+                         startDateLo = "2014-01-01",
+                         startDateHi = "2025-01-01")
 
 # gage data has already been pulled in temp data pull script
 
@@ -40,12 +40,12 @@ for (gage in usgs_gages) {
   message(paste("Pulling data for gage:", gage))
   try({
     flow_data <- readNWISdv(
-      siteNumbers = gage, 
-      parameterCd = parameterCd, 
-      statCd = statCd,  
-      startDate = start_date) 
-    
-  
+      siteNumbers = gage,
+      parameterCd = parameterCd,
+      statCd = statCd,
+      startDate = start_date)
+
+
     all_flow_data[[gage]] <- flow_data
   }, silent = TRUE)
 }
@@ -53,8 +53,8 @@ for (gage in usgs_gages) {
 # Combine all gage data into one dataframe
 usgs_flow_data <- bind_rows(all_flow_data)
 
-usgs_flow_data <- usgs_flow_data |> 
-  janitor::clean_names() |> 
+usgs_flow_data <- usgs_flow_data |>
+  janitor::clean_names() |>
   glimpse()
 
 
@@ -63,7 +63,7 @@ usgs_gage_flow_data <- readNWISsite(usgs_gages)
 
 
 ##### save raw data into aws bucket water-quality/data-raw/
-### USGS 
+### USGS
 # flow data
 wq_data_raw |> pins::pin_write(usgs_flow_data,
                                type = "csv",
