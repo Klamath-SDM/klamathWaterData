@@ -238,3 +238,68 @@
 #'   \item \code{n}: number of LandSat images available for a given month and year with no cloud coverage
 #'   }
 "dswe_monthly"
+
+#' @name wet_surface_water
+#' @title Monthly surface water extent estimates for wildlife refuges in the Klamath Basin
+#' @description Monthly estimates of open water extent derived from the Intermountain West
+#' Wetland Extent Tool (WET) raster dataset, summarized within bounding boxes for six wildlife
+#' refuges in the Klamath Basin. The WET SurfaceWater product represents the probability or
+#' presence of open surface water for each pixel. Two temporal resolutions are available:
+#' decadal composites (10-year mean) covering 2005–2014 and 2015–2022, and individual monthly
+#' images from 2022 onward. Source rasters are distributed by the Intermountain West Joint
+#' Venture (IWJV). See \code{data-raw/data-exploration/wet-data-exploration.Rmd} for
+#' exploratory analysis and \code{data-raw/processing-scripts/wet-process-data.R} for
+#' processing details.
+#' @format A tibble with columns:
+#' \itemize{
+#'   \item \code{refuge}: wildlife refuge area. One of \code{upper_klamath_lake},
+#'     \code{clear_lake}, \code{tule_lake}, \code{bear_valley},
+#'     \code{lower_klamath_sheepy}, or \code{klamath_marsh}
+#'   \item \code{type}: product type; always \code{"SurfaceWater"} in this dataset
+#'   \item \code{era_str}: era label as a character string (e.g., \code{"2005-2014"} for a
+#'     decadal composite or \code{"2022"} for an individual year)
+#'   \item \code{is_decadal}: logical; \code{TRUE} if the row represents a 10-year mean composite
+#'   \item \code{era_start}: integer start year of the era
+#'   \item \code{month_chr}: three-letter month abbreviation (e.g., \code{"JAN"})
+#'   \item \code{month_num}: integer month number (1–12)
+#'   \item \code{mean_val}: mean surface water raster value across all pixels within the refuge bbox
+#'   \item \code{median_val}: median surface water raster value within the refuge bbox
+#'   \item \code{sd_val}: standard deviation of raster values within the refuge bbox
+#'   \item \code{pct_wet}: fraction of pixels with a value greater than zero (proportion wet)
+#'   \item \code{n_pixels}: number of non-NA pixels within the refuge bbox
+#' }
+#' @source Intermountain West Joint Venture (IWJV) WET dataset \url{https://iwjv.org}
+"wet_surface_water"
+
+#' @name wet_hydroperiod
+#' @title Monthly hydroperiod estimates for wildlife refuges in the Klamath Basin
+#' @description Monthly estimates of hydroperiod duration derived from the Intermountain West
+#' Wetland Extent Tool (WET) raster dataset, summarized within bounding boxes for six wildlife
+#' refuges in the Klamath Basin. The WET Hydroperiod product represents the duration or
+#' persistence of water at each pixel — higher values indicate longer hydroperiod duration.
+#' Data are available as decadal composites (10-year mean) covering four eras from 1984 to 2022.
+#' Source rasters are distributed by the Intermountain West Joint Venture (IWJV). See
+#' \code{data-raw/data-exploration/wet-data-exploration.Rmd} for exploratory analysis and
+#' \code{data-raw/processing-scripts/wet-process-data.R} for processing details.
+#' @format A tibble with columns:
+#' \itemize{
+#'   \item \code{refuge}: wildlife refuge area. One of \code{upper_klamath_lake},
+#'     \code{clear_lake}, \code{tule_lake}, \code{bear_valley},
+#'     \code{lower_klamath_sheepy}, or \code{klamath_marsh}
+#'   \item \code{type}: product type; always \code{"Hydroperiod"} in this dataset
+#'   \item \code{era_str}: decadal era label (e.g., \code{"1984-1994"}, \code{"1995-2004"},
+#'     \code{"2005-2014"}, \code{"2015-2022"})
+#'   \item \code{is_decadal}: logical; always \code{TRUE} — hydroperiod data are decadal composites only
+#'   \item \code{era_start}: integer start year of the decadal era
+#'   \item \code{month_chr}: three-letter month abbreviation (e.g., \code{"JAN"})
+#'   \item \code{month_num}: integer month number (1–12)
+#'   \item \code{mean_val}: mean hydroperiod raster value across all pixels within the refuge bbox;
+#'     higher values indicate longer water persistence
+#'   \item \code{median_val}: median hydroperiod raster value within the refuge bbox
+#'   \item \code{sd_val}: standard deviation of raster values within the refuge bbox
+#'   \item \code{pct_wet}: fraction of pixels with a value greater than zero (proportion with any hydroperiod)
+#'   \item \code{n_pixels}: number of non-NA pixels within the refuge bbox
+#' }
+#' @source Intermountain West Joint Venture (IWJV) WET dataset \url{https://iwjv.org}
+"wet_hydroperiod"
+
