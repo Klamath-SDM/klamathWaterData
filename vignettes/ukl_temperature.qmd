@@ -1,0 +1,80 @@
+---
+title: "Upper Klamath Lake - Water Temperature"
+format: 
+  html:
+    embed-resources: true
+---
+
+```{r, include = F}
+colors_full <-  c("#9A8822", "#F5CDB4", "#F8AFA8", "#FDDDA0", "#74A089", #Royal 2
+                  "#899DA4", "#C93312", "#DC863B", # royal 1 (- 3)
+                  "#F1BB7B", "#FD6467", "#5B1A18", # Grand Budapest 1 (-4)
+                  "#D8B70A", "#02401B", "#A2A475", # Cavalcanti 1
+                  "#E6A0C4", "#C6CDF7", "#D8A499", "#7294D4", #Grand Budapest 2
+                  "#9986A5", "#EAD3BF", "#AA9486", "#B6854D", "#798E87" # Isle of dogs 2 altered slightly
+)
+```
+
+The goal of this document is to provide a script for pulling Upper Klamath Lake
+water temperature data and visualize the data.
+
+Please install `klamathWaterData` 
+
+`#install.packages("remotes")`
+
+`remotes::install_github("Klamath-SDM/klamathWaterData")`
+
+**Upper Klamath Lake USGS Gage Numbers**
+
+- RATTLESNAKE POINT - RPT 422042121513100
+- UPPER KLAMATH LAKE AT HOWARD BAY, OR 421935121551200
+- MID-TRENCH - LOWER - MDTL 422305121553800
+- MID-TRENCH - UPPER - MDTU 422305121553803
+- SHOALWATER BAY - SHB 422444121580400
+- MID-NORTH - LOWER - MDNL 422622122004000
+- MID-NORTH - UPPER - MDNU 422622122004003
+- WILLIAMSON RIVER OUTLET - WMR 422719121571400
+- SEVENMILE CNL AT DIKE RD BR, NR KLAMATH AGENCY, OR 11504290
+
+# UKL temperature data
+
+```{r}
+# Define UKL gages
+ukl_gage_numbers <- c("422042121513100", "421935121551200", "422305121553800",
+                      "422305121553803", "422444121580400", "422622122004000",
+                      "422622122004003", "422719121571400","11504290")
+
+# Filter the water temperature dataset in klamathWaterData
+ukl_temp <- klamathWaterData::temperature_data |> 
+  dplyr::filter(gage_id %in% ukl_gage_numbers)
+```
+
+# Visualizations
+
+Use the plotly figure to zoom in on specific time frames or select one location.
+
+## Visualize mean water temperature
+
+Mean water temperature is generally consistent across locations. Temperature is
+at or below 10C in April and May and increases to 25C or above by July/August.
+
+Plots for max and min are not shown.
+
+- Max water temperature is generally consistent across locations though Mid Trench Upper
+reaches the highest temperatures. 
+- Min water temperature is generally consistent across locations and is similar to 
+mean temperature.
+
+```{r}
+plot <- ukl_temp |> 
+  dplyr::filter(statistic == "mean") |> 
+  ggplot2::ggplot(ggplot2::aes(x = date, y = value, color = gage_name)) +
+  ggplot2::geom_line() +
+  ggplot2::scale_color_manual(values = colors_full) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "",
+       y = "Water temperature (C) - mean",
+       color = "USGS Gage Name")
+
+plotly::ggplotly(plot)
+```
