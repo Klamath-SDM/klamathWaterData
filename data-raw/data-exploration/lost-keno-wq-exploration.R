@@ -17,6 +17,18 @@ library(htmltools)
 library(knitr)
 library(janitor)
 
+# notes of finidings:
+
+#  the gages that are noy included in klamathWaterData package are excluded due to
+# the following gage criteria:
+# filter(monitoring_location_type_name %in% c("River/Stream", "Lake", "Stream",
+# "Reservoir", "Lake, Reservoir, Impoundment",
+# "Spring", "Estuary"))
+
+#  The only missing gages found are USGS gages:
+# 11485000, 420024121132800 and 420535121143800
+#  they will be added to temperature-data-pull.R script
+
 # =============================================================================
 # INPUTS
 # =============================================================================
@@ -244,6 +256,7 @@ reach_pal <- colorFactor(
 )
 
 all_gages <- all_gages |>
+  mutate(SiteID = as.character(SiteID)) |>
   mutate(
     radius     = if_else(Source == "USGS NWIS", 9, 6),
     popup_text = paste0(
@@ -296,9 +309,9 @@ cat("=== STEP 4: Comparing against klamathWaterData ===\n\n")
 
 # ── Load klamathWaterData objects ─────────────────────────────────────────────
 kwd <- list(
-  temperature = klamathWaterData::temperature_gage,
-  pH          = klamathWaterData::ph_gage,
-  DO          = klamathWaterData::do_gage
+  temperature = klamathWaterData::temperature_data,
+  pH          = klamathWaterData::ph_data,
+  DO          = klamathWaterData::do_data
 )
 
 # ── Extract IDs — full form AND prefix-stripped, to handle format mismatches ──
@@ -505,3 +518,71 @@ missing_do <- missing_wide |>
   select(reach, source, site_id, site_name, agency, parameters, start_date, end_date, lat, lon) |>
   glimpse()
 
+
+
+# relized that there were gages filtered out in the process-data scripts.
+#  such as leaving out wells
+
+# =============================================================================
+# Compare Temperature gages against S3
+# =============================================================================
+
+# ── Pull S3 data ──────────────────────────────────────────────────────────────
+wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
+
+wqx_gage_raw <- wq_data_board |>
+  pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
+  janitor::clean_names()
+
+usgs_temp_raw <- wq_data_board |>
+  pins::pin_read("water_quality/data-raw/usgs_temp_gage_data") |>
+  janitor::clean_names() |>
+  mutate(site_no = as.character(site_no))
+
+# ── S3 IDs ────────────────────────────────────────────────────────────────────
+temp_s3_ids <- unique(c(
+  wqx_gage_raw$monitoring_location_identifier,
+  usgs_temp_raw$site_no
+))
+
+# ── Compare all_gages ─────────────────────────────────────────────────────────
+temp_gages_check <- all_gages |>
+  mutate(in_s3 = SiteID %in% temp_s3_ids)
+
+# three missing gages
+temp_not_in_s3 <- temp_gages_check |>
+  filter(!in_s3) |>
+  select(Reach, Source, SiteID, SiteName, Agency, Parameters,
+         Start_Date, End_Date)
+
+
+
+# =============================================================================
+# Compare Dissolved Oxygen gages against S3
+# =============================================================================
+
+usgs_do_raw <- wq_data_board |>
+  pins::pin_read("water_quality/data-raw/usgs_do_data") |>
+  janitor::clean_names() |>
+  mutate(site_no = as.character(site_no))
+
+# ── S3 IDs ────────────────────────────────────────────────────────────────────
+do_s3_ids <- unique(c(
+  wqx_gage_raw$monitoring_location_identifier,
+  usgs_do_raw$site_no
+))
+
+# ── Filter to DO gages only ───────────────────────────────────────────────────
+all_do_gages <- all_gages |>
+  filter(str_detect(Parameters, fixed("Dissolved oxygen (DO)")))
+
+# ── Compare against S3 ────────────────────────────────────────────────────────
+do_gages_check <- all_do_gages |>
+  mutate(in_s3 = SiteID %in% do_s3_ids)
+
+# no missing DO gages
+do_not_in_s3 <- do_gages_check |>
+  filter(!in_s3) |>
+  select(Reach, Source, SiteID, SiteName, Agency, Parameters,
+         Start_Date, End_Date) |>
+  glimpse()
