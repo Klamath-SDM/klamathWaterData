@@ -1,581 +1,507 @@
 # =============================================================================
-# Water Quality Gages — Lost River & Keno Reach (Lake Ewauna to Keno Dam)
+# Gage Discovery — Water Quality Gages — Lost River & Keno Reach (Lake Ewauna to Keno Dam)
 # =============================================================================
-# (1) Pulls gages from WQX
-# (2) Filters to gages collecting Temperature, pH, and/or Dissolved Oxygen
-# (3) Determines temporal coverage of each parameter (USGS only — WQP site
-#     search does not return per-parameter date ranges)
-# (4) Plots all gages on one interactive map
-# (5) cross-check with klamathWaterData objects and determine if we have pulled
-#     that data already, or not
+# 1. Finds ALL gages (USGS + WQP) within two bounding boxes with
+#    Temperature, pH, and/or DO data from 2014 onwards
+# 2. Maps gage locations
+# 3. Builds a reference table (site, parameters, date range)
+# 4. Compares against klamathWaterData objects and flags missing gages
 # =============================================================================
-
 
 library(dataRetrieval)
 library(dplyr)
-library(purrr)
-library(stringr)
 library(tidyr)
-library(lubridate)
+library(stringr)
 library(leaflet)
 library(htmltools)
+library(knitr)
+library(janitor)
 
-# ---------------------------
-# Inputs
-# ---------------------------
+# =============================================================================
+# INPUTS
+# =============================================================================
 
-wq_chars <- c(
-  "Temperature, water",
-  "pH",
-  "Dissolved oxygen (DO)"
-)
-
-usgs_pcodes <- c(
-  "00010", # Temperature, water
-  "00400", # pH
-  "00300"  # Dissolved oxygen
-)
-
-pcode_lookup <- tibble(
-  parameterCd = usgs_pcodes,
-  CharacteristicName = c(
-    "Temperature, water",
-    "pH",
-    "Dissolved oxygen (DO)"
-  )
-)
-
-wqp_boxes <- list(
-  "Lost River"  = c(-121.701762, 41.929380, -121.052246, 42.210610),
+boxes <- list(
+  "Lost River" = c(-121.701762, 41.929380, -121.052246, 42.210610),
   "Keno Reach" = c(-121.883019, 42.078811, -121.763552, 42.235661)
 )
 
-start_date <- "1900-01-01"
-end_date   <- as.character(Sys.Date())
+wq_chars    <- c("Temperature, water", "pH", "Dissolved oxygen (DO)")
+usgs_pcodes <- c("00010", "00400", "00300")
+pcode_label <- c("00010" = "Temperature, water",
+                 "00400" = "pH",
+                 "00300" = "Dissolved oxygen (DO)")
 
-# ---------------------------
-# Final gage list
-# ---------------------------
+cutoff_year <- 2014
 
-target_wqx <- tribble(
-  ~Reach, ~MonitoringLocationIdentifier,
-  "Lost River", "USGS-415635121301401",
-  "Lost River", "USGS-11488495",
-  "Lost River", "USGS-415714121301401",
-  "Lost River", "OREGONDEQ-12491-ORDEQ",
-  "Lost River", "CALWR_WQX-F1379300",
-  "Lost River", "OREGONDEQ-30182-ORDEQ",
-  "Lost River", "OREGONDEQ-10758-ORDEQ",
-  "Lost River", "OREGONDEQ-28293-ORDEQ",
-  "Lost River", "OREGONDEQ-13045-ORDEQ",
-  "Lost River", "OREGONDEQ-10759-ORDEQ",
-  "Lost River", "OREGONDEQ-40823-ORDEQ",
-  "Lost River", "USGS-421010121271200",
-  "Lost River", "OREGONDEQ-38907-ORDEQ",
-  "Lost River", "OREGONDEQ-10761-ORDEQ",
-  "Keno Reach", "OREGONDEQ-30940-ORDEQ",
-  "Keno Reach", "OREGONDEQ-11598-ORDEQ",
-  "Keno Reach", "OREGONDEQ-11603-ORDEQ",
-  "Keno Reach", "OREGONDEQ-10768-ORDEQ"
+# =============================================================================
+# HELPER
+# =============================================================================
+
+# Cast all columns to character before binding to avoid type conflicts
+safe_bind <- function(lst) {
+  bind_rows(lapply(Filter(Negate(is.null), lst),
+                   function(df) mutate(df, across(everything(), as.character))))
+}
+
+# =============================================================================
+# 1. DISCOVER GAGES
+# =============================================================================
+
+# ── 1a. USGS ─────────────────────────────────────────────────────────────────
+cat("=== STEP 1: Discovering gages ===\n\n")
+cat("Querying USGS NWIS...\n")
+
+usgs_sites_list <- lapply(names(boxes), function(reach) {
+  tryCatch({
+    df <- whatNWISsites(
+      bBox          = boxes[[reach]],
+      parameterCd   = usgs_pcodes,
+      hasDataTypeCd = "uv"
+    )
+    if (!is.null(df) && nrow(df) > 0) df$Reach <- reach
+    df
+  }, error = function(e) {
+    cat("  Warning (USGS,", reach, "):", conditionMessage(e), "\n"); NULL
+  })
+})
+usgs_sites_raw <- safe_bind(usgs_sites_list)
+
+# Parameter inventory — what each site actually has and when
+usgs_inv <- tryCatch(
+  whatNWISdata(
+    siteNumber = unique(usgs_sites_raw$site_no),
+    service    = c("uv", "dv")
+  ),
+  error = function(e) { cat("  Warning (whatNWISdata):", conditionMessage(e), "\n"); NULL }
 )
 
-target_usgs <- tribble(
-  ~Reach, ~site_no,
-  "Lost River", "415954121312100",
-  "Lost River", "420036121333700",
-  "Lost River", "420535121143800",
-  "Lost River", "420024121132800",
-  "Keno Reach", "420732121501100",
-  "Keno Reach", "420853121505500",
-  "Keno Reach", "421015121471800",
-  "Keno Reach", "421209121463000"
-)
-
-# ---------------------------
-# Helper functions
-# ---------------------------
-
-safe_bind <- function(x) {
-  bind_rows(lapply(x, function(df) {
-    if (is.null(df) || nrow(df) == 0) return(tibble())
-    df |> mutate(across(everything(), as.character))
-  }))
-}
-
-pull_wqp_sites <- function(box, reach) {
-  message("Finding WQP sites in ", reach, "...")
-
-  whatWQPsites(
-    bBox = box,
-    characteristicName = wq_chars
-  ) |>
-    mutate(Reach = reach)
-}
-
-pull_wqp_results <- function(box, reach) {
-  message("Pulling WQP results in ", reach, "...")
-
-  readWQPdata(
-    bBox = box,
-    characteristicName = wq_chars,
-    startDateLo = start_date,
-    startDateHi = end_date,
-    service = "Result"
-  ) |>
-    mutate(Reach = reach)
-}
-
-pull_usgs_site_info <- function(site_no, reach) {
-  message("Finding USGS site info for ", site_no, "...")
-
-  readNWISsite(site_no) |>
-    mutate(
-      Reach = reach,
-      DataSource = "USGS NWIS"
-    )
-}
-
-pull_usgs_uv <- function(site_no, reach) {
-  message("Pulling USGS instantaneous data for ", site_no, "...")
-
-  out <- tryCatch(
-    readNWISuv(
-      siteNumbers = site_no,
-      parameterCd = usgs_pcodes,
-      startDate = start_date,
-      endDate = end_date,
-      tz = "UTC"
-    ),
-    error = function(e) NULL
-  )
-
-  if (is.null(out) || nrow(out) == 0) return(tibble())
-
-  out |>
-    mutate(
-      Reach = reach,
-      site_no = site_no
-    )
-}
-
-# ---------------------------
-# 1. WQP / WQX sites and results
-# ---------------------------
-
-wqp_sites_raw <- imap(wqp_boxes, pull_wqp_sites) |>
-  safe_bind()
-
-wqp_results_raw <- imap(wqp_boxes, pull_wqp_results) |>
-  safe_bind()
-
-wqp_sites <- wqp_sites_raw |>
-  semi_join(target_wqx, by = c("Reach", "MonitoringLocationIdentifier"))
-
-wqp_results <- wqp_results_raw |>
-  filter(CharacteristicName %in% wq_chars) |>
-  semi_join(target_wqx, by = c("Reach", "MonitoringLocationIdentifier"))
-
-# ---------------------------
-# 2. WQP temporal coverage
-# ---------------------------
-
-wqp_coverage_by_parameter <- wqp_results |>
-  mutate(ActivityDate = as.Date(ActivityStartDate)) |>
-  filter(!is.na(ActivityDate)) |>
-  group_by(
-    Reach,
-    MonitoringLocationIdentifier,
-    CharacteristicName
-  ) |>
-  summarise(
-    start_date = min(ActivityDate, na.rm = TRUE),
-    end_date   = max(ActivityDate, na.rm = TRUE),
-    n_results  = n(),
-    .groups = "drop"
-  )
-
-wqp_site_summary <- wqp_coverage_by_parameter |>
-  group_by(
-    Reach,
-    MonitoringLocationIdentifier
-  ) |>
-  summarise(
-    parameters = paste(sort(unique(CharacteristicName)), collapse = "; "),
-    start_date = min(start_date, na.rm = TRUE),
-    end_date = max(end_date, na.rm = TRUE),
-    temporal_coverage = paste(start_date, "to", end_date),
-    n_results = sum(n_results),
-    .groups = "drop"
-  )
-
-wqp_map_df <- wqp_sites |>
-  select(
-    Reach,
-    MonitoringLocationIdentifier,
-    MonitoringLocationName,
-    OrganizationIdentifier,
-    OrganizationFormalName,
-    LatitudeMeasure,
-    LongitudeMeasure
-  ) |>
-  distinct() |>
-  inner_join(
-    wqp_site_summary,
-    by = c("Reach", "MonitoringLocationIdentifier")
+usgs_params <- usgs_inv |>
+  filter(
+    parm_cd %in% usgs_pcodes,
+    !is.na(end_date),
+    as.integer(substr(end_date, 1, 4)) >= cutoff_year
   ) |>
   transmute(
-    Reach,
-    DataSource = "WQP/WQX",
-    SiteID = MonitoringLocationIdentifier,
-    SiteName = MonitoringLocationName,
-    Agency = OrganizationFormalName,
-    OrgID = OrganizationIdentifier,
-    parameters,
-    start_date,
-    end_date,
-    temporal_coverage,
-    n_results,
-    lat = as.numeric(LatitudeMeasure),
-    lon = as.numeric(LongitudeMeasure)
-  ) |>
-  filter(!is.na(lat), !is.na(lon))
-
-# ---------------------------
-# 3. USGS site info and results
-# ---------------------------
-
-usgs_sites_raw <- pmap(
-  list(target_usgs$site_no, target_usgs$Reach),
-  pull_usgs_site_info
-) |>
-  safe_bind()
-
-usgs_uv_raw <- pmap(
-  list(target_usgs$site_no, target_usgs$Reach),
-  pull_usgs_uv
-) |>
-  safe_bind()
-
-# Convert USGS wide instantaneous columns to long format.
-# This captures columns like X_00010_00000, X_00400_00000, X_00300_00000.
-usgs_uv_long <- usgs_uv_raw |>
-  mutate(dateTime = as.POSIXct(dateTime, tz = "UTC")) |>
-  pivot_longer(
-    cols = matches("^[A-Za-z]*_?(00010|00400|00300)_"),
-    names_to = "parameter_column",
-    values_to = "value",
-    values_drop_na = TRUE
-  ) |>
-  mutate(
-    parameterCd = str_extract(parameter_column, "00010|00400|00300")
-  ) |>
-  left_join(pcode_lookup, by = "parameterCd")
-
-usgs_coverage_by_parameter <- usgs_uv_long |>
-  filter(!is.na(CharacteristicName), !is.na(dateTime)) |>
-  group_by(
-    Reach,
-    site_no,
-    CharacteristicName
-  ) |>
-  summarise(
-    start_date = as.Date(min(dateTime, na.rm = TRUE)),
-    end_date   = as.Date(max(dateTime, na.rm = TRUE)),
-    n_results  = n(),
-    .groups = "drop"
+    SiteID        = site_no,
+    Parameter     = pcode_label[parm_cd],
+    Start         = as.Date(begin_date),
+    End           = as.Date(end_date),
+    Data_Type     = case_when(
+      data_type_cd == "uv" ~ "Continuous",
+      data_type_cd == "dv" ~ "Daily",
+      TRUE                 ~ data_type_cd
+    )
   )
 
-usgs_site_summary <- usgs_coverage_by_parameter |>
-  group_by(
-    Reach,
-    site_no
-  ) |>
+# One row per site summarising all parameters
+usgs_summary <- usgs_params |>
+  group_by(SiteID) |>
   summarise(
-    parameters = paste(sort(unique(CharacteristicName)), collapse = "; "),
-    start_date = min(start_date, na.rm = TRUE),
-    end_date = max(end_date, na.rm = TRUE),
-    temporal_coverage = paste(start_date, "to", end_date),
-    n_results = sum(n_results),
+    Parameters = paste(sort(unique(Parameter)), collapse = "; "),
+    Start_Date = min(Start, na.rm = TRUE),
+    End_Date   = max(End,   na.rm = TRUE),
+    Data_Type  = paste(sort(unique(Data_Type)), collapse = "; "),
     .groups = "drop"
-  )
+  ) |>
+  filter(year(End_Date) >= cutoff_year)
 
-usgs_map_df <- usgs_sites_raw |>
-  select(
-    Reach,
-    site_no,
-    station_nm,
-    agency_cd,
-    dec_lat_va,
-    dec_long_va
-  ) |>
-  distinct() |>
-  inner_join(
-    usgs_site_summary,
-    by = c("Reach", "site_no")
-  ) |>
+usgs_gages <- usgs_sites_raw |>
+  filter(site_no %in% usgs_summary$SiteID) |>
   transmute(
-    Reach,
-    DataSource = "USGS NWIS",
-    SiteID = site_no,
+    Reach    = Reach,
+    Source   = "USGS NWIS",
+    SiteID   = site_no,
     SiteName = station_nm,
-    Agency = "U.S. Geological Survey",
-    OrgID = agency_cd,
-    parameters,
-    start_date,
-    end_date,
-    temporal_coverage,
-    n_results,
-    lat = as.numeric(dec_lat_va),
-    lon = as.numeric(dec_long_va)
+    Agency   = "U.S. Geological Survey",
+    Lat      = as.numeric(dec_lat_va),
+    Lon      = as.numeric(dec_long_va)
   ) |>
-  filter(!is.na(lat), !is.na(lon))
+  distinct(SiteID, .keep_all = TRUE) |>
+  left_join(usgs_summary, by = "SiteID") |>
+  filter(!is.na(Lat), !is.na(Lon))
 
-# ---------------------------
-# 4. Final combined gage summary
-# ---------------------------
+cat("  USGS: found", nrow(usgs_gages), "gages with Temp/pH/DO from", cutoff_year, "onwards\n\n")
 
-gage_summary <- bind_rows(wqp_map_df, usgs_map_df) |>
-  arrange(Reach, DataSource, SiteID)
+# ── 1b. WQP (non-USGS) ────────────────────────────────────────────────────────
+cat("Querying Water Quality Portal (WQP)...\n")
 
-parameter_summary <- bind_rows(
-  wqp_coverage_by_parameter |>
-    transmute(
-      Reach,
-      DataSource = "WQP/WQX",
-      SiteID = MonitoringLocationIdentifier,
-      CharacteristicName,
-      start_date,
-      end_date,
-      n_results
-    ),
-  usgs_coverage_by_parameter |>
-    transmute(
-      Reach,
-      DataSource = "USGS NWIS",
-      SiteID = site_no,
-      CharacteristicName,
-      start_date,
-      end_date,
-      n_results
+# Pull sites
+wqp_sites_list <- lapply(names(boxes), function(reach) {
+  tryCatch({
+    df <- whatWQPsites(bBox = boxes[[reach]], characteristicName = wq_chars)
+    if (!is.null(df) && nrow(df) > 0) {
+      df <- mutate(df, across(everything(), as.character))
+      df$Reach <- reach
+    }
+    df
+  }, error = function(e) {
+    cat("  Warning (WQP sites,", reach, "):", conditionMessage(e), "\n"); NULL
+  })
+})
+wqp_sites_raw <- safe_bind(wqp_sites_list) |>
+  filter(!grepl("^USGS", OrganizationIdentifier, ignore.case = TRUE)) |>
+  distinct(MonitoringLocationIdentifier, .keep_all = TRUE)
+
+# Per-parameter result counts and year range (one call per characteristic)
+cat("  Verifying WQP data availability (one call per parameter)...\n")
+
+wqp_detail_list <- list()
+for (reach in names(boxes)) {
+  for (chr in wq_chars) {
+    key <- paste(reach, chr)
+    df <- tryCatch(
+      whatWQPdata(bBox = boxes[[reach]], characteristicName = chr),
+      error = function(e) NULL
     )
-) |>
-  arrange(Reach, DataSource, SiteID, CharacteristicName)
+    if (!is.null(df) && nrow(df) > 0) {
+      df <- mutate(df, across(everything(), as.character),
+                   Parameter = chr, Reach = reach)
+      wqp_detail_list[[key]] <- df
+    }
+  }
+}
+wqp_detail_raw <- safe_bind(wqp_detail_list) |>
+  mutate(resultCount = as.numeric(resultCount)) |>
+  filter(!is.na(resultCount), resultCount > 0)
 
-print(gage_summary)
-print(parameter_summary)
+# Year range per site x parameter via readWQPsummary
+cat("  Fetching WQP year-level date ranges (readWQPsummary)...\n")
 
-# ---------------------------
-# 5. Clean map with just target gages
-# ---------------------------
+wqp_yr_list <- list()
+for (reach in names(boxes)) {
+  for (chr in wq_chars) {
+    key <- paste(reach, chr)
+    df <- tryCatch(
+      readWQPsummary(bBox = boxes[[reach]], characteristicName = chr),
+      error = function(e) NULL
+    )
+    if (!is.null(df) && nrow(df) > 0) {
+      df <- mutate(df, across(everything(), as.character), Parameter = chr)
+      wqp_yr_list[[key]] <- df
+    }
+  }
+}
+wqp_yr_raw <- safe_bind(wqp_yr_list) |>
+  mutate(YearSummarized = as.integer(YearSummarized)) |>
+  filter(!is.na(YearSummarized), YearSummarized >= cutoff_year)
 
-bbox_rects <- tibble(
-  Reach = names(wqp_boxes),
-  west  = map_dbl(wqp_boxes, 1),
-  south = map_dbl(wqp_boxes, 2),
-  east  = map_dbl(wqp_boxes, 3),
-  north = map_dbl(wqp_boxes, 4)
-)
+# Sites confirmed to have data from cutoff_year onwards
+wqp_yr_summary <- wqp_yr_raw |>
+  group_by(MonitoringLocationIdentifier, Parameter) |>
+  summarise(
+    Start_Year = min(YearSummarized, na.rm = TRUE),
+    End_Year   = max(YearSummarized, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  filter(End_Year >= cutoff_year)
+
+confirmed_wqp_ids <- unique(wqp_yr_summary$MonitoringLocationIdentifier)
+
+# Build WQP per-site summary
+wqp_param_summary <- wqp_yr_summary |>
+  group_by(MonitoringLocationIdentifier) |>
+  summarise(
+    Parameters = paste(sort(unique(Parameter)), collapse = "; "),
+    Start_Date = as.Date(paste0(min(Start_Year), "-01-01")),
+    End_Date   = as.Date(paste0(max(End_Year),   "-12-31")),
+    Data_Type  = "Discrete samples",
+    .groups = "drop"
+  )
+
+wqp_gages <- wqp_sites_raw |>
+  filter(MonitoringLocationIdentifier %in% confirmed_wqp_ids) |>
+  transmute(
+    Reach    = Reach,
+    Source   = "WQP",
+    SiteID   = MonitoringLocationIdentifier,
+    SiteName = MonitoringLocationName,
+    Agency   = OrganizationFormalName,
+    Lat      = as.numeric(LatitudeMeasure),
+    Lon      = as.numeric(LongitudeMeasure)
+  ) |>
+  distinct(SiteID, .keep_all = TRUE) |>
+  left_join(wqp_param_summary, by = c("SiteID" = "MonitoringLocationIdentifier")) |>
+  filter(!is.na(Lat), !is.na(Lon), !is.na(Parameters))
+
+cat("  WQP: found", nrow(wqp_gages), "non-USGS gages with Temp/pH/DO from",
+    cutoff_year, "onwards\n\n")
+
+# ── 1c. Combine ───────────────────────────────────────────────────────────────
+all_gages <- bind_rows(usgs_gages, wqp_gages) |>
+  arrange(Reach, Source, SiteID)
+
+cat("  TOTAL:", nrow(all_gages), "gages across both reaches and both sources\n\n")
+
+# =============================================================================
+# 2. MAP
+# =============================================================================
+cat("=== STEP 2: Building map ===\n")
 
 reach_pal <- colorFactor(
   palette = c("Lost River" = "#1b9e77", "Keno Reach" = "#7570b3"),
-  domain = gage_summary$Reach
+  domain  = all_gages$Reach
 )
 
-shape_radius <- function(source) {
-  ifelse(source == "USGS NWIS", 8, 6)
-}
-
-gage_map <- leaflet(gage_summary) |>
-  addProviderTiles(providers$Esri.WorldTopoMap) |>
-
-  addRectangles(
-    data = bbox_rects,
-    lng1 = ~west,
-    lat1 = ~south,
-    lng2 = ~east,
-    lat2 = ~north,
-    color = "red",
-    weight = 2,
-    fill = FALSE,
-    popup = ~paste0("<b>", Reach, " bounding box</b>")
-  ) |>
-
-  addCircleMarkers(
-    data = gage_summary,
-    lng = ~lon,
-    lat = ~lat,
-    radius = ~shape_radius(DataSource),
-    color = ~reach_pal(Reach),
-    fillColor = ~reach_pal(Reach),
-    fillOpacity = 0.85,
-    stroke = TRUE,
-    weight = ~ifelse(DataSource == "USGS NWIS", 3, 1.5),
-    popup = ~paste0(
+all_gages <- all_gages |>
+  mutate(
+    radius     = if_else(Source == "USGS NWIS", 9, 6),
+    popup_text = paste0(
       "<b>", htmlEscape(SiteName), "</b><br>",
-      "<b>Site ID:</b> ", htmlEscape(SiteID), "<br>",
-      "<b>Reach:</b> ", htmlEscape(Reach), "<br>",
-      "<b>Source:</b> ", htmlEscape(DataSource), "<br>",
-      "<b>Agency:</b> ", htmlEscape(Agency), "<br>",
-      "<b>Parameters:</b> ", htmlEscape(parameters), "<br>",
-      "<b>Temporal coverage:</b> ", temporal_coverage, "<br>",
-      "<b>Result count:</b> ", n_results
-    ),
-    label = ~paste0(
-      SiteID, " | ",
-      DataSource, " | ",
-      parameters, " | ",
-      temporal_coverage
+      "<b>Site ID:</b> ",    htmlEscape(SiteID), "<br>",
+      "<b>Reach:</b> ",      htmlEscape(Reach), "<br>",
+      "<b>Source:</b> ",     htmlEscape(Source), "<br>",
+      "<b>Agency:</b> ",     htmlEscape(Agency), "<br>",
+      "<b>Parameters:</b> ", htmlEscape(Parameters), "<br>",
+      "<b>Period:</b> ",     as.character(Start_Date), " to ", as.character(End_Date)
     )
-  ) |>
-
-  addLegend(
-    position = "bottomright",
-    pal = reach_pal,
-    values = ~Reach,
-    title = "Reach"
   )
 
-gage_map
+gage_map <- leaflet(all_gages) |>
+  addProviderTiles(providers$Esri.WorldTopoMap) |>
+  addCircleMarkers(
+    lng         = ~Lon,
+    lat         = ~Lat,
+    radius      = ~radius,
+    fillColor   = ~reach_pal(Reach),
+    color       = "#333333",
+    weight      = 1,
+    fillOpacity = 0.9,
+    popup       = ~popup_text,
+    label       = ~paste0(SiteID, " | ", Source, " | ", Parameters)
+  ) |>
+  addLegend(
+    position = "bottomright",
+    pal      = reach_pal,
+    values   = ~Reach,
+    title    = "Reach"
+  ) |>
+  addControl(
+    html = "<div style='background:white;padding:8px 12px;border-radius:5px;font-size:12px'>
+              <b>All gages: Temp / pH / DO</b><br>
+              ● Large = USGS NWIS &nbsp; ● Small = WQP<br>
+              Data from 2014 onwards only<br>
+              Click marker for details
+            </div>",
+    position = "topleft"
+  )
 
+print(gage_map)
+cat("  Map created (object: gage_map)\n\n")
 
-#  Figure out from this gages, which ones we have pulled already
-kwd_gage_objects <- list(
+# =============================================================================
+# 4. COMPARE AGAINST klamathWaterData
+# =============================================================================
+cat("=== STEP 4: Comparing against klamathWaterData ===\n\n")
+
+# ── Load klamathWaterData objects ─────────────────────────────────────────────
+kwd <- list(
   temperature = klamathWaterData::temperature_gage,
   pH          = klamathWaterData::ph_gage,
   DO          = klamathWaterData::do_gage
 )
 
-# ---------------------------
-# 2. Helper: guess likely gage/site ID columns
-# ---------------------------
-
-get_gage_ids <- function(df) {
-  possible_id_cols <- names(df)[
-    str_detect(
-      names(df),
-      regex(
-        "gage_id",
-        ignore_case = TRUE
-      )
-    )
-  ]
-
-  ids <- df |>
-    select(any_of(possible_id_cols)) |>
-    mutate(across(everything(), as.character)) |>
-    pivot_longer(
-      cols = everything(),
-      values_to = "gage_id",
-      values_drop_na = TRUE
-    ) |>
-    distinct(gage_id) |>
-    pull(gage_id)
-
-  ids <- unique(c(
-    ids,
-    str_remove(ids, "^USGS-")
-  ))
-
-  ids[!is.na(ids) & ids != ""]
+# ── Extract IDs — full form AND prefix-stripped, to handle format mismatches ──
+# e.g. "USGS-11509500"       -> also stores "11509500"
+#      "HVTEPA_WQX-TR_SB"   -> also stores "TR_SB"
+#      "11509500"            -> already bare, stored as-is
+get_ids <- function(df) {
+  id_col <- names(df)[str_detect(names(df), regex("gage_id", ignore_case = TRUE))][1]
+  if (is.na(id_col)) return(character(0))
+  ids     <- unique(as.character(df[[id_col]]))
+  ids     <- ids[!is.na(ids) & ids != ""]
+  stripped <- str_remove(ids, "^[A-Za-z0-9_]+-")   # strip any org prefix
+  unique(c(ids, stripped))
 }
 
-kwd_gage_ids <- imap_dfr(kwd_gage_objects, function(df, parameter_group) {
-  tibble(
-    parameter_group = parameter_group,
-    existing_id = get_gage_ids(df)
-  )
-}) |>
-  distinct()
+kwd_ids <- lapply(kwd, get_ids)
 
-# ---------------------------
-# 3. Prepare your target gage IDs
-# ---------------------------
+# Diagnostic — confirm IDs are found for each object
+cat("── klamathWaterData ID counts ────────────────────────────────────────────\n")
+for (nm in names(kwd_ids)) {
+  cat(sprintf("  %-15s : %d IDs  (sample: %s)\n",
+              nm,
+              length(kwd_ids[[nm]]),
+              paste(head(kwd_ids[[nm]], 3), collapse = ", ")))
+}
+cat("\n")
 
-target_gages <- gage_summary |>
-  transmute(
-    Reach,
-    DataSource,
-    SiteID,
-    SiteID_no_prefix = str_remove(SiteID, "^USGS-"),
-    SiteName,
-    Agency,
-    parameters,
-    temporal_coverage
-  )
+# ── Parameter -> kwd object mapping ──────────────────────────────────────────
+param_to_kwd <- c(
+  "Temperature, water"    = "temperature",
+  "pH"                    = "pH",
+  "Dissolved oxygen (DO)" = "DO"
+)
 
-# ---------------------------
-# 4. Check whether each target gage exists in each KWD object
-# ---------------------------
-
-gage_existing_check <- target_gages |>
-  crossing(parameter_group = c("temperature", "pH", "DO")) |>
-  left_join(
-    kwd_gage_ids,
-    by = "parameter_group",
-    relationship = "many-to-many"
-  ) |>
+# ── Long table: one row per gage x parameter ──────────────────────────────────
+gage_params_long <- all_gages |>
+  select(Reach, Source, SiteID, SiteName, Agency,
+         Parameters, Start_Date, End_Date, Lat, Lon) |>
+  mutate(param_list = str_split(Parameters, "; ")) |>
+  unnest(param_list) |>
+  rename(Parameter = param_list) |>
+  filter(Parameter %in% names(param_to_kwd)) |>
   mutate(
-    exists_in_klamathWaterData =
-      SiteID == existing_id |
-      SiteID_no_prefix == existing_id |
-      str_remove(existing_id, "^USGS-") == SiteID_no_prefix
-  ) |>
-  group_by(
-    Reach,
-    DataSource,
-    SiteID,
-    SiteName,
-    Agency,
-    parameters,
-    temporal_coverage,
-    parameter_group
-  ) |>
-  summarise(
-    exists_in_klamathWaterData = any(exists_in_klamathWaterData, na.rm = TRUE),
-    matched_id = paste(unique(existing_id[exists_in_klamathWaterData]), collapse = "; "),
-    .groups = "drop"
-  ) |>
-  mutate(
-    matched_id = na_if(matched_id, "")
-  ) |>
-  arrange(Reach, DataSource, SiteID, parameter_group)
+    kwd_object  = param_to_kwd[Parameter],
+    # Strip any org prefix from SiteID for matching
+    SiteID_bare = str_remove(SiteID, "^[A-Za-z0-9_]+-"),
+    in_kwd = mapply(function(sid, bare, obj) {
+      ids <- kwd_ids[[obj]]
+      sid %in% ids | bare %in% ids
+    }, SiteID, SiteID_bare, kwd_object)
+  )
 
-# ---------------------------
-# 5. Wide summary: one row per gage
-# ---------------------------
-
-gage_existing_summary <- gage_existing_check |>
-  select(
-    Reach,
-    DataSource,
-    SiteID,
-    SiteName,
-    Agency,
-    parameters,
-    temporal_coverage,
-    parameter_group,
-    exists_in_klamathWaterData
-  ) |>
+# ── Wide table: one row per gage, in_kwd TRUE/FALSE per parameter ─────────────
+kwd_check <- gage_params_long |>
+  select(Reach, Source, SiteID, SiteName, Agency,
+         Parameters, Start_Date, End_Date,
+         Parameter, in_kwd, Lat, Lon) |>
   pivot_wider(
-    names_from = parameter_group,
-    values_from = exists_in_klamathWaterData,
-    names_prefix = "exists_in_"
+    names_from  = Parameter,
+    values_from = in_kwd,
+    names_prefix = "in_kwd_"
   ) |>
+  rename_with(~ str_replace_all(., "[^A-Za-z0-9_]", "_"), starts_with("in_kwd_")) |>
+  # NA means gage doesn't collect that parameter — not a failed match, treat as FALSE
+  mutate(across(starts_with("in_kwd_"), ~ replace_na(., FALSE))) |>
   mutate(
-    exists_in_any_klamathWaterData_object =
-      exists_in_temperature | exists_in_pH | exists_in_DO
+    n_params_collected = str_count(Parameters, ";") + 1,
+    n_params_in_kwd    = rowSums(across(starts_with("in_kwd_")), na.rm = TRUE),
+    in_all_kwd         = n_params_in_kwd == n_params_collected,
+    in_any_kwd         = n_params_in_kwd > 0,
+    status = case_when(
+      in_all_kwd             ~ "Complete — all params in klamathWaterData",
+      in_any_kwd & !in_all_kwd ~ "Partial — some params missing",
+      !in_any_kwd            ~ "Fully missing from klamathWaterData"
+    )
+  )
+
+# ── Missing by parameter: one row per gage x missing parameter ────────────────
+missing_by_param <- gage_params_long |>
+  filter(!in_kwd) |>
+  select(Reach, Source, SiteID, SiteName, Agency,
+         Parameter, kwd_object,
+         Start_Date, End_Date, Lat, Lon) |>
+  arrange(Reach, Source, SiteID, Parameter)
+
+# ── Missing wide: one row per gage showing which params are missing ───────────
+missing_wide <- gage_params_long |>
+  select(Reach, Source, SiteID, SiteName, Agency,
+         Parameters, Start_Date, End_Date,
+         Parameter, in_kwd, Lat, Lon) |>
+  mutate(missing = !in_kwd) |>
+  pivot_wider(
+    names_from  = Parameter,
+    values_from = missing,
+    names_prefix = "missing_"
   ) |>
-  arrange(Reach, DataSource, SiteID)
+  rename_with(~ str_replace_all(., "[^A-Za-z0-9_]", "_"),
+              starts_with("missing_")) |>
+  # NA = parameter not collected at this site = not missing, replace with FALSE
+  mutate(across(starts_with("missing_"), ~ replace_na(., FALSE))) |>
+  mutate(
+    missing_any = rowSums(across(starts_with("missing_")), na.rm = TRUE) > 0
+  ) |>
+  filter(missing_any) |>
+  arrange(Reach, Source, SiteID)
 
-# ---------------------------
-# 6. Inspect/export
-# ---------------------------
+# ── Print summary ─────────────────────────────────────────────────────────────
+cat("── Summary ───────────────────────────────────────────────────────────────\n")
+cat("  Total gages found                    :", nrow(all_gages), "\n")
+cat("  Complete (all params in kwd)         :", sum(kwd_check$in_all_kwd,  na.rm = TRUE), "\n")
+cat("  Partial  (some params missing)       :", sum(kwd_check$in_any_kwd & !kwd_check$in_all_kwd, na.rm = TRUE), "\n")
+cat("  Fully missing (not in any kwd obj)   :", sum(!kwd_check$in_any_kwd, na.rm = TRUE), "\n\n")
 
-print(gage_existing_check)
-print(gage_existing_summary)
+cat("── Gages with at least one parameter missing from klamathWaterData ───────\n")
+print(kable(
+  missing_wide |>  select(-Lat, -Lon),
+  format = "simple"
+))
 
-# narrow down missing gages on klamathWaterData
-missing <- gage_existing_summary |>
-  filter(exists_in_any_klamathWaterData_object == FALSE) |>
+cat("\n── Detail: which gage x parameter is missing ─────────────────────────────\n")
+print(kable(
+  missing_by_param |>  select(-Lat, -Lon),
+  format = "simple"
+))
+
+# ── Map: missing gages ────────────────────────────────────────────────────────
+if (nrow(missing_wide) > 0) {
+
+  status_pal <- colorFactor(
+    palette = c("Partial — some params missing"          = "#fc8d59",
+                "Fully missing from klamathWaterData"     = "#d73027"),
+    domain = c("Partial — some params missing",
+               "Fully missing from klamathWaterData")
+  )
+
+  # Add status back for map coloring
+  missing_map_df <- missing_wide |>
+    left_join(kwd_check |>  select(SiteID, status), by = "SiteID")
+
+  missing_map <- leaflet(missing_map_df) |>
+    addProviderTiles(providers$Esri.WorldTopoMap) |>
+    addCircleMarkers(
+      lng         = ~Lon,
+      lat         = ~Lat,
+      radius      = 8,
+      fillColor   = ~status_pal(status),
+      color       = "#333333",
+      weight      = 1,
+      fillOpacity = 0.9,
+      popup       = ~paste0(
+        "<b>", htmlEscape(SiteName), "</b><br>",
+        "<b>Site ID:</b> ",    htmlEscape(SiteID), "<br>",
+        "<b>Reach:</b> ",      htmlEscape(Reach), "<br>",
+        "<b>Source:</b> ",     htmlEscape(Source), "<br>",
+        "<b>Agency:</b> ",     htmlEscape(Agency), "<br>",
+        "<b>Parameters:</b> ", htmlEscape(Parameters), "<br>",
+        "<b>Period:</b> ",     as.character(Start_Date), " to ", as.character(End_Date), "<br>",
+        "<b>Status:</b> ",     htmlEscape(status)
+      ),
+      label = ~paste0(SiteID, " | ", status)
+    ) |>
+    addLegend(
+      position = "bottomright",
+      pal      = status_pal,
+      values   = ~status,
+      title    = "klamathWaterData status"
+    ) |>
+    addControl(
+      html = "<div style='background:white;padding:8px 12px;border-radius:5px;font-size:12px'>
+                <b>Gages with missing parameters</b><br>
+                Orange = partially missing<br>
+                Red    = fully missing<br>
+                Click marker for details
+              </div>",
+      position = "topleft"
+    )
+
+  print(missing_map)
+}
+
+# ── Save outputs ──────────────────────────────────────────────────────────────
+# file_path <- "C:/Users/YourName/Documents/my_folder/output_file.csv"
+#
+# # 3. Save the data frame to the folder
+# write.csv(my_data, file = file_path, row.names = FALSE)
+
+
+missing_temp <- missing_wide |>
+  clean_names() |>
+  filter(missing_temperature_water == TRUE) |>
+  select(reach, source, site_id, site_name, agency, parameters, start_date, end_date, lat, lon) |>
+  glimpse()
+
+#  no missing ph gages
+# missing_ph <- missing_wide |>
+#   clean_names() |>
+#   filter(missing_p_h == TRUE) |>
+#   select(reach, source, site_id, site_name, agency, parameters, start_date, end_date, lat, lon) |>
+#   glimpse()
+
+missing_do <- missing_wide |>
+  clean_names() |>
+  filter(missing_dissolved_oxygen_do == TRUE) |>
+  select(reach, source, site_id, site_name, agency, parameters, start_date, end_date, lat, lon) |>
   glimpse()
 
