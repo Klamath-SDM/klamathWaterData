@@ -162,6 +162,21 @@
 #'   }
 "water_level_data"
 
+#' @name tule_elevation
+#' @title Lake water elevation at Tule Sump Lake
+#' @description Lake water surface elevation (ft) data from U.S Bureau of Reclamation (USBR)
+#' @format A tibble with 13,232 rows and 7 columns
+#' \itemize{
+#'   \item \code{location}: location associated where data was collected/where gage is located
+#'   \item \code{gage_name}: name of the gaging station
+#'   \item \code{variable_name}: variable measured: "water level"
+#'   \item \code{value}: observed value of the temperature (numeric)
+#'   \item \code{unit}: units of measurement: feet above sea level in USBR datum.
+#'   \item \code{statistic}: summary statistic type: "mean"
+#'   \item \code{date}: date of the observation
+#'   }
+"tule_elevation"
+
 #' @name water_level_gage
 #' @title A dataset containing metadata for water level gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC8) information for each station.
