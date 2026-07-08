@@ -142,14 +142,15 @@
 "usgs_dam_removal_monitoring_layers"
 
 #' @name water_level_data
-#' @title Lake water surface elevation data from four different USGS gages across the Klamath Basin
+#' @title Lake water surface elevation data from four different USGS gages, and one USBR monitoring site across the Klamath Basin
 #' @description Lake water surface elevation (ft) data from the following gages:
 #' \itemize{
 #'   \item 11505900
 #'   \item 11504300
 #'   \item 11505800
 #'   \item 11507001
-#' @format A tibble with 4 rows and 8 columns
+#'   \item usbr tule lake sump 1a
+#' @format A tibble with 30,084 rows and 8 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -163,23 +164,27 @@
 "water_level_data"
 
 #' @name water_level_gage
-#' @title A dataset containing metadata for water level gages located across the Klamath Basin watershed.
-#' Includes location, agency, and hydrologic unit code (HUC8) information for each station.
+#' @title Metadata for water level gages in the Klamath Basin.
+#'
+#' @description A dataset containing metadata for water level gages located
+#' across the Klamath Basin watershed, including location, agency, and
+#' Hydrologic Unit Code (HUC8) information for each station.
 #' \itemize{
 #'   \item 11505900
 #'   \item 11504300
 #'   \item 11505800
 #'   \item 11507001
-#' @format A tibble with 4 rows and 8 columns
+#'   \item usbr tule lake sump 1a
+#'   }
+#' @format A tibble with 5 rows and 7 columns:
 #' \itemize{
-#'   \item{\code{location}: location associated where data was collected/where gage is located
+#'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
 #'   \item \code{gage_id}: unique identifier for the gage
-#'   \item \code{variable_name}: variable measured: "water level"
-#'   \item \code{value}: observed value of the temperature (numeric)
-#'   \item \code{unit}: units of measurement: feet
-#'   \item \code{statistic}: summary statistic type: "mean"
-#'   \item \code{date}: date of the observation
+#'   \item \code{agency}: agency responsible for operating or maintaining the gage
+#'   \item \code{latitude}: latitude coordinate of the gage location
+#'   \item \code{longitude}: longitude coordinate of the gage location
+#'   \item \code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
 #'   }
 "water_level_gage"
 
