@@ -195,6 +195,7 @@ all_usgs_temp_data_raw_clean <- all_usgs_temp_data_raw |>
                                     gage_id %in% c("422042121513100", "421935121551200", "422305121553800", # upper klamath lake gages
                                                    "422305121553803", "422444121580400", "422622122004000",
                                                    "422622122004003", "422719121571400","11504290") ~ "upper klamath lake",
+                                    site_no == "420024121132800" ~ "lost river",
                                     T ~ waterbody_name)) |>
            glimpse()
 
