@@ -16,10 +16,10 @@ wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", pref
 huc_code <- "180102" # huc code for Klamath basin
 
 # DO data
-wqx_do_data <- readWQPdata(huc = huc_code,                       
+wqx_do_data <- readWQPdata(huc = huc_code,
                              characteristicName = "Dissolved oxygen (DO)",
-                             startDateLo = "2014-01-01",               
-                             startDateHi = "2025-01-01") 
+                             startDateLo = "2014-01-01",
+                             startDateHi = "2025-01-01")
 
 # gage data has already been pulled in temp data pull script
 
@@ -47,7 +47,7 @@ usgs_gages <- unique(klamath_sites$site_no)
 head(usgs_gages)
 
 # Define parameters
-start_date <- "2014-01-01"
+start_date <- "1996-01-01"
 parameterCd <- "00300"  # Dissolved Oxygen
 statCd <- c("00001", "00002", "00003")  # Min, Max, Mean DO
 
@@ -59,16 +59,16 @@ for (gage in usgs_gages) {
   message(paste("Pulling DO data for gage:", gage))
   try({
     do_data <- readNWISdv(
-      siteNumbers = gage, 
-      parameterCd = parameterCd, 
-      statCd = statCd, 
+      siteNumbers = gage,
+      parameterCd = parameterCd,
+      statCd = statCd,
       startDate = start_date
-    ) 
-    
+    )
+
     # Add gage ID column
-    do_data <- do_data |> 
+    do_data <- do_data |>
       mutate(gage_id = gage)
-    
+
     # Store in list
     all_do_data[[gage]] <- do_data
   }, silent = TRUE)
@@ -92,7 +92,7 @@ wq_data_raw |> pins::pin_write(wqx_do_data,
                                type = "csv",
                                title = "wqx_do")
 
-### USGS 
+### USGS
 # do data
 wq_data_raw |> pins::pin_write(usgs_do_data,
                                type = "csv",
