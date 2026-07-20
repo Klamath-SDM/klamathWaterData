@@ -118,7 +118,7 @@
 #' @name do_data
 #' @title Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC8 18010204)
 #' @description Mean, min and max dissolved oxygen data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
-#' @format A tibble with 394,437 rows and 8 columns
+#' @format A tibble with 365,162 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
