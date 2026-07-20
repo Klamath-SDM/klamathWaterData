@@ -8,7 +8,7 @@ library(pins)
 # the goal of this script is to pull dissolved oxygen data from different sources and save into aws bucket. Pulling last 10 years of data
 
 # Define aws bucket (klamath-sdm)
-wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/data-raw/")
+# wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/data-raw/")
 
 
 ### WQX data pull -----
@@ -18,7 +18,7 @@ huc_code <- "180102" # huc code for Klamath basin
 # DO data
 wqx_do_data <- readWQPdata(huc = huc_code,
                              characteristicName = "Dissolved oxygen (DO)",
-                             startDateLo = "2014-01-01",
+                             startDateLo = "1996-01-01",
                              startDateHi = "2025-01-01")
 
 # gage data has already been pulled in temp data pull script
@@ -82,23 +82,27 @@ glimpse(usgs_do_data)
 
 
 #### gage data pull----
-usgs_gage_do_data <- readNWISsite(usgs_gages)
+# usgs_gage_do_data <- readNWISsite(usgs_gages)
+# Split site numbers into groups of 50
+site_batches <- split(usgs_gages, ceiling(seq_along(usgs_gages) / 50))
 
+# Read metadata batch-by-batch
+usgs_gage_do_data <- bind_rows(lapply(site_batches, readNWISsite))
 
 ##### save raw data into aws bucket water-quality/data-raw/
 ### WQX
 # do data
-wq_data_raw |> pins::pin_write(wqx_do_data,
-                               type = "csv",
-                               title = "wqx_do")
-
-### USGS
-# do data
-wq_data_raw |> pins::pin_write(usgs_do_data,
-                               type = "csv",
-                               title = "usgs_do")
-# gage do data
-wq_data_raw |> pins::pin_write(usgs_gage_do_data,
-                               type = "csv",
-                               title = "usgs_gage_do")
+# wq_data_raw |> pins::pin_write(wqx_do_data,
+#                                type = "csv",
+#                                title = "wqx_do")
+#
+# ### USGS
+# # do data
+# wq_data_raw |> pins::pin_write(usgs_do_data,
+#                                type = "csv",
+#                                title = "usgs_do")
+# # gage do data
+# wq_data_raw |> pins::pin_write(usgs_gage_do_data,
+#                                type = "csv",
+#                                title = "usgs_gage_do")
 

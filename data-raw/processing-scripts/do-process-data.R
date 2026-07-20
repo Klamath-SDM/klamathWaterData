@@ -14,27 +14,42 @@ library(sf)
 # raw data will be pulled from S3 bucket. These data is originally retrieved on do-data-pull.R
 
 # setting up aws bucket
-wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
-
-
+# wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
 #source(here::here('data-raw', 'processing-scripts', 'utils.R'))
 
+
+#  Notes from July 2026 - We decided to not save data on aws.
+# data was pulled on do-data-pull.R script and sourced here. aws pull code is comment out
+
+source("data-raw/data-pull/do-data-pull.R")
 ### WQX ----
 # pulling raw data
 # DO data
-wqx_data_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/wqx_do_data") |>
+# wqx_data_raw <- wq_data_board |>
+#   pins::pin_read("water_quality/data-raw/wqx_do_data") |>
+#   janitor::clean_names() |>
+#   filter(statistical_base_code %in% c("Mean", "Maximum", "Minimum")) |>
+#   glimpse()
+
+wqx_data_raw <- wqx_do_data |>
   janitor::clean_names() |>
   filter(statistical_base_code %in% c("Mean", "Maximum", "Minimum")) |>
   glimpse()
 
-# GAGE data
-wqx_gage_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
+# # GAGE data
+# wqx_gage_raw <- wq_data_board |>
+#   pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
+#   janitor::clean_names() |>
+#   filter(monitoring_location_type_name %in% c("River/Stream", "Lake", "Stream",
+#                                               "Reservoir", "Lake, Reservoir, Impoundment",
+#                                               "Spring", "Estuary")) |>
+#   glimpse()
+
+wqx_gage_raw <- wqx_gage_data |>
   janitor::clean_names() |>
   filter(monitoring_location_type_name %in% c("River/Stream", "Lake", "Stream",
-                                              "Reservoir", "Lake, Reservoir, Impoundment",
-                                              "Spring", "Estuary")) |>
+                                                "Reservoir", "Lake, Reservoir, Impoundment",
+                                                "Spring", "Estuary")) |>
   glimpse()
 
 # JOIN - station data with flow data
@@ -129,8 +144,12 @@ gage_do_wqx <- rivermile::find_nearest_river_miles(gage_do_wqx_clean) |>
 
 # pulling raw data
 # DO data
-usgs_data_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/usgs_do_data") |>
+# usgs_data_raw <- wq_data_board |>
+#   pins::pin_read("water_quality/data-raw/usgs_do_data") |>
+#   janitor::clean_names() |>
+#   glimpse()
+
+usgs_data_raw <- usgs_do_data |>
   janitor::clean_names() |>
   glimpse()
 
@@ -159,11 +178,16 @@ usgs_data_raw_clean <- usgs_data_raw |>
   glimpse()
 
 # GAGE data
-usgs_gage_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/usgs_gage_do_data") |>
+# usgs_gage_raw <- wq_data_board |>
+#   pins::pin_read("water_quality/data-raw/usgs_gage_do_data") |>
+#   janitor::clean_names() |>
+#   mutate(station_nm = tools::toTitleCase(tolower(station_nm))) |>
+#   glimpse()
+usgs_gage_raw <- usgs_gage_do_data |>
   janitor::clean_names() |>
   mutate(station_nm = tools::toTitleCase(tolower(station_nm))) |>
   glimpse()
+
 
 # JOIN - station data with temp data
 all_usgs_do_raw <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by = "site_no") |>
@@ -194,6 +218,9 @@ all_usgs_do_raw_clean <- all_usgs_do_raw |>
                                                       "Upper Klamath Lake - Rattlesnake Point Fish Cage",
                                                       "Upper Klamath Lake - Mid-North Fish Cage - Mdnfc", "Fish Banks West - Fbw") ~ "Upper Klamath Lake",
                                     station_nm == "Shoalwater Bay - Shb" ~ "Shoalwater Bay",
+                                    station_nm %in% c("Lake Ewauna Near Altamont, or - Bottom", "Lake Ewauna at Railroad Bridge Drawspan") ~ "Lake Ewauna",
+                                    str_detect(str_to_lower(station_nm), "ukl") ~ "Upper Klamath Lake",
+                                    station_nm == "Tulelake Cn a Sheepy Ridge Pumping Sta Nr Hatfield" ~ "Tule Lake",
                                     T ~ waterbody_name)) |>
   glimpse()
 
@@ -232,7 +259,7 @@ gage_do_usgs <- rivermile::find_nearest_river_miles(gage_do_usgs_clean) |>
 
 ### saves clean data to aws
 # processed data folder
-wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
+# wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
 
 do_data <- do_wqx |>
   mutate(variable_name = "dissolved oxygen",
@@ -254,11 +281,11 @@ do_gage <- gage_do_wqx |>
   glimpse()
 
 # TODOO - re-write these on aws bucket if modified
-wq_processed_data |> pins::pin_write(do_data,
-                                     type = "csv")
-
-wq_processed_data |> pins::pin_write(do_gage,
-                                     type = "csv")
+# wq_processed_data |> pins::pin_write(do_data,
+#                                      type = "csv")
+#
+# wq_processed_data |> pins::pin_write(do_gage,
+#                                      type = "csv")
 # save rda files
 usethis::use_data(do_data, overwrite = TRUE)
 usethis::use_data(do_gage, overwrite = TRUE)
