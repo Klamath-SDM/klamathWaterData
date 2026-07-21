@@ -13,8 +13,8 @@ library(sf)
 # raw data will be pulled from S3 bucket. These data is originally retrieved on flow-data-pull.R
 
 # setting up aws bucket
-wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
-
+# wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
+source("data-raw/data-pull/flow-data-pull.R")
 
 #source(here::here('data-raw', 'processing-scripts', 'utils.R'))
 
@@ -22,18 +22,29 @@ wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
 ### WQX ----
 # pulling raw data
 # FLOW data
-wqx_data_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/wqx_flow_data") |>
+# wqx_data_raw <- wq_data_board |>
+#   pins::pin_read("water_quality/data-raw/wqx_flow_data") |>
+#   janitor::clean_names() |>
+#   glimpse()
+
+wqx_data_raw <- wqx_flow_data |>
   janitor::clean_names() |>
   glimpse()
+
 
 # GAGE data
-wqx_gage_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
-  janitor::clean_names() |>
+# wqx_gage_raw <- wq_data_board |>
+#   pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
+#   janitor::clean_names() |>
+#
+#   mutate(gage_id = monitoring_location_identifier) |>
+#   glimpse()
 
+wqx_gage_raw <- wqx_gage_data |>
+  janitor::clean_names() |>
   mutate(gage_id = monitoring_location_identifier) |>
   glimpse()
+
 
 # JOIN - station data with flow data
 all_wqx_flow_data <- wqx_data_raw |> left_join(wqx_gage_raw) |>
@@ -84,11 +95,15 @@ flow_wqx <- all_wqx_flow_data_clean |>
   glimpse()
 
 #### monitoring site table ----
-wqx_gage_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
+# wqx_gage_raw <- wq_data_board |>
+#   pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
+#   janitor::clean_names() |>
+#   rename(gage_id = monitoring_location_identifier) |>
+#   glimpse()
+
+wqx_gage_raw <- wqx_gage_data |>
   janitor::clean_names() |>
-  rename(gage_id = monitoring_location_identifier) |>
-  glimpse()
+  rename(gage_id = monitoring_location_identifier)
 
 gage_flow_wqx_clean <- flow_wqx |> left_join(wqx_gage_raw, by = "gage_id") |>
   mutate(gage_name = monitoring_location_name,
@@ -112,7 +127,7 @@ gage_flow_wqx <- rivermile::find_nearest_river_miles(gage_flow_wqx_clean) |>
 
 #### saves clean data to aws ----
 # open processed-data folder
-wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
+# wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
 
 # save data
 # # monitoring data - flow
@@ -128,8 +143,12 @@ wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1"
 ### USGS ----
 # pulling raw data
 # FLOW data
-usgs_data_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/usgs_flow_data") |>
+# usgs_data_raw <- wq_data_board |>
+#   pins::pin_read("water_quality/data-raw/usgs_flow_data") |>
+#   janitor::clean_names() |>
+#   glimpse()
+
+usgs_data_raw <- usgs_flow_data |>
   janitor::clean_names() |>
   glimpse()
 
@@ -143,10 +162,14 @@ usgs_data_raw_clean <- usgs_data_raw |>
   select(date, agency_cd, gage_id, variable_name, value, unit, site_no, statistic)
 
 # since stream names are in the gage data, we are pulling in it in and binding
-usgs_gage_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/usgs_gage_flow_data") |>  #pulling gage data
+# usgs_gage_raw <- wq_data_board |>
+#   pins::pin_read("water_quality/data-raw/usgs_gage_flow_data") |>  #pulling gage data
+#   janitor::clean_names() |>
+#   # select(site_no, station_nm) |>
+#   glimpse()
+
+usgs_gage_raw <- usgs_gage_flow_data |>
   janitor::clean_names() |>
-  # select(site_no, station_nm) |>
   glimpse()
 
 
@@ -202,11 +225,16 @@ gage_flow_usgs <- rivermile::find_nearest_river_miles(gage_flow_usgs_clean) |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
   glimpse()
 
+### USBR ----
+usbr_flow_data <- usbr_flow_data |>
+  rename(stream = location) |>
+  glimpse()
+
 # combine gage and data files ---------------------------------------------
 flow_data <- flow_wqx |>
   mutate(date = as.Date(date)) |>
   bind_rows(flow_usgs |>
-              mutate(gage_id = as.character(gage_id))) |>
+              mutate(gage_id = as.character(gage_id)), usbr_flow_data) |>
   mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
@@ -225,11 +253,11 @@ flow_gage <- gage_flow_wqx |>
 
 
 # save data
-wq_processed_data |> pins::pin_write(flow_data,
-                                     type = "csv")
-
-wq_processed_data |> pins::pin_write(flow_gage,
-                                     type = "csv")
+# wq_processed_data |> pins::pin_write(flow_data,
+#                                      type = "csv")
+#
+# wq_processed_data |> pins::pin_write(flow_gage,
+#                                      type = "csv")
 # save rda files
 usethis::use_data(flow_data, overwrite = TRUE)
 usethis::use_data(flow_gage, overwrite = TRUE)

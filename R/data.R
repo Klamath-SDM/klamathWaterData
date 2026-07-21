@@ -85,8 +85,8 @@
 
 #' @name flow_data
 #' @title Publicly available flow data in the Klamath Basin watershed (HUC8 18010204)
-#' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
-#' @format A tibble with 114,654 rows and 8 columns
+#' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX and USBR data portals.
+#' @format A tibble with 128,113 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
