@@ -150,14 +150,16 @@
 #'   \item 11505800
 #'   \item 11507001
 #'   \item usbr tule lake sump 1a
-#' @format A tibble with 30,084 rows and 8 columns:
+#'   \item usbr-lrs
+#'   \item usbr-clk
+#' @format A tibble with 66,371 rows and 8 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
 #'   \item \code{gage_id}: unique identifier for the gage
 #'   \item \code{variable_name}: variable measured: "water level"
 #'   \item \code{value}: observed value of the temperature (numeric)
-#'   \item \code{unit}: units of measurement: feet
+#'   \item \code{unit}: units of measurement: feet, feet above sea level - USBR datum
 #'   \item \code{statistic}: summary statistic type: "mean"
 #'   \item \code{date}: date of the observation
 #'   }
@@ -175,8 +177,10 @@
 #'   \item 11505800
 #'   \item 11507001
 #'   \item usbr tule lake sump 1a
+#'   \item usbr-lrs
+#'   \item usbr-clk
 #'   }
-#' @format A tibble with 5 rows and 7 columns:
+#' @format A tibble with 7 rows and 7 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station

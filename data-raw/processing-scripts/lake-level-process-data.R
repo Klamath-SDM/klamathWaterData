@@ -2,23 +2,21 @@ library(tidyverse)
 library(dplyr)
 library(tidyr)
 library(purrr)
-library(pins)
+library(janitor)
 library(rivermile)
 library(sf)
 library(readxl)
 library(stringr)
 
-# raw data will be pulled from S3 bucket. These data is originally retrieved on lake-level-data-pull.R
+# These data is originally retrieved on lake-level-data-pull.R
 # Additionally, this script pulls and process data for water elevation at Tule Sumps provided by Torrey Tyler (USBR)
 # both datasets are combined into water_level_data.rda
 
-# setting up aws bucket
-wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
+source("data-raw/data-pull/lake-levels-data-pull.R")
 
-
-# pulling raw data
-water_level_data <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/water_level_data") |>
+# USGS ----
+## water level data
+water_level_data <- water_level_data |>
   janitor::clean_names() |>
   glimpse()
 
@@ -37,9 +35,8 @@ water_level_data_raw_clean <- water_level_data |>
     unit = "feet") |>
   glimpse()
 
-# GAGE data
-water_level_gage_data <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/water_level_gage_data") |>
+## GAGE data
+water_level_gage_data <- water_level_gage_data |>
   janitor::clean_names() |>
   mutate(station_nm = tools::toTitleCase(tolower(station_nm))) |>
   glimpse()
@@ -51,7 +48,7 @@ all_usgs_water_level_raw <- water_level_data_raw_clean |> left_join(water_level_
   mutate(waterbody_name = "upper klamath lake") |>
   glimpse()
 
-#### water data table usgs ----
+### water data table usgs ----
 water_level_data_usgs <- all_usgs_water_level_raw |>
   mutate(gage_id = as.character(site_no),
          gage_name = tolower(station_nm),
@@ -60,7 +57,7 @@ water_level_data_usgs <- all_usgs_water_level_raw |>
   rename(location = stream) |>
   glimpse()
 
-#### monitoring site table usgs ----
+### monitoring site table usgs ----
 water_level_gage_usgs <- all_usgs_water_level_raw |>
   mutate(gage_name = tolower(station_nm),
          gage_id = as.character(site_no),
@@ -77,6 +74,18 @@ water_level_gage_usgs <- all_usgs_water_level_raw |>
   relocate(location, .before = gage_name) |>
   glimpse()
 
+# USBR ----
+water_level_data_usbr <- usbr_lake_level |>
+  mutate(gage_name = tolower(location),
+         gage_id = case_when(str_detect(str_to_lower(gage_name), "(lrs)") ~ "usbr-lrs",
+                             str_detect(str_to_lower(gage_name), "(clk)")   ~ "usbr-clk",
+                             TRUE ~ NA),
+         location = "clear lake",
+         variable_name = "water level",
+         unit = "feet",
+         statistic = "mean") |>
+  select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
+  glimpse()
 
 # ============================================================
 # Combine Tule Lake (Tule Sumps) daily elevation data
@@ -168,7 +177,7 @@ tule_elev <- tule_elev_raw |>
          gage_id = "usbr tule lake sump 1a",
          variable_name = "water level",
          value = tule_lake_elev_ft,
-         unit = "ft above sea level - USBR datum",
+         unit = "feet above sea level - USBR datum",
          statistic = "mean") |>
   select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |> glimpse()
 
@@ -184,7 +193,7 @@ tule_elev_early <- readxl::read_excel("data-raw/raw-tule-lake-level-data/TID Ele
          gage_id = "usbr tule lake sump 1a",
          variable_name = "water level",
          value = tlelev,
-         unit = "ft above sea level - USBR datum",
+         unit = "feet above sea level - USBR datum",
          statistic = "mean") |> # TODO confirm that these values are mean
   select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |> glimpse()
 
@@ -195,7 +204,7 @@ tule_elevation <- bind_rows(tule_elev, tule_elev_early)
 
 #### water data table ----
 # join usbr tule lake data with usgs
-water_level_data <- bind_rows(tule_elevation, water_level_data_usgs) |> glimpse()
+water_level_data <- bind_rows(tule_elevation, water_level_data_usgs, water_level_data_usbr) |> glimpse()
 
 #### water data gage table ----
 water_level_gage <- water_level_gage_usgs |>
@@ -205,7 +214,24 @@ water_level_gage <- water_level_gage_usgs |>
           agency = "u.s. bureau of reclamation",
           latitude = NA_integer_,
           longitude = NA_integer_,
-          huc8 = 18010203) |>
+          huc8 = "18010203") |>
+  add_row(
+    location = "clear lake",
+    gage_name = "usbr clear lake west lobe",
+    gage_id = "clk",
+    agency = "u.s. bureau of reclamation",
+    latitude = NA_integer_,
+    longitude = NA_integer_,
+    huc8 = "18010204") |>
+  add_row(
+    location = "clear lake",
+    gage_name = "usbr clear lake reservoir east lobe",
+    gage_id = "lrs",
+    agency = "u.s. bureau of reclamation",
+    latitude = NA_integer_,
+    longitude = NA_integer_,
+    huc8 = "18010204") |>
+  mutate(huc8 = as.numeric(huc8)) |>
   glimpse()
 
 

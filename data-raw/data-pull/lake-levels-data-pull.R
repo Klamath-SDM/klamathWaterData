@@ -5,19 +5,20 @@ library(tidyr)
 library(purrr)
 library(pins)
 
-# the goal of this script is to pull Lake water surface elevation data from different sources and save into aws bucket. Pulling last 10 years of data
+# the goal of this script is to pull Lake water surface elevation data from different sources. Pulling 1996-2025 data
 
-# Define aws bucket (klamath-sdm)
-wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/data-raw/")
+#  USGS data ----
+start_date <- "1996-01-01"
+end_date <- "2025-12-31"
 
-#### pulling usgs lake water surface data
-ukl_levels_1 <- dataRetrieval::readNWISdv(11505900, parameterCd = "72275", startDate = "2014-01-01")
+#### usgs lake water surface data ----
+ukl_levels_1 <- dataRetrieval::readNWISdv(11505900, parameterCd = "72275", start_date , end_date)
 
-ukl_levels_2 <- dataRetrieval::readNWISdv(11504300, parameterCd = "72275", startDate = "2014-01-01")
+ukl_levels_2 <- dataRetrieval::readNWISdv(11504300, parameterCd = "72275", start_date , end_date)
 
-ukl_levels_3 <- dataRetrieval::readNWISdv(11505800, parameterCd = "72275", startDate = "2014-01-01")
+ukl_levels_3 <- dataRetrieval::readNWISdv(11505800, parameterCd = "72275", start_date , end_date)
 
-ukl_levels_4 <- dataRetrieval::readNWISdv(11507001, parameterCd = "72275", startDate = "2014-01-01")
+ukl_levels_4 <- dataRetrieval::readNWISdv(11507001, parameterCd = "72275", start_date , end_date)
 
 water_level_data <- bind_rows(ukl_levels_1, ukl_levels_2, ukl_levels_3, ukl_levels_4)
 
@@ -28,14 +29,92 @@ usgs_gages <- c("11505900", "11504300", "11505800", "11507001")
 
 water_level_gage_data <- readNWISsite(usgs_gages)
 
+
+#  USBR data----
+## Clear Lake East Lobe (LRS) ----
+# https://www.usbr.gov/pn-bin/wyreport.pl?site=lrs&parameter=FD&head=yes
+
+lrs_level_url <- paste0(
+  "https://data.usbr.gov/rise/api/result/download",
+  "?type=csv",
+  "&itemId=134049",
+  "&order=ASC",
+  "&after=1996-01-01",
+  "&before=2026-01-01")
+
+lrs_level_raw <- readLines(lrs_level_url, warn = FALSE)
+
+hdr <- grep("Datetime", lrs_level_raw)[1]
+
+lrs <- read.csv(
+  text = paste(lrs_level_raw[hdr:length(lrs_level_raw)], collapse = "\n"),
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+
+# Confirm the downloaded series
+unique(lrs[c("Location", "Parameter", "Units")])
+
+clear_lake_dam_channel <- data.frame(
+  location  = lrs[["Location"]],
+  parameter = lrs[["Parameter"]],
+  units     = lrs[["Units"]],
+  date      = as.Date(
+    as.POSIXct(lrs[["Datetime (UTC)"]], tz = "UTC"),
+    tz = "America/Los_Angeles"
+  ),
+  value = as.numeric(lrs[["Result"]])
+)
+
+## Pull location metadata ----
+#  TODO - is this info available?
+
+
+## Clear Lake West Lobe (CLK) ----
+clk_level_url <- paste0(
+  "https://data.usbr.gov/rise/api/result/download",
+  "?type=csv",
+  "&itemId=134025",
+  "&order=ASC",
+  "&after=1996-01-01",
+  "&before=2026-01-01"
+)
+
+clk_level_raw <- readLines(clk_level_url, warn = FALSE)
+
+hdr <- grep("Datetime", clk_level_raw)[1]
+
+clk <- read.csv(
+  text = paste(clk_level_raw[hdr:length(clk_level_raw)], collapse = "\n"),
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+
+# Confirm the downloaded series
+unique(clk[c("Location", "Parameter", "Units")])
+
+clear_lake_west <- data.frame(
+  location  = clk[["Location"]],
+  parameter = clk[["Parameter"]],
+  units     = clk[["Units"]],
+  date      = as.Date(
+    as.POSIXct(clk[["Datetime (UTC)"]], tz = "UTC"),
+    tz = "America/Los_Angeles"
+  ),
+  value = as.numeric(clk[["Result"]])
+)
+
+#  bind both USBR gages
+usbr_lake_level <- bind_rows(clear_lake_dam_channel, clear_lake_west) |> glimpse()
+
 ##### save raw data into aws bucket water-quality/data-raw/
 
 ### USGS
 # lake surface elevation data
-wq_data_raw |> pins::pin_write(water_level_data,
-                               type = "csv",
-                               title = "water_level_data")
-# gage data
-wq_data_raw |> pins::pin_write(water_level_gage_data,
-                               type = "csv",
-                               title = "water_level_gage_data")
+# wq_data_raw |> pins::pin_write(water_level_data,
+#                                type = "csv",
+#                                title = "water_level_data")
+# # gage data
+# wq_data_raw |> pins::pin_write(water_level_gage_data,
+#                                type = "csv",
+#                                title = "water_level_gage_data")
