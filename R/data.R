@@ -188,39 +188,6 @@
 #'   }
 "water_level_gage"
 
-#' @name hydromet_data
-#' @title Daily hydromet data from USBR Klamath Basin monitoring network
-#' @description Daily hydrological and meteorological data from the U.S. Bureau of Reclamation (USBR)
-#' Pacific Northwest Hydromet system for the Klamath Basin. Data are retrieved from the USBR
-#' webarccsv API and cover reservoir forebay elevations, stream gauge heights, and discharge
-#' at 15 stations across the Klamath Project area in Oregon and California.
-#' Data span from water year 1918 (October 1, 1918) to the present.
-#'
-#' Parameter codes can be decoded using the \code{param_defs} lookup table defined in
-#' \code{data-raw/data-pull/hydromet-data-pull.R}, which maps each short code to a full name,
-#' units, and description:
-#' \tabular{lll}{
-#'   \strong{parameter} \tab \strong{full_name} \tab \strong{units} \cr
-#'   FB  \tab Forebay elevation (instantaneous) \tab ft \cr
-#'   FD  \tab Forebay elevation (daily average) \tab ft \cr
-#'   GD  \tab Gauge height (daily average)      \tab ft \cr
-#'   GJ  \tab Gauge height, junction/sump       \tab ft \cr
-#'   GJ2 \tab Gauge height, junction/sump #2    \tab ft \cr
-#'   QD  \tab Discharge (daily average)         \tab cfs \cr
-#'   QJ  \tab Canal/diversion discharge         \tab cfs \cr
-#'   QP  \tab Pumped discharge                  \tab cfs \cr
-#' }
-#' @format A tibble with columns:
-#' \itemize{
-#'   \item \code{site}: USBR station code (e.g., "GER", "CLK", "HRPO")
-#'   \item \code{parameter}: short USBR parameter code (e.g., "FD", "QD", "GD"); join to \code{param_defs} for full name and units
-#'   \item \code{label}: descriptive label combining site location and parameter (e.g., "Gerber Reservoir - Daily Avg Forebay Elevation (ft)")
-#'   \item \code{date}: date of observation (1918-01-01 to present) (Date)
-#'   \item \code{value}: observed numeric value
-#' }
-#' @source USBR PN Hydromet \url{https://www.usbr.gov/pn/hydromet/klamath/arcread.html}
-"hydromet_data"
-
 #' @name dswe_monthly
 #' @title Monthly aggregated dynamic surface water extent (DSWE) data
 #' @description Monthly summary statistics for the dynamic surface water extent for wildlife refuges in the Klamath Basin.

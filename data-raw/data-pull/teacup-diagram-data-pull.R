@@ -12,8 +12,10 @@ library(dataRetrieval)
 # The diagram is an HTML image map. Its embedded <area> links point to
 # three different data providers:
 #   1. USBR Hydromet stations  (kinstant_graph.html?cbtt=<site>&pcode=<param>)
-#      -> pulled here via the Hydromet archive CSV API (webarccsv.pl),
-#         the same endpoint used in hydromet-data-pull.R
+#      -> pulled here via the Hydromet archive CSV API (webarccsv.pl).
+#         Supersedes the old hydromet-data-pull.R / hydromet_data dataset,
+#         which pulled a broader but less-curated station list from the
+#         same API.
 #   2. USGS NWIS gauges        (waterdata.usgs.gov/nwis/uv?site_no=...&parm_cd=...)
 #      -> pulled here via dataRetrieval::readNWISdv
 #   3. Oregon Water Resources Dept "near real time" stations
@@ -77,8 +79,7 @@ SLEEP_SEC <- 1
 UA <- "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 # ------------------------------------------------------------
-# Parse webarccsv.pl response (same format used by
-# data-raw/data-pull/hydromet-data-pull.R)
+# Parse webarccsv.pl response
 # ------------------------------------------------------------
 
 parse_webarccsv <- function(raw_text, station_params) {
