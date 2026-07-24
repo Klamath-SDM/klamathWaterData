@@ -10,7 +10,7 @@ A tibble with columns:
 \item \code{source}: data provider, one of \code{"USBR Hydromet"}, \code{"USGS NWIS"}, or \code{"OWRD"}
 \item \code{site}: station identifier — USBR cbtt code (e.g., "GER", "CLK"), USGS site number (e.g., "11507001"), or OWRD station number (e.g., "11495600")
 \item \code{label}: descriptive label combining station location and parameter (e.g., "Gerber Reservoir - Forebay Elevation (ft)")
-\item \code{measure_type}: measurement category, one of \code{"Elevation"}, \code{"Storage"}, or \code{"Flow"}
+\item \code{measure_type}: measurement category, one of \code{"elevation"}, \code{"storage"}, or \code{"flow"}
 \item \code{lat}: latitude of the station in decimal degrees (USBR sites from the USBR RISE API; USGS sites from \code{dataRetrieval::readNWISsite}; OWRD sites from the OWRD near-real-time station page)
 \item \code{long}: longitude of the station in decimal degrees
 \item \code{date}: date of observation (Date)

@@ -310,7 +310,8 @@ teacup_data <- bind_rows(
   nf_sprague |> mutate(source = "OWRD")
 ) |>
   filter(!is.na(value)) |>
-  select(source, site, label, measure_type, lat, long, date, value)
+  select(source, site, label, measure_type, lat, long, date, value) |>
+  mutate(measure_type = tolower(measure_type))
 
 message("\n--- Summary ---")
 message("Total rows: ", nrow(teacup_data))
