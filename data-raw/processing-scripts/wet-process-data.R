@@ -1,22 +1,60 @@
 library(tidyverse)
 library(terra)
+library(sf)
 
-# Refuge bounding boxes: c(xmin, ymin, xmax, ymax)
-upper_klamath_lake_bbox    <- c(-122.107301, 42.214015, -121.787324, 42.602368)
-clear_lake_bbox            <- c(-121.289207, 41.781010, -121.015256, 41.995292)
-tule_lake_bbox             <- c(-121.598288, 41.800411, -121.347044, 41.995232)
-bear_valley_bbox           <- c(-121.979966, 42.034977, -121.889353, 42.096687)
-lower_klamath_sheepy_bbox  <- c(-121.851156, 41.883384, -121.591674, 42.033576)
-klamath_marsh_bbox         <- c(-121.806202, 42.827148, -121.517889, 43.072530)
+# -------------------------------------------------------------------------
+# Refuge bounding boxes
+#
+# Bounding boxes are derived from the authoritative refuge boundaries in
+# rivermile::klamath_refuges (a 6-feature sf polygon layer, EPSG:4326),
+# each buffered by 0.5 miles before taking the bounding box. This replaces
+# the hand-picked bboxes previously hardcoded here. The refuge/orgname
+# lookup below maps this package's existing refuge labels onto
+# klamath_refuges$orgname; "lower_klamath_sheepy" maps to the single
+# "lower klamath national wildlife refuge" polygon, which is the only
+# lower Klamath / Sheepy Ridge unit present in klamath_refuges.
+#
+# WET rasters are in EPSG:4326 (decimal degrees), so refuge polygons are
+# buffered in a projected CRS (EPSG:32610, UTM Zone 10N — meters, and
+# appropriate for the Klamath Basin's longitude range) and transformed
+# back to EPSG:4326 before computing the bbox used to crop() the rasters.
+#
+# NOTE: bear_valley is expected to come out all-NA / zero-pixel in both
+# wet_surface_water and wet_hydroperiod. Verified via visual QC (raster
+# vs. refuge boundary overlay, checked across multiple products/eras) that
+# the source WET rasters have no detected water anywhere inside the actual
+# Bear Valley NWR boundary — this refuge is small and mostly upland/forest,
+# below the product's mapping resolution/threshold. The previous
+# hand-drawn bbox for this refuge happened to clip the edge of an unrelated
+# stream feature just northeast of the refuge, which produced a handful of
+# nonzero pixels that were never really inside the refuge; the
+# rivermile-derived bbox is tighter and excludes that spillover, so the
+# all-NA result here is more correct, not a regression.
+# -------------------------------------------------------------------------
 
-refuge_bboxes <- list(
-  upper_klamath_lake   = upper_klamath_lake_bbox,
-  clear_lake           = clear_lake_bbox,
-  tule_lake            = tule_lake_bbox,
-  bear_valley          = bear_valley_bbox,
-  lower_klamath_sheepy = lower_klamath_sheepy_bbox,
-  klamath_marsh        = klamath_marsh_bbox
+REFUGE_BUFFER_MILES <- 0.5
+REFUGE_BUFFER_METERS <- REFUGE_BUFFER_MILES * 1609.344
+BUFFER_CRS <- 32610 # UTM Zone 10N
+
+refuge_lookup <- tribble(
+  ~refuge,                ~orgname,
+  "upper_klamath_lake",   "upper klamath national wildlife refuge",
+  "clear_lake",           "clear lake national wildlife refuge",
+  "tule_lake",            "tule lake national wildlife refuge",
+  "bear_valley",          "bear valley national wildlife refuge",
+  "lower_klamath_sheepy", "lower klamath national wildlife refuge",
+  "klamath_marsh",        "klamath marsh national wildlife refuge"
 )
+
+refuge_boundaries_buffered <- rivermile::klamath_refuges |>
+  inner_join(refuge_lookup, by = "orgname") |>
+  st_transform(BUFFER_CRS) |>
+  st_buffer(REFUGE_BUFFER_METERS) |>
+  st_transform(4326)
+
+refuge_bboxes <- refuge_boundaries_buffered |>
+  split(refuge_boundaries_buffered$refuge) |>
+  map(~ as.numeric(st_bbox(.x))) # c(xmin, ymin, xmax, ymax)
 
 # -------------------------------------------------------------------------
 # File inventory

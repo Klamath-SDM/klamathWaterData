@@ -9,7 +9,7 @@ A tibble with columns:
 \itemize{
 \item \code{refuge}: wildlife refuge area. One of \code{upper_klamath_lake},
 \code{clear_lake}, \code{tule_lake}, \code{bear_valley},
-\code{lower_klamath_sheepy}, or \code{klamath_marsh}
+\code{lower_klamath_sheepy}, or \code{klamath_marsh}. See note above on \code{bear_valley}.
 \item \code{type}: product type; always \code{"Hydroperiod"} in this dataset
 \item \code{era_str}: decadal era label (e.g., \code{"1984-1994"}, \code{"1995-2004"},
 \code{"2005-2014"}, \code{"2015-2022"})
@@ -17,8 +17,9 @@ A tibble with columns:
 \item \code{era_start}: integer start year of the decadal era
 \item \code{month_chr}: three-letter month abbreviation (e.g., \code{"JAN"})
 \item \code{month_num}: integer month number (1–12)
-\item \code{mean_val}: mean hydroperiod raster value across all pixels within the refuge bbox;
-higher values indicate longer water persistence
+\item \code{mean_val}: mean hydroperiod raster value across all pixels within the refuge bbox
+(\code{rivermile::klamath_refuges} boundary buffered by 0.5 miles); higher values indicate
+longer water persistence
 \item \code{median_val}: median hydroperiod raster value within the refuge bbox
 \item \code{sd_val}: standard deviation of raster values within the refuge bbox
 \item \code{pct_wet}: fraction of pixels with a value greater than zero (proportion with any hydroperiod)
@@ -26,7 +27,8 @@ higher values indicate longer water persistence
 }
 }
 \source{
-Intermountain West Joint Venture (IWJV) WET dataset \url{https://iwjv.org}
+Intermountain West Joint Venture (IWJV) WET dataset \url{https://iwjv.org};
+refuge boundaries from \code{rivermile::klamath_refuges}
 }
 \usage{
 wet_hydroperiod
@@ -37,8 +39,22 @@ Wetland Extent Tool (WET) raster dataset, summarized within bounding boxes for s
 refuges in the Klamath Basin. The WET Hydroperiod product represents the duration or
 persistence of water at each pixel — higher values indicate longer hydroperiod duration.
 Data are available as decadal composites (10-year mean) covering four eras from 1984 to 2022.
-Source rasters are distributed by the Intermountain West Joint Venture (IWJV). See
-\code{data-raw/data-exploration/wet-data-exploration.Rmd} for exploratory analysis and
-\code{data-raw/processing-scripts/wet-process-data.R} for processing details.
+Source rasters are distributed by the Intermountain West Joint Venture (IWJV).
+
+Refuge bounding boxes are derived from \code{rivermile::klamath_refuges} (authoritative
+refuge polygon boundaries), each buffered by 0.5 miles and reduced to a bounding box before
+cropping the source rasters. See \code{data-raw/data-exploration/wet-data-exploration.Rmd}
+for exploratory analysis and \code{data-raw/processing-scripts/wet-process-data.R} for
+processing details, including the buffer distance and the refuge/\code{orgname} lookup.
+
+\strong{Note on \code{bear_valley}}: all rows for this refuge are \code{NA}/zero-pixel by
+design, not a processing bug. Visual QC (raster vs. refuge boundary overlay, checked across
+multiple products/eras) confirmed the source WET rasters have no detected water anywhere
+inside the actual Bear Valley NWR boundary — it is a small, mostly upland/forested refuge,
+below this product's mapping resolution/threshold. An earlier version of this dataset used a
+hand-drawn bounding box that happened to clip the edge of an unrelated stream feature just
+northeast of the refuge, producing a handful of nonzero pixels that were never actually
+inside the refuge; the current \code{rivermile}-derived bbox is tighter and excludes that
+spillover.
 }
 \keyword{datasets}

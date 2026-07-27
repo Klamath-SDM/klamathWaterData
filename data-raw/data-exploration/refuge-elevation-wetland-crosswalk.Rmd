@@ -1,0 +1,418 @@
+---
+title: "Refuge Crosswalk: USBR Hydromet Elevations & WET Wetland Extent"
+author: "Maddee Wiggins"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+```
+
+```{r libraries}
+library(tidyverse)
+library(sf)
+library(ggplot2)
+library(scales)
+library(patchwork)
+library(knitr)
+```
+
+# Overview
+
+This document crosswalks USBR Hydromet **elevation** (and gauge-height/stage) stations to
+each of the six Klamath Basin wildlife refuges in `rivermile::klamath_refuges`, then joins
+the nearest hydrologically relevant station's monthly water level to the processed WET
+**monthly surface water extent** data (`wet_surface_water`) for that refuge. The goal is a
+combined monthly view — station water level alongside wetland surface water extent — for
+refuges where a nearby Hydromet gauge exists.
+
+The crosswalk is **proximity-based**: for each refuge we compute the distance from every
+Hydromet elevation station to the refuge boundary and rank candidates. Proximity is a
+reasonable first-pass heuristic but is not a guarantee of hydrologic connection — see
+[Section 6](#gaps) for refuges where the nearest station is too far away (or not actually
+the controlling structure) to be considered relevant.
+
+---
+
+# 1. Load data
+
+```{r load-data}
+data("wet_surface_water", package = "klamathWaterData")
+data("hydromet_data",     package = "klamathWaterData")
+
+refuges <- rivermile::klamath_refuges
+
+cat("wet_surface_water:", nrow(wet_surface_water), "rows\n")
+cat("hydromet_data:    ", nrow(hydromet_data),     "rows\n")
+cat("refuges:          ", nrow(refuges),           "features\n")
+
+kable(st_drop_geometry(refuges), caption = "rivermile::klamath_refuges")
+```
+
+---
+
+# 2. USBR Hydromet elevation stations
+
+`hydromet_data$parameter` mixes elevation/stage parameters with flow parameters. We keep
+only the elevation- and gauge-height-type parameters — flow (`Discharge...`,
+`Canal/diversion discharge`, `Pumped discharge`) is out of scope for this crosswalk.
+
+```{r elevation-params}
+elevation_params <- c(
+  "Forebay elevation (daily average)",
+  "Forebay elevation (instantaneous)",
+  "Gauge height (daily average)",
+  "Gauge height, junction/sump",
+  "Gauge height, junction/sump #2"
+)
+
+hydromet_elev <- hydromet_data |> filter(parameter %in% elevation_params)
+
+kable(
+  hydromet_elev |> distinct(site, parameter, label, units),
+  caption = "USBR Hydromet elevation/stage parameters available"
+)
+
+no_elev <- setdiff(unique(hydromet_data$site), unique(hydromet_elev$site))
+cat("Sites with NO elevation-type parameter (flow-only, excluded):",
+    paste(no_elev, collapse = ", "), "\n")
+```
+
+## 2.1 Station coordinates
+
+`hydromet_data` does not carry station coordinates, so this lookup was built from the USBR
+RISE open-data API (`data.usbr.gov/rise/api/location`), which catalogs each Hydromet `cbtt`
+under a named Reclamation location.
+
+```{r station-lookup}
+elev_station_lookup <- tribble(
+  ~site,  ~lat,      ~long,       ~station_name,
+  "LRS",  41.926030, -121.075876, "Clear Lake Reservoir East Lobe",
+  "CLK",  41.846626, -121.209623, "Clear Lake Reservoir West Lobe",
+  "LRSC", 41.927834, -121.074174, "Lost River below Clear Lake Dam",
+  "KELO", 42.163299, -121.319785, "Lost River near E Langell Valley Rd Bridge",
+  "HRPO", 42.169507, -121.453355, "Lost River at Harpold Dam",
+  "GER",  42.201271, -121.129795, "Gerber Reservoir and Dam",
+  "MAL",  42.005769, -121.223952, "Malone Diversion Reservoir and Dam",
+  "EEEO", 42.047187, -121.795794, "Klamath Straits Drain Pumping Plant E/EE",
+  "FPPO", 42.079884, -121.843742, "Klamath Straits Drain Pumping Plant F/FF",
+  "STDC", 41.996724, -121.777916, "Klamath Straits Drain at Headworks (Hwy 161)"
+)
+
+stations_sf <- elev_station_lookup |>
+  st_as_sf(coords = c("long", "lat"), crs = 4326, remove = FALSE)
+
+kable(elev_station_lookup, caption = "USBR Hydromet elevation station coordinates")
+```
+
+---
+
+# 3. Spatial crosswalk: nearest station per refuge
+
+Distances are computed in a projected CRS (EPSG:32610, UTM Zone 10N — meters, appropriate
+for the Klamath Basin) from each station to the refuge polygon boundary, then converted to
+miles.
+
+```{r crosswalk-distance}
+BUFFER_CRS <- 32610
+
+stations_proj <- st_transform(stations_sf, BUFFER_CRS)
+refuges_proj  <- st_transform(refuges, BUFFER_CRS)
+
+dist_m <- st_distance(stations_proj, refuges_proj)
+
+crosswalk_dist <- as_tibble(dist_m) |>
+  setNames(refuges_proj$orgname) |>
+  mutate(site = stations_proj$site) |>
+  pivot_longer(-site, names_to = "orgname", values_to = "dist_m") |>
+  mutate(dist_mi = as.numeric(dist_m) / 1609.344) |>
+  left_join(elev_station_lookup |> select(site, station_name), by = "site") |>
+  arrange(orgname, dist_mi)
+
+nearest_per_refuge <- crosswalk_dist |>
+  group_by(orgname) |>
+  slice_min(dist_mi, n = 3) |>
+  ungroup()
+
+kable(
+  nearest_per_refuge |> mutate(dist_mi = round(dist_mi, 2)) |>
+    select(orgname, site, station_name, dist_mi),
+  caption = "Three nearest USBR Hydromet elevation stations per refuge"
+)
+```
+
+## 3.1 Map: refuges & elevation stations
+
+```{r crosswalk-map, fig.height=8}
+ggplot() +
+  geom_sf(data = refuges, aes(fill = orgname), alpha = 0.5, color = "grey30") +
+  geom_sf(data = stations_sf, color = "black", size = 2) +
+  geom_sf_text(data = stations_sf, aes(label = site), nudge_y = 0.02, size = 3) +
+  scale_fill_brewer(palette = "Set3", name = "Refuge") +
+  labs(
+    title = "Klamath Refuges & USBR Hydromet Elevation Stations",
+    x = NULL, y = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom", legend.text = element_text(size = 7)) +
+  guides(fill = guide_legend(nrow = 3))
+```
+
+---
+
+# 4. Selecting a representative station per refuge
+
+For refuges with a station reasonably close to the boundary, we take the single nearest
+station as the "hydrologically relevant" gauge. Where a site has more than one elevation-type
+parameter (e.g. `GER` has both forebay elevation and gauge height), we prefer, in order:
+forebay elevation (daily average) > gauge height (daily average) > gauge height, junction/sump
+> forebay elevation (instantaneous) > gauge height, junction/sump #2.
+
+```{r select-station}
+param_priority <- c(
+  "Forebay elevation (daily average)",
+  "Gauge height (daily average)",
+  "Gauge height, junction/sump",
+  "Forebay elevation (instantaneous)",
+  "Gauge height, junction/sump #2"
+)
+
+refuge_station_xwalk <- nearest_per_refuge |>
+  group_by(orgname) |>
+  slice_min(dist_mi, n = 1) |>
+  ungroup() |>
+  select(orgname, site, station_name, dist_mi)
+
+refuge_param_xwalk <- refuge_station_xwalk |>
+  left_join(hydromet_elev |> distinct(site, parameter), by = "site") |>
+  mutate(param_rank = match(parameter, param_priority)) |>
+  group_by(orgname) |>
+  slice_min(param_rank, n = 1) |>
+  ungroup() |>
+  select(orgname, site, station_name, parameter, dist_mi)
+
+kable(
+  refuge_param_xwalk |> mutate(dist_mi = round(dist_mi, 2)),
+  caption = "Selected USBR Hydromet elevation series per refuge"
+)
+```
+
+---
+
+# 5. Monthly water level & WET surface water extent
+
+`wet_surface_water` has two temporal structures: decadal composites (`is_decadal == TRUE`,
+one value per calendar month averaged over a 10-year era) and individual calendar months
+from 2022 onward (`is_decadal == FALSE`, `era_start` is the actual year). We match each
+structure to the Hydromet record at the same resolution: a decadal climatological monthly
+mean for decadal rows, and the actual year-month mean for annual rows.
+
+```{r monthly-refuge-xwalk}
+refuge_key_lookup <- tribble(
+  ~refuge,                ~orgname,
+  "upper_klamath_lake",   "upper klamath national wildlife refuge",
+  "clear_lake",           "clear lake national wildlife refuge",
+  "tule_lake",            "tule lake national wildlife refuge",
+  "bear_valley",          "bear valley national wildlife refuge",
+  "lower_klamath_sheepy", "lower klamath national wildlife refuge",
+  "klamath_marsh",        "klamath marsh national wildlife refuge"
+)
+
+xwalk <- refuge_param_xwalk |>
+  left_join(refuge_key_lookup, by = "orgname")
+
+hydromet_monthly_decadal <- hydromet_elev |>
+  inner_join(xwalk |> select(refuge, site, parameter), by = c("site", "parameter")) |>
+  mutate(year = year(date), month_num = month(date)) |>
+  # match wet_surface_water's decadal eras
+  mutate(era_str = case_when(
+    year >= 2005 & year <= 2014 ~ "2005-2014",
+    year >= 2015 & year <= 2022 ~ "2015-2022",
+    TRUE ~ NA_character_
+  )) |>
+  filter(!is.na(era_str)) |>
+  group_by(refuge, site, era_str, month_num) |>
+  summarise(elevation_ft = mean(value, na.rm = TRUE), .groups = "drop") |>
+  mutate(is_decadal = TRUE)
+
+hydromet_monthly_annual <- hydromet_elev |>
+  inner_join(xwalk |> select(refuge, site, parameter), by = c("site", "parameter")) |>
+  mutate(year = year(date), month_num = month(date)) |>
+  filter(year >= 2022) |>
+  group_by(refuge, site, era_start = year, month_num) |>
+  summarise(elevation_ft = mean(value, na.rm = TRUE), .groups = "drop") |>
+  mutate(is_decadal = FALSE)
+
+combined_decadal <- wet_surface_water |>
+  filter(is_decadal) |>
+  inner_join(hydromet_monthly_decadal, by = c("refuge", "is_decadal", "era_str", "month_num"))
+
+combined_annual <- wet_surface_water |>
+  filter(!is_decadal) |>
+  inner_join(hydromet_monthly_annual, by = c("refuge", "is_decadal", "era_start", "month_num"))
+
+combined_monthly <- bind_rows(combined_decadal, combined_annual) |>
+  arrange(refuge, is_decadal, era_start, month_num)
+
+cat("Combined monthly rows (decadal):", nrow(combined_decadal), "\n")
+cat("Combined monthly rows (annual): ", nrow(combined_annual), "\n")
+cat("Refuges represented:", paste(unique(combined_monthly$refuge), collapse = ", "), "\n")
+
+kable(head(combined_monthly, 10), caption = "combined_monthly — first rows")
+```
+
+---
+
+# 6. Data gaps & caveats {#gaps}
+
+Not every refuge has a Hydromet elevation station close enough to be considered
+hydrologically relevant. Distances to the nearest candidate:
+
+```{r gap-summary}
+gap_summary <- refuge_station_xwalk |>
+  mutate(
+    relevance = case_when(
+      dist_mi < 2  ~ "Direct / on-site",
+      dist_mi < 12 ~ "Nearby, plausible",
+      TRUE         ~ "Too far — not relevant"
+    )
+  )
+
+kable(
+  gap_summary |> mutate(dist_mi = round(dist_mi, 2)),
+  caption = "Nearest station relevance by refuge"
+)
+```
+
+- **Clear Lake** and **Lower Klamath/Sheepy** have a station essentially on-site (`CLK` sits
+  inside Clear Lake Reservoir; `STDC` sits inside the Lower Klamath refuge boundary at the
+  Straits Drain headworks) — the crosswalk is direct and reliable here.
+- **Tule Lake** and **Bear Valley** have their nearest station several miles away, and in both
+  cases the nearest station is Klamath Straits Drain infrastructure (`STDC`/`EEEO`/`FPPO`),
+  which serves the Tule Lake/Lower Klamath conveyance system rather than being *inside* either
+  refuge. Treat the Tule Lake and Bear Valley rows in `combined_monthly` as a loose regional
+  proxy, not a direct on-site water level. Tule Lake's actual controlling structures are the
+  Tule Lake Sump 1A/1B forebay gauges (`TULC`/`TULC2`), which are not present in this version
+  of `hydromet_data` (see `data-raw/data-pull/teacup-diagram-data-pull.R` on a separate branch
+  for a pull that includes them).
+- **Klamath Marsh** has no Hydromet elevation station within a reasonable distance (nearest is
+  ~46 miles). It is excluded from `combined_monthly` entirely — there is no relevant USBR
+  Hydromet gauge for this refuge in the current data.
+- **Upper Klamath Lake** is also excluded here for the same reason (nearest Hydromet elevation
+  station is ~15 miles away, at Klamath Straits Drain infrastructure that is not on the lake
+  itself). Upper Klamath Lake's real elevation record is a USGS product already in this
+  package as `water_level_data`/`water_level_gage` (gages 11505900, 11504300, 11505800,
+  11507001), not USBR Hydromet — a natural follow-up would repeat this crosswalk against that
+  dataset for Upper Klamath Lake specifically.
+- Recall from `wet-process-data.R` / `R/data.R` that **Bear Valley** also has no WET-detected
+  surface water within its own refuge boundary in any product or era (visual QC confirmed
+  this separately) — so even where a proxy elevation series exists for Bear Valley, there is
+  no wetland extent signal on the other side of the join for it to move with.
+
+---
+
+# 7. Combined monthly plots
+
+Refuges with a direct or plausible station only (`Clear Lake`, `Lower Klamath/Sheepy`,
+`Tule Lake`) — dual view of station elevation/stage and WET mean surface water value, decadal
+composites.
+
+```{r combined-decadal-plot, fig.height=8}
+plot_refuges <- c("clear_lake", "lower_klamath_sheepy", "tule_lake")
+
+combined_decadal |>
+  filter(refuge %in% plot_refuges) |>
+  select(refuge, era_str, month_num, elevation_ft, mean_val) |>
+  pivot_longer(c(elevation_ft, mean_val), names_to = "metric", values_to = "value") |>
+  mutate(metric = recode(metric,
+                         elevation_ft = "Hydromet elevation/stage (ft)",
+                         mean_val     = "WET mean surface water value")) |>
+  ggplot(aes(x = month_num, y = value, color = era_str, group = era_str)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 2) +
+  facet_grid(metric ~ refuge, scales = "free_y") +
+  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
+  scale_color_brewer(palette = "Set2", name = "Era") +
+  labs(
+    title = "Monthly Hydromet Elevation vs. WET Surface Water — Decadal Composites",
+    x = "Month", y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom")
+```
+
+Annual monthly values (2022–present):
+
+```{r combined-annual-plot, fig.height=8}
+combined_annual |>
+  filter(refuge %in% plot_refuges) |>
+  select(refuge, era_start, month_num, elevation_ft, mean_val) |>
+  pivot_longer(c(elevation_ft, mean_val), names_to = "metric", values_to = "value") |>
+  mutate(metric = recode(metric,
+                         elevation_ft = "Hydromet elevation/stage (ft)",
+                         mean_val     = "WET mean surface water value")) |>
+  ggplot(aes(x = month_num, y = value, color = factor(era_start), group = era_start)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 2) +
+  facet_grid(metric ~ refuge, scales = "free_y") +
+  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
+  scale_color_brewer(palette = "Dark2", name = "Year") +
+  labs(
+    title = "Monthly Hydromet Elevation vs. WET Surface Water — Annual (2022–present)",
+    x = "Month", y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom")
+```
+
+## 7.1 Elevation vs. surface water extent — scatter
+
+```{r elevation-vs-wet-scatter, fig.height=6}
+combined_monthly |>
+  filter(refuge %in% plot_refuges) |>
+  ggplot(aes(x = elevation_ft, y = mean_val, color = refuge)) +
+  geom_point(size = 2.5, alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.8) +
+  facet_wrap(~refuge, scales = "free") +
+  scale_color_brewer(palette = "Set2", guide = "none") +
+  labs(
+    title = "Hydromet Elevation/Stage vs. WET Mean Surface Water Value",
+    subtitle = "One point per refuge-month (decadal + annual)",
+    x = "Hydromet elevation/stage (ft)",
+    y = "WET mean surface water value"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+```{r elevation-vs-wet-cor}
+combined_monthly |>
+  filter(refuge %in% plot_refuges) |>
+  group_by(refuge) |>
+  summarise(
+    n = n(),
+    cor_elevation_meanval = cor(elevation_ft, mean_val, use = "complete.obs"),
+    cor_elevation_pctwet  = cor(elevation_ft, pct_wet,  use = "complete.obs"),
+    .groups = "drop"
+  ) |>
+  kable(caption = "Correlation between Hydromet elevation/stage and WET metrics, by refuge")
+```
+
+---
+
+# 8. Session info
+
+```{r session-info}
+sessionInfo()
+```
