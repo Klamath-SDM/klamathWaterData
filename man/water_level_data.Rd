@@ -3,9 +3,9 @@
 \docType{data}
 \name{water_level_data}
 \alias{water_level_data}
-\title{Lake water surface elevation data from four different USGS gages across the Klamath Basin}
+\title{Lake water surface elevation data from four different USGS gages, and one USBR monitoring site across the Klamath Basin}
 \format{
-A tibble with 4 rows and 8 columns
+A tibble with 30,084 rows and 8 columns:
 \itemize{
 \item \code{location}: location associated where data was collected/where gage is located
 \item \code{gage_name}: name of the gaging station
