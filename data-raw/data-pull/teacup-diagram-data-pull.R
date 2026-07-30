@@ -303,6 +303,7 @@ nf_sprague <- whychusModel::get_owrd_hydro(11495900, START_DATE, END_DATE , "MDF
 # ------------------------------------------------------------
 # 4. Combine USBR + USGS + OWRD into one tidy dataset
 # ------------------------------------------------------------
+ELEV_MAX_FT <- 5000
 
 teacup_data <- bind_rows(
   usbr_data |> mutate(source = "USBR Hydromet"),
@@ -312,7 +313,12 @@ teacup_data <- bind_rows(
 ) |>
   filter(!is.na(value)) |>
   select(source, site, label, measure_type, lat, long, date, value) |>
-  mutate(measure_type = tolower(measure_type))
+  mutate(measure_type = tolower(measure_type)) |>
+  # `TULC2` has one row (2022-02-09, value = 998877) that is obviously not a real elevation —
+  # almost certainly a parsing artifact  (e.g. an unhandled sentinel value from the USBR archive).
+  # It's excluded from everything downstream in this document; the
+  # underlying pull script should be fixed to catch this at the source.
+  filter(measure_type != "elevation" | value <= ELEV_MAX_FT)
 
 message("\n--- Summary ---")
 message("Total rows: ", nrow(teacup_data))
