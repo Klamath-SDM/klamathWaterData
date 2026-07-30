@@ -211,7 +211,6 @@
 #'   }
 "dswe_monthly"
 
-<<<<<<< HEAD
 #' @name wet_surface_water
 #' @title Monthly surface water extent estimates for wildlife refuges in the Klamath Basin
 #' @description Monthly estimates of open water extent derived from the Intermountain West
@@ -308,7 +307,6 @@
 #' refuge boundaries from \code{rivermile::klamath_refuges}
 "wet_hydroperiod"
 
-=======
 #' @name teacup_diagram_data
 #' @title Elevation, storage, and flow data from the USBR Klamath "Teacup" diagram
 #' @description Daily elevation, reservoir storage, and streamflow data for the monitoring
@@ -333,4 +331,4 @@
 #' }
 #' @source USBR PN Hydromet \url{https://www.usbr.gov/pn/hydromet/klamath/teacup.html}, USGS NWIS \url{https://waterservices.usgs.gov/}, Oregon Water Resources Department \url{https://apps.wrd.state.or.us/apps/sw/hydro_near_real_time/}
 "teacup_diagram_data"
->>>>>>> 2de3463574d22077777643d44806567ebf03dd5d
+
