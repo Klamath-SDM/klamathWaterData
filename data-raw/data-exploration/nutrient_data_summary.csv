@@ -1,19 +1,16 @@
 location,gage_id,gage_name,min_date,max_date
+tule lake,USGS-11488510,tulelake cn a sheepy ridge pumping sta nr hatfield,2002-08-19,2018-09-24
 upper klamath lake,KLAMATHTRIBES_WQX-KL0011,agency lake north,1991-06-05,2018-10-23
 upper klamath lake,KLAMATHTRIBES_WQX-KL0010,agency lake south,1990-01-18,2018-10-23
-upper klamath lake,KLAMATHTRIBES_WQX-SR0040,north fork sprague river at fs 3411 road,2001-03-07,2016-12-27
-upper klamath lake,KLAMATHTRIBES_WQX-SR0140,north fork sprague river at ivory pine road,2005-06-08,2016-12-27
-upper klamath lake,KLAMATHTRIBES_WQX-SR0150,south fork sprague river at ivory pine road,2009-08-11,2016-12-16
-upper klamath lake,KLAMATHTRIBES_WQX-SR0050,south fork sprague river at picnic area,2001-03-07,2016-12-16
-upper klamath lake,KLAMATHTRIBES_WQX-SR0090,sprague river at chiloquin ridge road,2001-04-04,2016-12-29
-upper klamath lake,KLAMATHTRIBES_WQX-SR0060,sprague river at godowa road,2001-03-21,2016-12-28
-upper klamath lake,KLAMATHTRIBES_WQX-WR1000,sprague river at kirchers bridge,2005-01-13,2005-01-13
+upper klamath lake,USGS-422622122004000,mid-north - lower  - mdnl,2003-06-17,2023-09-25
+upper klamath lake,USGS-422042121513100,rattlesnake point  -  rpt,2006-05-22,2023-09-25
+upper klamath lake,USGS-422444121580400,shoalwater bay - shb,2019-04-16,2023-09-25
 upper klamath lake,KLAMATHTRIBES_WQX-SR0080,sprague river at lone pine,2001-03-22,2016-12-29
-upper klamath lake,KLAMATHTRIBES_WQX-SR0070,sycan river at drews road,2001-03-21,2016-12-28
 upper klamath lake,KLAMATHTRIBES_WQX-BP,upper klamath lake at ball point,1994-09-20,1994-09-20
 upper klamath lake,KLAMATHTRIBES_WQX-KL0009,upper klamath lake at coon point,1997-07-16,2018-10-23
 upper klamath lake,KLAMATHTRIBES_WQX-KL0006,upper klamath lake at eagle ridge,1990-01-18,2018-10-23
 upper klamath lake,KLAMATHTRIBES_WQX-KL0001,upper klamath lake at fremont bridge,1991-10-07,2018-10-23
+upper klamath lake,USGS-421935121551200,"upper klamath lake at howard bay, or",2020-05-12,2023-09-25
 upper klamath lake,KLAMATHTRIBES_WQX-KL0005,upper klamath lake at mid-lake,1990-01-18,2018-10-23
 upper klamath lake,KLAMATHTRIBES_WQX-KL0008,upper klamath lake at mid-lake north,1990-01-18,2018-10-23
 upper klamath lake,KLAMATHTRIBES_WQX-KL0003,upper klamath lake at north buck island,1990-01-18,2018-10-23
@@ -22,8 +19,7 @@ upper klamath lake,KLAMATHTRIBES_WQX-KL0002,upper klamath lake at pelican marina
 upper klamath lake,KLAMATHTRIBES_WQX-KL0007,upper klamath lake at shoal water bay,1990-01-18,2018-10-23
 upper klamath lake,KLAMATHTRIBES_WQX-SBE,upper klamath lake at shoalwater bay east,1994-09-20,1994-09-20
 upper klamath lake,KLAMATHTRIBES_WQX-KL0004,upper klamath lake at wocus bay,1990-01-18,2018-10-23
+upper klamath lake,USGS-421830121512600,"upper klamath lake near buck island, or",2019-04-16,2023-09-25
 upper klamath lake,KLAMATHTRIBES_WQX-WS,weather station,1990-06-29,1991-04-30
 upper klamath lake,KLAMATHTRIBES_WQX-WR6000,williamson river at modoc point road,2005-01-13,2005-01-13
-USGS-421830121512600,USGS-421830121512600,NA,2019-04-16,2023-09-25
-USGS-421935121551200,USGS-421935121551200,NA,2020-05-12,2023-09-25
-USGS-422042121513100,USGS-422042121513100,NA,2006-05-22,2023-09-25
+upper klamath lake,USGS-422719121571400,williamson river outlet - wmr,2005-06-15,2023-09-25
