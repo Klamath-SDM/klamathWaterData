@@ -236,8 +236,18 @@ temperature_gage_usgs <- rivermile::find_nearest_river_miles(gage_temperature_us
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
   glimpse()
 
+### USFWS ----
 
+# pulling raw data -- This data was shared by Tylor Daley from USFWS
+# TEMPERATURE data
+#  scott river
+sckr_data_raw <- read_csv("data-raw/temp-data/water_temp_usfws_sckr.csv") |> glimpse()
+sckr_metadata_raw <- read_csv("data-raw/temp-data/sckr_metadata.csv") |> glimpse()
+sckr_metadata_raw |>
+  mutate(location ,
+         gage_name)
 
+sckr_join <- bind_cols(sckr_data_raw, sckr_metadata_raw)
 # combine gage and data files ---------------------------------------------
 temperature_data <- temperature_data_wqx |>
   mutate(variable_name = "temperature",

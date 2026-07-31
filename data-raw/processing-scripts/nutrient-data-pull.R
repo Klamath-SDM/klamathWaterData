@@ -1,3 +1,40 @@
+#' library(dataRetrieval)
+#' library(dplyr)
+#' library(janitor)
+#' library(readr)
+#' library(sf)
+#'
+#' #' @name nutrient_gage_data_ukl
+#' #' @title Nutrient monitoring gages in Upper Klamath Lake (UKL)
+#' #' @description A dataset containing metadata for nutrient monitoring gages located in Upper Klamath Lake.
+#' #' Includes USGS and Klamath Tribes monitoring locations with site information and coordinates.
+#' #' @format A tibble with rows and columns:
+#' #' \itemize{
+#' #'   \item{\code{location}: location name (upper klamath lake)
+#' #'   \item{\code{gage_name}: name of the monitoring location/gage
+#' #'   \item{\code{gage_id}: unique identifier for the gage
+#' #'   \item{\code{agency}: agency responsible for monitoring (USGS, Klamath Tribes)
+#' #'   \item{\code{latitude}: latitude coordinate of the gage location
+#' #'   \item{\code{longitude}: longitude coordinate of the gage location
+#' #' }
+#' "nutrient_gage_data_ukl"
+#'
+#' #' @name nutrient_gage_data_tule
+#' #' @title Nutrient monitoring gages in Tule Lake
+#' #' @description A dataset containing metadata for nutrient monitoring gages located in Tule Lake.
+#' #' Includes USGS monitoring locations with site information and coordinates.
+#' #' @format A tibble with rows and columns:
+#' #' \itemize{
+#' #'   \item{\code{location}: location name (tule lake)
+#' #'   \item{\code{gage_name}: name of the monitoring location/gage
+#' #'   \item{\code{gage_id}: unique identifier for the gage
+#' #'   \item{\code{agency}: agency responsible for monitoring (USGS)
+#' #'   \item{\code{latitude}: latitude coordinate of the gage location
+#' #'   \item{\code{longitude}: longitude coordinate of the gage location
+#' #' }
+#' "nutrient_gage_data_tule"
+#'
+
 library(dataRetrieval)
 library(dplyr)
 library(janitor)
@@ -11,7 +48,7 @@ library(ggplot2)
 # Upper Klamath Lake -----
 
 ### USGS sites for UKL nutrient data --------
-usgs_sites <- list(
+usgs_ukl_sites <- list(
   buck_island = "USGS-421830121512600",
   howard = "USGS-421935121551200",
   rpt = "USGS-422042121513100",
@@ -20,12 +57,12 @@ usgs_sites <- list(
   mdnl = "USGS-422622122004000")
 
 # Pull nutrient data for all sites
-all_usgs_nutrients <- list()
-for (site_name in names(usgs_sites)) {
+usgs_ukl_raw <- list()
+for (site_name in names(usgs_ukl_sites)) {
   cat("Pulling", site_name, "\n")
 
-  all_usgs_nutrients[[site_name]] <- readWQPdata(
-    siteid = usgs_sites[[site_name]],
+  usgs_ukl_raw[[site_name]] <- readWQPdata(
+    siteid = usgs_ukl_sites[[site_name]],
     characteristicType = "Nutrient",
     startDateLo = "01-01-1996",
     startDateHi = "12-31-2025"
@@ -35,20 +72,20 @@ for (site_name in names(usgs_sites)) {
 }
 
 # Combine all sites
-usgs_nutrients <- do.call(rbind, all_usgs_nutrients)
+usgs_ukl_combined <- do.call(rbind, usgs_ukl_raw)
 
 # Summary of each site
-usgs_nutrients_ukl <- usgs_nutrients |>
+usgs_ukl_clean <- usgs_ukl_combined |>
   select(OrganizationIdentifier, ActivityStartDate, MonitoringLocationIdentifier, CharacteristicName,
          ResultMeasureValue, ResultMeasure.MeasureUnitCode) |>
   clean_names() |>
   filter(!is.na(result_measure_value)) |>
   glimpse()
 
-unique(usgs_nutrients_ukl$characteristic_name)
+unique(usgs_ukl_clean$characteristic_name)
 
 
-usgs_nutrients_ukl_clean <- usgs_nutrients_ukl |>
+usgs_ukl_processed <- usgs_ukl_clean |>
   mutate(location = "upper klamath lake",
          # gage_name = monitoring_location_identifier,
          gage_id = monitoring_location_identifier,
@@ -61,17 +98,17 @@ usgs_nutrients_ukl_clean <- usgs_nutrients_ukl |>
   glimpse()
 
 
-gage_data <- read_waterdata_monitoring_location(
-  monitoring_location_id = unlist(usgs_sites, use.names = FALSE))
+usgs_ukl_gage_meta <- read_waterdata_monitoring_location(
+  monitoring_location_id = unlist(usgs_ukl_sites, use.names = FALSE))
 
-gage_reference <- gage_data |>
+usgs_ukl_gage_ref <- usgs_ukl_gage_meta |>
   mutate(monitoring_location_name = tolower(monitoring_location_name),
          gage_id = monitoring_location_id) |>
   select(monitoring_location_name, gage_id) |>
   st_drop_geometry() |>
   glimpse()
 
-ukl_usgs_nutrients_data <- usgs_nutrients_ukl_clean |> left_join(gage_reference, by = "gage_id") |>
+ukl_usgs_nutrients_data <- usgs_ukl_processed |> left_join(usgs_ukl_gage_ref, by = "gage_id") |>
   mutate(gage_name = monitoring_location_name) |>
   relocate(gage_name, .after = location) |>
   select(-monitoring_location_name) |>
@@ -81,11 +118,11 @@ ukl_usgs_nutrients_data <- usgs_nutrients_ukl_clean |> left_join(gage_reference,
 ### Klamath Tribes -----
 # the klamath tribes data was downloaded from the Klamath Tribes Water Quality Monitoring Data portal:
 # https://klamathtribeswaterquality.com/data/
-klamath_tribes_wqx <- read_csv("data-raw/klamath-tribes-data/all_klamath_wqx_data.csv")
+klamath_tribes_raw <- read_csv("data-raw/klamath-tribes-data/all_klamath_wqx_data.csv")
 
-unique(klamath_tribes_wqx$characteristic_name)
+unique(klamath_tribes_raw$characteristic_name)
 
-klmth_trib_nutrients_data <- klamath_tribes_wqx |>
+nutrient_data_ukl_klamath_tribes <- klamath_tribes_raw |>
   filter(characteristic_name %in% c("Phosphorus", "Silica", "Ammonia-nitrogen",
                                     "Total Phosphorus, mixed forms","Nitrogen", "Nitrite",
                                     "Nitrate + Nitrite")) |>
@@ -107,13 +144,13 @@ klmth_trib_nutrients_data <- klamath_tribes_wqx |>
 
 # combine klamath tribes + usgs
 
-ukl_nutrient_data <- bind_rows(klmth_trib_nutrients_data, ukl_usgs_nutrients_data) |> glimpse()
+nutrient_data_ukl <- bind_rows(nutrient_data_ukl_klamath_tribes, ukl_usgs_nutrients_data) |> glimpse()
 
 
 # Tule Lake -----
 # Approximate bounding box around Tule Lake and nearby canals/refuge units
 
-tule_sites <- list(
+usgs_tule_sites <- list(
   tule_1 = "USGS-415223121323501",
   tule_2 = "USGS-415217121294901",
   tule_3 = "USGS-11488510",
@@ -121,12 +158,12 @@ tule_sites <- list(
   tule_5 = "USGS-415334121314501")
 
 # Pull nutrient data for all sites
-all_tule_nutrients <- list()
-for (site_name in names(tule_sites)) {
+usgs_tule_raw <- list()
+for (site_name in names(usgs_tule_sites)) {
   cat("Pulling", site_name, "\n")
 
-  all_tule_nutrients[[site_name]] <- readWQPdata(
-    siteid = tule_sites[[site_name]],
+  usgs_tule_raw[[site_name]] <- readWQPdata(
+    siteid = usgs_tule_sites[[site_name]],
     characteristicType = "Nutrient",
     startDateLo = "01-01-1996",
     startDateHi = "12-31-2025"
@@ -136,23 +173,23 @@ for (site_name in names(tule_sites)) {
 }
 
 # Combine all sites
-tule_nutrients <- do.call(rbind, all_tule_nutrients)
+usgs_tule_combined <- do.call(rbind, usgs_tule_raw)
 
-range(tule_nutrients$ActivityStartDate) # overall time range "2002-08-19" - "2018-09-24"
+range(usgs_tule_combined$ActivityStartDate) # overall time range "2002-08-19" - "2018-09-24"
 # note that all sites except one has data within the time range of 1996-2025
 
 # Summary of each site
-tule_nutrients_usgs <- tule_nutrients |>
+usgs_tule_clean <- usgs_tule_combined |>
   select(OrganizationIdentifier, ActivityStartDate, MonitoringLocationIdentifier, CharacteristicName,
          ResultMeasureValue, ResultMeasure.MeasureUnitCode) |>
   clean_names() |>
   filter(!is.na(result_measure_value)) |>
   glimpse()
 
-unique(tule_nutrients_usgs$characteristic_name)
+unique(usgs_tule_clean$characteristic_name)
 
 
-tule_nutrients_usgs_clean <- tule_nutrients_usgs |>
+usgs_tule_processed <- usgs_tule_clean |>
   mutate(location = "tule lake",
          # gage_name = monitoring_location_identifier,
          gage_id = monitoring_location_identifier,
@@ -165,53 +202,63 @@ tule_nutrients_usgs_clean <- tule_nutrients_usgs |>
   glimpse()
 
 # get gage data
-tule_gage_data <- read_waterdata_monitoring_location(
-  monitoring_location_id = unlist(tule_sites, use.names = FALSE))
+usgs_tule_gage_meta <- read_waterdata_monitoring_location(
+  monitoring_location_id = unlist(usgs_tule_sites, use.names = FALSE))
 
-gage_reference_tule <- tule_gage_data |>
+usgs_tule_gage_ref <- usgs_tule_gage_meta |>
   mutate(monitoring_location_name = tolower(monitoring_location_name),
          gage_id = monitoring_location_id) |>
   select(monitoring_location_name, gage_id) |>
   st_drop_geometry()
 
 # add gage name by joining gage data column
-tule_nutrients_data <- tule_nutrients_usgs_clean |> left_join(gage_reference_tule, by = "gage_id") |>
+nutrient_data_tule <- usgs_tule_processed |> left_join(usgs_tule_gage_ref, by = "gage_id") |>
   mutate(gage_name = monitoring_location_name) |>
   relocate(gage_name, .after = location) |>
   select(-monitoring_location_name) |>
   glimpse()
 
-tule_nutrients_data_summary <- tule_nutrients_data |>
+# ============================================================================
+# Combine final data objects
+# ============================================================================
+
+# Combine all nutrient data (UKL + Tule Lake)
+nutrient_data <- bind_rows(nutrient_data_ukl, nutrient_data_tule)
+
+# Combine all gage metadata (UKL + Tule Lake)
+nutrient_gage <- bind_rows(
+  usgs_ukl_gage_ref |> mutate(location = "upper klamath lake") |> relocate(location),
+  usgs_tule_gage_ref |> mutate(location = "tule lake") |> relocate(location)
+) |>
+  distinct(gage_id, .keep_all = TRUE)
+
+# ============================================================================
+# Summary Statistics
+# ============================================================================
+
+nutrient_data_tule_summary <- nutrient_data_tule |>
   filter(!is.na(date)) |>
   group_by(location, gage_id, gage_name) |>
   summarise(
     min_date = min(date, na.rm = TRUE),
     max_date = max(date, na.rm = TRUE),
-    parameters = paste(
-      sort(unique(variable_name)),
-      collapse = ", "
-    ),
     .groups = "drop"
   ) |>
   arrange(gage_name)
 
 
-ukl_gage_data_summary <- ukl_nutrient_data |>
+nutrient_data_ukl_summary <- nutrient_data_ukl |>
   filter(!is.na(date)) |>
   group_by(location, gage_id, gage_name) |>
   summarise(
     min_date = min(date, na.rm = TRUE),
     max_date = max(date, na.rm = TRUE),
-    parameters = paste(
-      sort(unique(variable_name)),
-      collapse = ", "
-    ),
     .groups = "drop"
   ) |>
   arrange(gage_name)
 
-nutrient_data_summary <- bind_rows(tule_nutrients_data_summary, ukl_gage_data_summary)
+nutrient_data_summary <- bind_rows(nutrient_data_tule_summary, nutrient_data_ukl_summary)
 
 nutrient_data_summary
 # TODO only saves to share with Jim
-write_csv(nutrient_data_summary,"data-raw/data-exploration/nutrient_data_summary.csv")
+# write_csv(nutrient_data_summary,"data-raw/data-exploration/nutrient_data_summary.csv")
