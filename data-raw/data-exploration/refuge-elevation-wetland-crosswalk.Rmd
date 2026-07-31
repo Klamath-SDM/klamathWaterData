@@ -33,7 +33,7 @@ library(knitr)
 
 This document crosswalks water-surface-**elevation** stations from `teacup_diagram_data` (https://www.usbr.gov/pn/hydromet/klamath/teacup.html) to each of the six
 Klamath Basin wildlife refuges in (stored in `rivermile::klamath_refuges`), then joins each matched
-station's monthly water level to the processed WET (Intermountain West Joint Venture (IWJV) **monthly surface water extent** data (`wet_surface_water`) for that refuge. The goal is a combined monthly view — station water
+station's monthly water level to the processed WET (Intermountain West Joint Venture (IWJV)) monthly surface water extent data (`wet_surface_water`) for that refuge. The goal is a combined monthly view — station water
 level alongside wetland surface water extent — for refuges with a relevant elevation gauge.
 
 The refuge/station crosswalk is a hand-curated lookup (Section 3), only stations that are actually on or clearly hydrologically tied to a refuge are assigned to it. Three refuges — Bear Valley, Klamath Marsh, and Lower Klamath/Sheepy have no station assigned and are excluded from the combined analysis. 
@@ -247,7 +247,7 @@ combined_decadal |>
   ggplot(aes(x = month_num, y = value, color = era_str, group = era_str)) +
   geom_line(linewidth = 0.9) +
   geom_point(size = 2) +
-  facet_grid(metric ~ refuge, scales = "free_y") +
+  facet_wrap(vars(metric, refuge), scales = "free_y", ncol = length(plot_refuges)) +
   scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
   scale_color_brewer(palette = "Set2", name = "Era") +
   labs(
@@ -271,7 +271,7 @@ combined_annual |>
   ggplot(aes(x = month_num, y = value, color = factor(era_start), group = era_start)) +
   geom_line(linewidth = 0.9) +
   geom_point(size = 2) +
-  facet_grid(metric ~ refuge, scales = "free_y") +
+  facet_wrap(vars(metric, refuge), scales = "free_y", ncol = length(plot_refuges)) +
   scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
   scale_color_brewer(palette = "Dark2", name = "Year") +
   labs(
@@ -305,6 +305,10 @@ combined_decadal |>
   ) +
   theme_minimal(base_size = 11) +
   theme(legend.position = "bottom")
+```
+
+```{r}
+knitr::knit_exit()
 ```
 
 ---
