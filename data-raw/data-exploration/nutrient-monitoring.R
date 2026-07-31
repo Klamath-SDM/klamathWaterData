@@ -4,6 +4,8 @@ library(janitor)
 library(readr)
 library(sf)
 library(ggplot2)
+library(leaflet)
+library(htmlwidgets)
 
 #  the purpose of this markdown is to pull and explore nutrient data al UKL and Tule lake
 #  this script will serve as a reference to what it is publicly available and their time coverage
@@ -77,6 +79,9 @@ ukl_usgs_nutrients_data <- usgs_nutrients_ukl_clean |> left_join(gage_reference,
   select(-monitoring_location_name) |>
   glimpse()
 
+# table for creating a map
+gage_data_map <- gage_data |>
+  select(monitoring_location_id, monitoring_location_name) |> glimpse()
 
 ### Klamath Tribes -----
 # the klamath tribes data was downloaded from the Klamath Tribes Water Quality Monitoring Data portal:
@@ -93,7 +98,7 @@ klmth_trib_nutrients_data <- klamath_tribes_wqx |>
                                                 "KLAMATHTRIBES_WQX-SR0050", "KLAMATHTRIBES_WQX-SR0150",
                                                 "KLAMATHTRIBES_WQX-SR0140", "KLAMATHTRIBES_WQX-SR0040",
                                                 "KLAMATHTRIBES_WQX-SR0060", "KLAMATHTRIBES_WQX-SR0070",
-                                                "AMATHTRIBES_WQX-SR0080")) |>
+                                                "AMATHTRIBES_WQX-SR0080", "KLAMATHTRIBES_WQX-SR0080")) |>
   mutate(location = "upper klamath lake",
          gage_name = tolower(monitoring_location_name),
          gage_id = monitoring_location_identifier,
@@ -107,8 +112,35 @@ klmth_trib_nutrients_data <- klamath_tribes_wqx |>
 
 # combine klamath tribes + usgs
 
-ukl_nutrient_data <- bind_rows(klmth_trib_nutrients_data, ukl_usgs_nutrients_data) |> glimpse()
+ukl_nutrient_data <- bind_rows(klmth_trib_nutrients_data, ukl_usgs_nutrients_data) |>
+  glimpse()
 
+# table for creating a map
+gage_data_map_2 <- klamath_tribes_wqx |>
+  filter(characteristic_name %in% c("Phosphorus", "Silica", "Ammonia-nitrogen",
+                                    "Total Phosphorus, mixed forms","Nitrogen", "Nitrite",
+                                    "Nitrate + Nitrite")) |>
+  filter(!monitoring_location_identifier %in% c("KLAMATHTRIBES_WQX-WR1000", "KLAMATHTRIBES_WQX-SR0090",
+                                                "KLAMATHTRIBES_WQX-SR0050", "KLAMATHTRIBES_WQX-SR0150",
+                                                "KLAMATHTRIBES_WQX-SR0140", "KLAMATHTRIBES_WQX-SR0040",
+                                                "KLAMATHTRIBES_WQX-SR0060", "KLAMATHTRIBES_WQX-SR0070",
+                                                "AMATHTRIBES_WQX-SR0080", "KLAMATHTRIBES_WQX-SR0080")) |>
+  mutate(monitoring_location_id = monitoring_location_identifier) |>
+  select(monitoring_location_id, monitoring_location_name, latitude_measure, longitude_measure) |>
+  distinct(
+    monitoring_location_id,
+    monitoring_location_name,
+    latitude_measure,
+    longitude_measure
+  ) |>
+  filter(
+    !is.na(latitude_measure),
+    !is.na(longitude_measure)
+  ) |>
+  st_as_sf(
+    coords = c("longitude_measure", "latitude_measure"),
+    crs = 4326
+  ) |> glimpse()
 
 # Tule Lake -----
 # Approximate bounding box around Tule Lake and nearby canals/refuge units
@@ -181,6 +213,13 @@ tule_nutrients_data <- tule_nutrients_usgs_clean |> left_join(gage_reference_tul
   select(-monitoring_location_name) |>
   glimpse()
 
+
+# table for creating a map
+gage_data_map_3 <- tule_gage_data |>
+  filter(monitoring_location_id == "USGS-11488510") |>
+  select(monitoring_location_id, monitoring_location_name) |> glimpse()
+
+
 tule_nutrients_data_summary <- tule_nutrients_data |>
   filter(!is.na(date)) |>
   group_by(location, gage_id, gage_name) |>
@@ -214,4 +253,41 @@ nutrient_data_summary <- bind_rows(tule_nutrients_data_summary, ukl_gage_data_su
 
 nutrient_data_summary
 # TODO only saves to share with Jim
-write_csv(nutrient_data_summary,"data-raw/data-exploration/nutrient_data_summary.csv")
+# write_csv(nutrient_data_summary,"data-raw/data-exploration/nutrient_data_summary.csv")
+
+
+# map
+mapping_data <- bind_rows(gage_data_map, gage_data_map_2, gage_data_map_3) |> glimpse()
+
+mapping_data_clean <- mapping_data |>
+  left_join(
+    nutrient_data_summary,
+    by = c("monitoring_location_id" = "gage_id")
+  ) |>
+  select(monitoring_location_id, gage_name, min_date, max_date, geometry) |>
+  glimpse()
+
+
+nutrient_data_gage_reference_map <- leaflet() |>
+  addProviderTiles(providers$Esri.WorldTopoMap) |>
+  # Klamath Tribes stations
+  addCircleMarkers(
+    data = mapping_data_clean,
+    color = "blue",
+    radius = 5,
+    stroke = FALSE,
+    fillOpacity = 0.8,
+    popup = ~paste0(
+      "<b>", gage_name, "</b><br>",
+      monitoring_location_id, "<br>",
+      "min_date:", min_date,"<br>",
+      "max_date:", max_date
+    )
+  )
+
+nutrient_data_gage_reference_map
+
+saveWidget(
+  nutrient_data_gage_reference_map,
+  file = "data-raw/data-exploration/nutrient_data_gage_reference_map.html",
+  selfcontained = TRUE)
