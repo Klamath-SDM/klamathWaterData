@@ -19,10 +19,9 @@ A tibble with columns:
 \item \code{month_num}: integer month number (1–12)
 \item \code{mean_val}: mean hydroperiod raster value across all pixels within the refuge bbox
 (\code{rivermile::klamath_refuges} boundary buffered by 0.5 miles); higher values indicate
-longer water persistence
+longer water persistence — this is the column to use for comparing hydroperiod duration
 \item \code{median_val}: median hydroperiod raster value within the refuge bbox
 \item \code{sd_val}: standard deviation of raster values within the refuge bbox
-\item \code{pct_wet}: fraction of pixels with a value greater than zero (proportion with any hydroperiod)
 \item \code{n_pixels}: number of non-NA pixels within the refuge bbox
 }
 }
@@ -56,5 +55,13 @@ hand-drawn bounding box that happened to clip the edge of an unrelated stream fe
 northeast of the refuge, producing a handful of nonzero pixels that were never actually
 inside the refuge; the current \code{rivermile}-derived bbox is tighter and excludes that
 spillover.
+
+\strong{Note on \code{pct_wet}}: as with \code{wet_surface_water}, the underlying WET
+Hydroperiod raster is a continuous per-pixel value, not a binary mask, and true zero pixels
+are essentially absent inside a refuge boundary. \code{pct_wet} (\code{mean(value > 0)}) is
+exactly \code{1} for every non-\code{NA} row in this dataset — it carries no information here
+and should not be used to compare refuges or eras. \code{mean_val} (the average of the
+continuous per-pixel hydroperiod values) is the column that actually distinguishes
+shorter- vs. longer-duration water persistence.
 }
 \keyword{datasets}

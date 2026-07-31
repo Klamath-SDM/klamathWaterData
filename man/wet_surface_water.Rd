@@ -18,10 +18,10 @@ decadal composite or \code{"2022"} for an individual year)
 \item \code{month_chr}: three-letter month abbreviation (e.g., \code{"JAN"})
 \item \code{month_num}: integer month number (1–12)
 \item \code{mean_val}: mean surface water raster value across all pixels within the refuge bbox
-(\code{rivermile::klamath_refuges} boundary buffered by 0.5 miles)
+(\code{rivermile::klamath_refuges} boundary buffered by 0.5 miles) — the continuous
+water-probability/fraction signal; this is the column to use for tracking extent/intensity
 \item \code{median_val}: median surface water raster value within the refuge bbox
 \item \code{sd_val}: standard deviation of raster values within the refuge bbox
-\item \code{pct_wet}: fraction of pixels with a value greater than zero (proportion wet)
 \item \code{n_pixels}: number of non-NA pixels within the refuge bbox
 }
 }
@@ -56,5 +56,17 @@ hand-drawn bounding box that happened to clip the edge of an unrelated stream fe
 northeast of the refuge, producing a handful of nonzero pixels that were never actually
 inside the refuge; the current \code{rivermile}-derived bbox is tighter and excludes that
 spillover.
+
+\strong{Note on \code{pct_wet}}: the underlying WET SurfaceWater raster stores a continuous
+per-pixel value roughly between 0 and 1 (a water-probability/fraction metric), not a binary
+wet/dry mask — true zero pixels are rare inside a refuge boundary. Because \code{pct_wet} is
+defined as \code{mean(value > 0)}, it only asks whether a pixel registers \emph{any} nonzero
+signal at all, however faint (observed minimums are as low as ~0.00004). Across this dataset
+\code{pct_wet} is exactly \code{1} for the median and 3rd-quartile row (overall mean ~0.88),
+i.e. it saturates at 1 most of the time and mostly just confirms the refuge bbox overlaps
+\emph{some} part of the mapped wetland complex — it does not mean the refuge is fully
+flooded. \code{mean_val} (the average of the continuous per-pixel values) is the column that
+actually tracks water extent/intensity; a more discriminating "percent wet" would threshold
+at something like \code{value > 0.5} rather than \code{value > 0}.
 }
 \keyword{datasets}

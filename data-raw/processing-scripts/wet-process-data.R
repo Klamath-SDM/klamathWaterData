@@ -130,7 +130,7 @@ wet_data <- file_meta |>
   ) |>
   unnest(refuge_stats) |>
   select(refuge, type, era_str, is_decadal, era_start, month_chr, month_num,
-         mean_val, median_val, sd_val, pct_wet, n_pixels)
+         mean_val, median_val, sd_val, n_pixels)
 
 # -------------------------------------------------------------------------
 # Split into SurfaceWater and Hydroperiod datasets

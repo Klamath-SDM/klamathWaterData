@@ -33,8 +33,7 @@ library(knitr)
 
 This document crosswalks water-surface-**elevation** stations from `teacup_diagram_data` (https://www.usbr.gov/pn/hydromet/klamath/teacup.html) to each of the six
 Klamath Basin wildlife refuges in (stored in `rivermile::klamath_refuges`), then joins each matched
-station's monthly water level to the processed WET (Intermountain West Joint Venture (IWJV) **monthly surface water extent** data
-(`wet_surface_water`) for that refuge. The goal is a combined monthly view — station water
+station's monthly water level to the processed WET (Intermountain West Joint Venture (IWJV) **monthly surface water extent** data (`wet_surface_water`) for that refuge. The goal is a combined monthly view — station water
 level alongside wetland surface water extent — for refuges with a relevant elevation gauge.
 
 The refuge/station crosswalk is a hand-curated lookup (Section 3), only stations that are actually on or clearly hydrologically tied to a refuge are assigned to it. Three refuges — Bear Valley, Klamath Marsh, and Lower Klamath/Sheepy have no station assigned and are excluded from the combined analysis. 
@@ -77,38 +76,6 @@ stations_sf <- elev_stations |>
 kable(elev_stations, caption = "Elevation stations available in teacup_diagram_data")
 ```
 
-This is a shorter list than the raw USBR Hydromet station inventory — `teacup_diagram_data`
-only carries the stations actually embedded in the teacup diagram, and several Klamath Straits
-Drain gauge-height stations (`EEEO`, `FPPO`, `STDC`) that exist in the broader Hydromet network
-are not part of it. That matters for Lower Klamath NWR — see [Section 5](#gaps).
-
-## 2.1 Data quality check
-
-All stations here are Klamath Basin reservoir/lake elevations, which physically fall well
-under 5,000 ft. A quick bounds check catches at least one clear parsing glitch in the source
-pull rather than letting it silently corrupt a monthly mean below.
-
-```{r elevation-qc}
-ELEV_MAX_FT <- 5000
-
-elev_outliers <- teacup_diagram_data |>
-  filter(measure_type == "elevation", value > ELEV_MAX_FT)
-
-kable(elev_outliers, caption = paste0("Elevation values > ", ELEV_MAX_FT, " ft (excluded below)"))
-```
-
-`TULC2` has one row (2022-02-09, value = 998877) that is obviously not a real elevation —
-almost certainly a parsing artifact in `teacup-diagram-data-pull.R` (e.g. an unhandled sentinel
-value from the USBR archive). It's excluded from everything downstream in this document; the
-underlying pull script should be fixed to catch this at the source.
-
-```{r elevation-qc-filter}
-teacup_diagram_data <- teacup_diagram_data |>
-  filter(measure_type != "elevation" | value <= ELEV_MAX_FT)
-```
-
----
-
 # 3. Spatial crosswalk of elevation sites with refuges
 
 Each elevation station is assigned to a refuge only where it is genuinely on-site or the
@@ -117,8 +84,7 @@ obvious controlling structure — not just the nearest point on a map:
 - **Tule Lake NWR** — `TULC` and `TULC2`, the refuge's own Sump 1A and Sump 1B forebay gauges.
 - **Clear Lake NWR** — `CLK`, Clear Lake Reservoir West Lobe, inside the refuge.
 - **Upper Klamath Lake NWR** — `11507001`, the USGS lake-elevation gauge near Link River Dam.
-- **Bear Valley, Klamath Marsh, Lower Klamath/Sheepy** — no station assigned; see
-  [Section 5](#gaps) for why each is left out rather than matched to a distant proxy.
+- **Bear Valley, Klamath Marsh, Lower Klamath/Sheepy** — no station assigned
 
 ```{r crosswalk-table}
 crosswalk <- tribble(
@@ -229,51 +195,43 @@ cat("Refuges represented:", paste(plot_refuges, collapse = ", "), "\n")
 kable(head(combined_monthly, 10), caption = "combined_monthly — first rows")
 ```
 
----
+## 4.1 Package dataset: `refuge_elevation_wetland`
 
-# 5. Data gaps & caveats {#gaps}
+`combined_decadal` and `combined_annual` are working objects scoped to this document. For
+downstream use in the package, they're combined (via `combined_monthly`) into a single, tidy,
+renamed dataset — one row per refuge-month, elevation and WET columns clearly distinguished by
+prefix — and saved as `refuge_elevation_wetland`.
 
-```{r gap-distances}
-stations_proj <- st_transform(stations_sf, 32610)
-refuges_proj  <- st_transform(refuges, 32610)
+```{r package-dataset}
+refuge_elevation_wetland <- combined_monthly |>
+  transmute(
+    refuge,
+    is_decadal,
+    era_str,
+    era_start,
+    month_num,
+    month_chr,
+    elevation_mean_ft,
+    elevation_min_ft,
+    elevation_max_ft,
+    wet_mean_val   = mean_val,
+    wet_median_val = median_val,
+    wet_sd_val     = sd_val,
+    wet_n_pixels   = n_pixels
+  ) |>
+  arrange(refuge, is_decadal, era_start, month_num) |> 
+  mutate(month_chr = tolower(month_chr)) |>
+  select(-era_start)
 
-nearest_unassigned <- as_tibble(st_distance(stations_proj, refuges_proj)) |>
-  setNames(refuges_proj$orgname) |>
-  mutate(site = stations_proj$site) |>
-  pivot_longer(-site, names_to = "orgname", values_to = "dist_m") |>
-  mutate(dist_mi = as.numeric(dist_m) / 1609.344) |>
-  filter(orgname %in% c(
-    "bear valley national wildlife refuge",
-    "klamath marsh national wildlife refuge",
-    "lower klamath national wildlife refuge"
-  )) |>
-  group_by(orgname) |>
-  slice_min(dist_mi, n = 1) |>
-  ungroup() |>
-  transmute(refuge = orgname, nearest_site = site, nearest_dist_mi = round(dist_mi, 1))
+glimpse(refuge_elevation_wetland)
+kable(head(refuge_elevation_wetland, 10), caption = "refuge_elevation_wetland — first rows")
 
-kable(nearest_unassigned, caption = "Nearest available elevation station for excluded refuges (for reference only — not used in the crosswalk)")
+usethis::use_data(refuge_elevation_wetland, overwrite = TRUE)
 ```
 
-- **Klamath Marsh** has no elevation station anywhere near it — the nearest, `11507001`
-  (Upper Klamath Lake), is ~40 miles away. There is no USBR Hydromet or USGS elevation gauge in
-  `teacup_diagram_data` that is remotely relevant to this refuge.
-- **Bear Valley**'s nearest station is also `11507001`, ~13 miles away — too far to be a
-  meaningful proxy, and moot regardless: `wet-process-data.R` / `R/data.R` document that Bear
-  Valley has no WET-detected surface water within its own refuge boundary in any product or
-  era (confirmed separately via visual QC), so even a good elevation series for Bear Valley
-  would have no wetland-extent signal on the other side of the join to move with.
-- **Lower Klamath/Sheepy**'s nearest station is `TULC` (Tule Lake Sump 1A), ~4 miles away. It
-  is deliberately **not** assigned here: `TULC` is a real, on-site gauge for Tule Lake, and
-  reusing it as a distant proxy for a different refuge risked implying a level of confidence
-  the crosswalk doesn't have. The refuges most likely to have their own relevant Klamath
-  Straits Drain gauges (`EEEO`, `FPPO`, `STDC`) are outside the scope of `teacup_diagram_data`
-  (see [Section 2](#elevation-stations-in-teacup_diagram_data)) — a future pull that includes
-  them would let Lower Klamath/Sheepy be added properly instead of via proxy.
-
 ---
 
-# 6. Combined monthly plots
+# 5. Combined monthly plots
 
 Dual view of station elevation and WET mean surface water value for the three refuges with an
 assigned station: Clear Lake, Tule Lake, and Upper Klamath Lake.
@@ -324,7 +282,7 @@ combined_annual |>
   theme(legend.position = "bottom", strip.text = element_text(size = 8))
 ```
 
-## 6.1 Elevation range within each decadal month {#ribbon}
+## 5.1 Elevation range within each decadal month {#ribbon}
 
 The decadal composites average 10 years of daily elevation into one monthly value, which can
 hide how much a reservoir actually swings within that window. Plotting the min–max range
@@ -349,55 +307,9 @@ combined_decadal |>
   theme(legend.position = "bottom")
 ```
 
-## 6.2 Elevation vs. surface water extent — scatter
-
-```{r elevation-vs-wet-scatter, fig.height=5}
-combined_monthly |>
-  filter(refuge %in% plot_refuges) |>
-  ggplot(aes(x = elevation_mean_ft, y = mean_val, color = refuge)) +
-  geom_point(size = 2.5, alpha = 0.7) +
-  geom_smooth(method = "lm", se = FALSE, linewidth = 0.8) +
-  facet_wrap(~refuge, scales = "free") +
-  scale_color_brewer(palette = "Set2", guide = "none") +
-  labs(
-    title    = "Water Surface Elevation vs. WET Mean Surface Water Value",
-    subtitle = "One point per refuge-month (decadal + annual)",
-    x = "Water surface elevation (ft)",
-    y = "WET mean surface water value"
-  ) +
-  theme_minimal(base_size = 12)
-```
-
-```{r elevation-vs-wet-cor}
-combined_monthly |>
-  filter(refuge %in% plot_refuges) |>
-  group_by(refuge) |>
-  summarise(
-    n = n(),
-    cor_elevation_meanval = cor(elevation_mean_ft, mean_val, use = "complete.obs"),
-    cor_elevation_pctwet  = cor(elevation_mean_ft, pct_wet,  use = "complete.obs"),
-    .groups = "drop"
-  ) |>
-  kable(caption = "Correlation between water surface elevation and WET metrics, by refuge")
-```
-
-Clear Lake and Tule Lake both show a clear positive relationship between reservoir elevation
-and WET-detected surface water extent, as expected for on-site gauges. Upper Klamath Lake's
-relationship is weaker — its elevation range across the record (~4 ft) is small relative to the
-lake's overall size, so WET-detected extent within the refuge boundary is less sensitive to it
-than the two reservoirs are to their own level changes.
-
 ---
 
-#7. Save data 
-
-```{r}
-
-combined_monthly
-combined_decadal 
-```
-
-# 8. Session info
+# 6. Session info
 
 ```{r session-info}
 sessionInfo()
