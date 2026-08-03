@@ -2,7 +2,7 @@
 #' @title Temperature gages in the Klamath Basin watershed (HUC8 18010204)
 #' @description A dataset containing metadata for temperature gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
-#' @format A tibble with 94 rows and 8 columns
+#' @format A tibble with 96 rows and 8 columns
 #' \itemize{
 #'   \item{\code{location}: location associated where data was collected/where gage is located
 #'   \item{\code{gage_name}: name of the gaging station
@@ -18,8 +18,8 @@
 
 #' @name temperature_data
 #' @title Publicly available temperature data in the Klamath Basin watershed (HUC8 18010204)
-#' @description Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
-#' @format A tibble with 348,642 rows and 8 columns
+#' @description Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX and USFWS.
+#' @format A tibble with 414,312 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station

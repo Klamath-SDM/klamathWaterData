@@ -372,6 +372,7 @@ temperature_data <- temperature_data_wqx |>
   mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
+  filter(!is.na(location) & !is.na(gage_name)) |>
   glimpse()
 
 temperature_gage <- temperature_gage_usgs |>
@@ -380,6 +381,7 @@ temperature_gage <- temperature_gage_usgs |>
   mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
+  filter(!is.na(location)) |>
   glimpse()
 
 ### saves clean data to aws
