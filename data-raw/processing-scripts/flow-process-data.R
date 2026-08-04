@@ -245,7 +245,8 @@ flow_gage <- gage_flow_wqx |>
   # These two sites didn't overlap the NHD line for the Scott River so marking their RM as NA
   mutate(river_mile = case_when(gage_name == "Scott River at Gaging Station" ~ NA,
                                 gage_name == "Scott River South Fork" ~ NA,
-                                .default = as.numeric(river_mile))) |>
+                                .default = as.numeric(river_mile)),
+         huc8 = as.numeric(huc8)) |>
   mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
