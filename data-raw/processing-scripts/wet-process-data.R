@@ -3,18 +3,25 @@ library(terra)
 library(sf)
 
 # -------------------------------------------------------------------------
-# Refuge bounding boxes
+# Refuge + lake bounding boxes
 #
-# Bounding boxes are derived from the authoritative refuge boundaries in
-# rivermile::klamath_refuges (a 6-feature sf polygon layer, EPSG:4326),
-# each buffered by 0.5 miles before taking the bounding box. This replaces
-# the hand-picked bboxes previously hardcoded here. The refuge/orgname
-# lookup below maps this package's existing refuge labels onto
-# klamath_refuges$orgname; "lower_klamath_sheepy" maps to the single
+# Bounding boxes are derived from two authoritative rivermile boundary
+# layers (both EPSG:4326): rivermile::klamath_refuges (6 wildlife refuges)
+# and rivermile::klamath_lakes (5 lakes/reservoirs) — this used to be
+# refuges only. Both are buffered by 0.5 miles before taking the bounding
+# box; this replaces the hand-picked bboxes previously hardcoded here. The
+# refuge/orgname lookup below maps this package's existing refuge labels
+# onto klamath_refuges$orgname; "lower_klamath_sheepy" maps to the single
 # "lower klamath national wildlife refuge" polygon, which is the only
-# lower Klamath / Sheepy Ridge unit present in klamath_refuges.
+# lower Klamath / Sheepy Ridge unit present in klamath_refuges. The
+# lake/lake_name lookup does the same for klamath_lakes, with every id
+# prefixed "lake_" so it can never collide with a refuge id (e.g. the
+# refuge "tule_lake" vs. the lake boundary "lake_tule_lake" are two
+# different polygons for the same feature — the refuge boundary is not
+# identical to the lake's own shoreline). A `boundary_type` column
+# ("refuge" or "lake") on the final output tells the two apart.
 #
-# WET rasters are in EPSG:4326 (decimal degrees), so refuge polygons are
+# WET rasters are in EPSG:4326 (decimal degrees), so both boundary sets are
 # buffered in a projected CRS (EPSG:32610, UTM Zone 10N — meters, and
 # appropriate for the Klamath Basin's longitude range) and transformed
 # back to EPSG:4326 before computing the bbox used to crop() the rasters.
@@ -37,13 +44,27 @@ REFUGE_BUFFER_METERS <- REFUGE_BUFFER_MILES * 1609.344
 BUFFER_CRS <- 32610 # UTM Zone 10N
 
 refuge_lookup <- tribble(
-  ~refuge,                ~orgname,
-  "upper_klamath_lake",   "upper klamath national wildlife refuge",
-  "clear_lake",           "clear lake national wildlife refuge",
-  "tule_lake",            "tule lake national wildlife refuge",
-  "bear_valley",          "bear valley national wildlife refuge",
-  "lower_klamath_sheepy", "lower klamath national wildlife refuge",
-  "klamath_marsh",        "klamath marsh national wildlife refuge"
+  ~name,                ~orgname,
+  "upper_klamath_lake_refuge",   "upper klamath national wildlife refuge",
+  "clear_lake_refuge",           "clear lake national wildlife refuge",
+  "tule_lake_refuge",            "tule lake national wildlife refuge",
+  "bear_valley_refuge",          "bear valley national wildlife refuge",
+  "lower_klamath_sheepy_refuge", "lower klamath national wildlife refuge",
+  "klamath_marsh_refuge",        "klamath marsh national wildlife refuge"
+)
+
+lake_lookup <- tribble(
+  ~name,                      ~lake_name,
+  "clear_lake_reservoir",  "clear lake reservoir",
+  "gerber_reservoir",      "gerber reservoir",
+  "lower_klamath_lake",    "lower klamath lake",
+  "tule_lake",             "tule lake",
+  "upper_klamath_lake",    "upper klamath lake"
+)
+
+boundary_type_lookup <- bind_rows(
+  refuge_lookup |> transmute(name, boundary_type = "refuge"),
+  lake_lookup   |> transmute(name, boundary_type = "lake")
 )
 
 refuge_boundaries_buffered <- rivermile::klamath_refuges |>
@@ -52,9 +73,21 @@ refuge_boundaries_buffered <- rivermile::klamath_refuges |>
   st_buffer(REFUGE_BUFFER_METERS) |>
   st_transform(4326)
 
+lake_boundaries_buffered <- rivermile::klamath_lakes |>
+  inner_join(lake_lookup, by = "lake_name") |>
+  st_transform(BUFFER_CRS) |>
+  st_buffer(REFUGE_BUFFER_METERS) |>
+  st_transform(4326)
+
 refuge_bboxes <- refuge_boundaries_buffered |>
-  split(refuge_boundaries_buffered$refuge) |>
+  split(refuge_boundaries_buffered$name) |>
   map(~ as.numeric(st_bbox(.x))) # c(xmin, ymin, xmax, ymax)
+
+lake_bboxes <- lake_boundaries_buffered |>
+  split(lake_boundaries_buffered$name) |>
+  map(~ as.numeric(st_bbox(.x))) # c(xmin, ymin, xmax, ymax)
+
+all_bboxes <- c(refuge_bboxes, lake_bboxes)
 
 # -------------------------------------------------------------------------
 # File inventory
@@ -84,9 +117,9 @@ file_meta <- tibble(path = tif_files) |>
   )
 
 # -------------------------------------------------------------------------
-# Extract per-refuge statistics from each raster
+# Extract per-refuge/lake statistics from each raster
 # -------------------------------------------------------------------------
-extract_refuge_stats <- function(path, refuge_name, bbox) {
+extract_refuge_stats <- function(path, area_name, bbox) {
   r <- rast(path)
 
   # bbox is c(xmin, ymin, xmax, ymax); terra::ext() expects xmin, xmax, ymin, ymax
@@ -99,7 +132,7 @@ extract_refuge_stats <- function(path, refuge_name, bbox) {
 
   if (is.null(r_crop)) {
     return(tibble(
-      refuge     = refuge_name,
+      name       = area_name,
       mean_val   = NA_real_,
       median_val = NA_real_,
       sd_val     = NA_real_,
@@ -111,7 +144,7 @@ extract_refuge_stats <- function(path, refuge_name, bbox) {
   vals <- values(r_crop, na.rm = TRUE)
 
   tibble(
-    refuge     = refuge_name,
+    name       = area_name,
     mean_val   = mean(vals),
     median_val = median(vals),
     sd_val     = sd(vals),
@@ -120,16 +153,18 @@ extract_refuge_stats <- function(path, refuge_name, bbox) {
   )
 }
 
-message("Processing ", nrow(file_meta), " rasters across ", length(refuge_bboxes), " refuges...")
+message("Processing ", nrow(file_meta), " rasters across ", length(all_bboxes),
+        " boundaries (", length(refuge_bboxes), " refuges + ", length(lake_bboxes), " lakes)...")
 
 wet_data <- file_meta |>
   mutate(
     refuge_stats = map(path, function(p) {
-      imap_dfr(refuge_bboxes, ~ extract_refuge_stats(p, .y, .x))
+      imap_dfr(all_bboxes, ~ extract_refuge_stats(p, .y, .x))
     })
   ) |>
   unnest(refuge_stats) |>
-  select(refuge, type, era_str, is_decadal, era_start, month_chr, month_num,
+  left_join(boundary_type_lookup, by = "name") |>
+  select(name, boundary_type, type, era_str, is_decadal, era_start, month_chr, month_num,
          mean_val, median_val, sd_val, n_pixels)
 
 # -------------------------------------------------------------------------

@@ -3,13 +3,19 @@
 \docType{data}
 \name{wet_hydroperiod}
 \alias{wet_hydroperiod}
-\title{Monthly hydroperiod estimates for wildlife refuges in the Klamath Basin}
+\title{Monthly hydroperiod estimates for wildlife refuges and lakes in the Klamath Basin}
 \format{
 A tibble with columns:
 \itemize{
-\item \code{refuge}: wildlife refuge area. One of \code{upper_klamath_lake},
-\code{clear_lake}, \code{tule_lake}, \code{bear_valley},
-\code{lower_klamath_sheepy}, or \code{klamath_marsh}. See note above on \code{bear_valley}.
+\item \code{name}: area id. Refuges (\code{boundary_type == "refuge"}): one of
+\code{upper_klamath_lake}, \code{clear_lake}, \code{tule_lake}, \code{bear_valley},
+\code{lower_klamath_sheepy}, or \code{klamath_marsh} (see note above on
+\code{bear_valley}). Lakes (\code{boundary_type == "lake"}): one of
+\code{upper_klamath_lake}, \code{lake_clear_lake_reservoir},
+\code{tule_lake}, \code{gerber_reservoir}, or \code{lower_klamath_lake} —
+always prefixed \code{lake_} so a lake id can never collide with a refuge id
+\item \code{boundary_type}: \code{"refuge"} or \code{"lake"} — which \code{rivermile}
+boundary layer this row's bbox came from
 \item \code{type}: product type; always \code{"Hydroperiod"} in this dataset
 \item \code{era_str}: decadal era label (e.g., \code{"1984-1994"}, \code{"1995-2004"},
 \code{"2005-2014"}, \code{"2015-2022"})
@@ -17,17 +23,18 @@ A tibble with columns:
 \item \code{era_start}: integer start year of the decadal era
 \item \code{month_chr}: three-letter month abbreviation (e.g., \code{"JAN"})
 \item \code{month_num}: integer month number (1–12)
-\item \code{mean_val}: mean hydroperiod raster value across all pixels within the refuge bbox
-(\code{rivermile::klamath_refuges} boundary buffered by 0.5 miles); higher values indicate
-longer water persistence — this is the column to use for comparing hydroperiod duration
-\item \code{median_val}: median hydroperiod raster value within the refuge bbox
-\item \code{sd_val}: standard deviation of raster values within the refuge bbox
-\item \code{n_pixels}: number of non-NA pixels within the refuge bbox
+\item \code{mean_val}: mean hydroperiod raster value across all pixels within the area's
+bbox (buffered 0.5 miles); higher values indicate longer water persistence — this is the
+column to use for comparing hydroperiod duration
+\item \code{median_val}: median hydroperiod raster value within the area's bbox
+\item \code{sd_val}: standard deviation of raster values within the area's bbox
+\item \code{n_pixels}: number of non-NA pixels within the area's bbox
 }
 }
 \source{
 Intermountain West Joint Venture (IWJV) WET dataset \url{https://iwjv.org};
-refuge boundaries from \code{rivermile::klamath_refuges}
+refuge boundaries from \code{rivermile::klamath_refuges}; lake boundaries from
+\code{rivermile::klamath_lakes}
 }
 \usage{
 wet_hydroperiod
@@ -35,16 +42,21 @@ wet_hydroperiod
 \description{
 Monthly estimates of hydroperiod duration derived from the Intermountain West
 Wetland Extent Tool (WET) raster dataset, summarized within bounding boxes for six wildlife
-refuges in the Klamath Basin. The WET Hydroperiod product represents the duration or
-persistence of water at each pixel — higher values indicate longer hydroperiod duration.
-Data are available as decadal composites (10-year mean) covering four eras from 1984 to 2022.
-Source rasters are distributed by the Intermountain West Joint Venture (IWJV).
+refuges and five lakes/reservoirs in the Klamath Basin. The WET Hydroperiod product
+represents the duration or persistence of water at each pixel — higher values indicate longer
+hydroperiod duration. Data are available as decadal composites (10-year mean) covering four
+eras from 1984 to 2022. Source rasters are distributed by the Intermountain West Joint
+Venture (IWJV).
 
-Refuge bounding boxes are derived from \code{rivermile::klamath_refuges} (authoritative
-refuge polygon boundaries), each buffered by 0.5 miles and reduced to a bounding box before
-cropping the source rasters. See \code{data-raw/data-exploration/wet-data-exploration.Rmd}
-for exploratory analysis and \code{data-raw/processing-scripts/wet-process-data.R} for
-processing details, including the buffer distance and the refuge/\code{orgname} lookup.
+Bounding boxes are derived from two authoritative \code{rivermile} boundary layers —
+\code{rivermile::klamath_refuges} (refuges) and \code{rivermile::klamath_lakes} (lakes) —
+each buffered by 0.5 miles and reduced to a bounding box before cropping the source rasters.
+A refuge and its "same" lake are not the same polygon (e.g. the \code{tule_lake} refuge
+boundary and the \code{lake_tule_lake} lake boundary cover different areas), so both appear
+as separate rows rather than being merged. See
+\code{data-raw/data-exploration/wet-data-exploration.Rmd} for exploratory analysis and
+\code{data-raw/processing-scripts/wet-process-data.R} for processing details, including the
+buffer distance and the refuge/lake lookups.
 
 \strong{Note on \code{bear_valley}}: all rows for this refuge are \code{NA}/zero-pixel by
 design, not a processing bug. Visual QC (raster vs. refuge boundary overlay, checked across
