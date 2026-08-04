@@ -304,7 +304,7 @@ shkr_metadata_raw <- read_csv("data-raw/temp-data/shkr_metadata.csv") |>
 temperature_data_shkr <- bind_cols(shkr_data_raw, shkr_metadata_raw |>
                                      mutate(location = waterbody,
                                             gage_name = site_name,
-                                            gage_id = tolower(organization_site_id)) |>
+                                            gage_id = organization_site_id) |>
                                      select(location, gage_name, gage_id)) |>
   mutate(stream = location) |>
   select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date)
@@ -313,8 +313,7 @@ temperature_data_shkr <- bind_cols(shkr_data_raw, shkr_metadata_raw |>
 temperature_data_sckr <- bind_cols(sckr_data_raw, sckr_metadata_raw |>
                                      mutate(location = waterbody,
                                             gage_name = site_name,
-                                            gage_id = tolower(organization_site_id)) |>
-                                     select(location, gage_name, gage_id)) |>
+                                            gage_id = organization_site_id)) |>
   mutate(stream = location) |>
   select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date)
 
