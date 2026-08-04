@@ -188,39 +188,6 @@
 #'   }
 "water_level_gage"
 
-#' @name hydromet_data
-#' @title Daily hydromet data from USBR Klamath Basin monitoring network
-#' @description Daily hydrological and meteorological data from the U.S. Bureau of Reclamation (USBR)
-#' Pacific Northwest Hydromet system for the Klamath Basin. Data are retrieved from the USBR
-#' webarccsv API and cover reservoir forebay elevations, stream gauge heights, and discharge
-#' at 15 stations across the Klamath Project area in Oregon and California.
-#' Data span from water year 1918 (October 1, 1918) to the present.
-#'
-#' Parameter codes can be decoded using the \code{param_defs} lookup table defined in
-#' \code{data-raw/data-pull/hydromet-data-pull.R}, which maps each short code to a full name,
-#' units, and description:
-#' \tabular{lll}{
-#'   \strong{parameter} \tab \strong{full_name} \tab \strong{units} \cr
-#'   FB  \tab Forebay elevation (instantaneous) \tab ft \cr
-#'   FD  \tab Forebay elevation (daily average) \tab ft \cr
-#'   GD  \tab Gauge height (daily average)      \tab ft \cr
-#'   GJ  \tab Gauge height, junction/sump       \tab ft \cr
-#'   GJ2 \tab Gauge height, junction/sump #2    \tab ft \cr
-#'   QD  \tab Discharge (daily average)         \tab cfs \cr
-#'   QJ  \tab Canal/diversion discharge         \tab cfs \cr
-#'   QP  \tab Pumped discharge                  \tab cfs \cr
-#' }
-#' @format A tibble with columns:
-#' \itemize{
-#'   \item \code{site}: USBR station code (e.g., "GER", "CLK", "HRPO")
-#'   \item \code{parameter}: short USBR parameter code (e.g., "FD", "QD", "GD"); join to \code{param_defs} for full name and units
-#'   \item \code{label}: descriptive label combining site location and parameter (e.g., "Gerber Reservoir - Daily Avg Forebay Elevation (ft)")
-#'   \item \code{date}: date of observation (1918-01-01 to present) (Date)
-#'   \item \code{value}: observed numeric value
-#' }
-#' @source USBR PN Hydromet \url{https://www.usbr.gov/pn/hydromet/klamath/arcread.html}
-"hydromet_data"
-
 #' @name dswe_monthly
 #' @title Monthly aggregated dynamic surface water extent (DSWE) data
 #' @description Monthly summary statistics for the dynamic surface water extent for wildlife refuges in the Klamath Basin.
@@ -243,3 +210,28 @@
 #'   \item \code{n}: number of LandSat images available for a given month and year with no cloud coverage
 #'   }
 "dswe_monthly"
+
+#' @name teacup_diagram_data
+#' @title Elevation, storage, and flow data from the USBR Klamath "Teacup" diagram
+#' @description Daily elevation, reservoir storage, and streamflow data for the monitoring
+#' stations embedded in the USBR "Major Storage Reservoirs in the Klamath River Basin" teacup
+#' diagram. Combines three sources: USBR Hydromet stations (retrieved from the webarccsv archive
+#' API), USGS NWIS gauges (retrieved via \code{dataRetrieval::readNWISdv}), and two Sprague River
+#' stations published only by the Oregon Water Resources Department (retrieved via
+#' \code{whychusModel::get_owrd_hydro()}) — SF Sprague River nr Bly (OWRD station 11495600) and
+#' NF Sprague River above SRIC Canal nr Bly (OWRD station 11495900) — neither of which has a
+#' usable USGS NWIS record. See \code{data-raw/data-pull/teacup-diagram-data-pull.R} for the full
+#' pull, including the station/parameter lookup tables for each source.
+#' @format A tibble with columns:
+#' \itemize{
+#'   \item \code{source}: data provider, one of \code{"USBR Hydromet"}, \code{"USGS NWIS"}, or \code{"OWRD"}
+#'   \item \code{site}: station identifier — USBR cbtt code (e.g., "GER", "CLK"), USGS site number (e.g., "11507001"), or OWRD station number (e.g., "11495600")
+#'   \item \code{label}: descriptive label combining station location and parameter (e.g., "Gerber Reservoir - Forebay Elevation (ft)")
+#'   \item \code{measure_type}: measurement category, one of \code{"elevation"}, \code{"storage"}, or \code{"flow"}
+#'   \item \code{lat}: latitude of the station in decimal degrees (USBR sites from the USBR RISE API; USGS sites from \code{dataRetrieval::readNWISsite}; OWRD sites from the OWRD near-real-time station page)
+#'   \item \code{long}: longitude of the station in decimal degrees
+#'   \item \code{date}: date of observation (Date)
+#'   \item \code{value}: observed numeric value (units vary by \code{measure_type}: ft for Elevation, acre-ft for Storage, cfs for Flow)
+#' }
+#' @source USBR PN Hydromet \url{https://www.usbr.gov/pn/hydromet/klamath/teacup.html}, USGS NWIS \url{https://waterservices.usgs.gov/}, Oregon Water Resources Department \url{https://apps.wrd.state.or.us/apps/sw/hydro_near_real_time/}
+"teacup_diagram_data"
