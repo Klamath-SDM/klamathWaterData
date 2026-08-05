@@ -277,15 +277,40 @@ nutrient_data_gage_reference_map <- leaflet() |>
     radius = 5,
     stroke = FALSE,
     fillOpacity = 0.8,
+
+    # Hover tooltip
+    label = ~lapply(
+      paste0(
+        "<b>", gage_name, "</b><br>",
+        monitoring_location_id, "<br>",
+        "<b>Period:</b> ", min_date, " – ", max_date
+      ),
+      HTML
+    ),
+
+    labelOptions = labelOptions(
+      direction = "auto",
+      textOnly = FALSE,
+      textsize = "13px",
+      style = list(
+        "background-color" = "white",
+        "border" = "1px solid #666",
+        "border-radius" = "4px",
+        "padding" = "6px 8px"
+      )
+    ),
+
+    # Click popup
     popup = ~paste0(
       "<b>", gage_name, "</b><br>",
-      monitoring_location_id, "<br>",
-      "min_date:", min_date,"<br>",
-      "max_date:", max_date
+      "<b>Gage ID:</b> ", monitoring_location_id, "<br>",
+      "<b>Min date:</b> ", min_date, "<br>",
+      "<b>Max date:</b> ", max_date
     )
   )
 
 nutrient_data_gage_reference_map
+
 
 saveWidget(
   nutrient_data_gage_reference_map,
