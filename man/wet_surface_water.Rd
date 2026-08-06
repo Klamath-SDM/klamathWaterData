@@ -7,13 +7,16 @@
 \format{
 A tibble with columns:
 \itemize{
-\item \code{name}: area id. Refuges (\code{boundary_type == "refuge"}): one of
-\code{upper_klamath_lake}, \code{clear_lake}, \code{tule_lake}, \code{bear_valley},
-\code{lower_klamath_sheepy}, or \code{klamath_marsh} (see note above on
-\code{bear_valley}). Lakes (\code{boundary_type == "lake"}): one of
-\code{upper_klamath_lake}, \code{clear_lake_reservoir},
-\code{tule_lake}, \code{gerber_reservoir}, or \code{lower_klamath_lake} —
-always prefixed \code{lake_} so a lake id can never collide with a refuge id
+\item \code{name}: area id, built in \code{data-raw/processing-scripts/wet-process-data.R}.
+Refuges (\code{boundary_type == "refuge"}): always suffixed \code{_refuge} — one of
+\code{upper_klamath_lake_refuge}, \code{clear_lake_refuge}, \code{tule_lake_refuge},
+\code{bear_valley_refuge}, \code{lower_klamath_sheepy_refuge}, or
+\code{klamath_marsh_refuge} (see note above on \code{bear_valley_refuge}). Lakes
+(\code{boundary_type == "lake"}): never suffixed — one of \code{upper_klamath_lake},
+\code{clear_lake_reservoir}, \code{tule_lake}, \code{gerber_reservoir}, or
+\code{lower_klamath_lake}. The \code{_refuge} suffix means a refuge id can never
+collide with a lake id even where they cover roughly the same feature (e.g.
+\code{tule_lake_refuge} vs. \code{tule_lake})
 \item \code{boundary_type}: \code{"refuge"} or \code{"lake"} — which \code{rivermile}
 boundary layer this row's bbox came from
 \item \code{type}: product type; always \code{"SurfaceWater"} in this dataset
@@ -24,8 +27,8 @@ decadal composite or \code{"2022"} for an individual year)
 \item \code{month_chr}: three-letter month abbreviation (e.g., \code{"JAN"})
 \item \code{month_num}: integer month number (1–12)
 \item \code{mean_val}: mean surface water raster value across all pixels within the area's
-bbox (buffered 0.5 miles) — the continuous water-probability/fraction signal; this is the
-column to use for tracking extent/intensity
+bbox (buffered 0.5 miles) — a continuous water-probability/fraction signal, roughly
+between 0 and 1; this is the column to use for tracking extent/intensity
 \item \code{median_val}: median surface water raster value within the area's bbox
 \item \code{sd_val}: standard deviation of raster values within the area's bbox
 \item \code{n_pixels}: number of non-NA pixels within the area's bbox
@@ -51,33 +54,21 @@ the Intermountain West Joint Venture (IWJV).
 Bounding boxes are derived from two authoritative \code{rivermile} boundary layers —
 \code{rivermile::klamath_refuges} (refuges) and \code{rivermile::klamath_lakes} (lakes) —
 each buffered by 0.5 miles and reduced to a bounding box before cropping the source rasters.
-A refuge and its "same" lake are not the same polygon (e.g. the \code{tule_lake} refuge
-boundary and the \code{lake_tule_lake} lake boundary cover different areas), so both appear
+A refuge and its "same" lake are not the same polygon (e.g. the \code{tule_lake_refuge}
+boundary and the \code{tule_lake} lake boundary cover different areas), so both appear
 as separate rows rather than being merged. See
 \code{data-raw/data-exploration/wet-data-exploration.Rmd} for exploratory analysis and
 \code{data-raw/processing-scripts/wet-process-data.R} for processing details, including the
 buffer distance and the refuge/lake lookups.
 
-\strong{Note on \code{bear_valley}}: all rows for this refuge are \code{NA}/zero-pixel by
-design, not a processing bug. Visual QC (raster vs. refuge boundary overlay, checked across
-multiple products/eras) confirmed the source WET rasters have no detected water anywhere
-inside the actual Bear Valley NWR boundary — it is a small, mostly upland/forested refuge,
-below this product's mapping resolution/threshold. An earlier version of this dataset used a
-hand-drawn bounding box that happened to clip the edge of an unrelated stream feature just
-northeast of the refuge, producing a handful of nonzero pixels that were never actually
-inside the refuge; the current \code{rivermile}-derived bbox is tighter and excludes that
-spillover.
-
-\strong{Note on \code{pct_wet}}: the underlying WET SurfaceWater raster stores a continuous
-per-pixel value roughly between 0 and 1 (a water-probability/fraction metric), not a binary
-wet/dry mask — true zero pixels are rare inside a refuge boundary. Because \code{pct_wet} is
-defined as \code{mean(value > 0)}, it only asks whether a pixel registers \emph{any} nonzero
-signal at all, however faint (observed minimums are as low as ~0.00004). Across this dataset
-\code{pct_wet} is exactly \code{1} for the median and 3rd-quartile row (overall mean ~0.88),
-i.e. it saturates at 1 most of the time and mostly just confirms the refuge bbox overlaps
-\emph{some} part of the mapped wetland complex — it does not mean the refuge is fully
-flooded. \code{mean_val} (the average of the continuous per-pixel values) is the column that
-actually tracks water extent/intensity; a more discriminating "percent wet" would threshold
-at something like \code{value > 0.5} rather than \code{value > 0}.
+\strong{Note on \code{bear_valley_refuge}}: all rows for this refuge are \code{NA}/zero-pixel
+by design, not a processing bug. Visual QC (raster vs. refuge boundary overlay, checked
+across multiple products/eras) confirmed the source WET rasters have no detected water
+anywhere inside the actual Bear Valley NWR boundary — it is a small, mostly
+upland/forested refuge, below this product's mapping resolution/threshold. An earlier
+version of this dataset used a hand-drawn bounding box that happened to clip the edge of an
+unrelated stream feature just northeast of the refuge, producing a handful of nonzero pixels
+that were never actually inside the refuge; the current \code{rivermile}-derived bbox is
+tighter and excludes that spillover.
 }
 \keyword{datasets}

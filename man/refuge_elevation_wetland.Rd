@@ -3,11 +3,16 @@
 \docType{data}
 \name{refuge_elevation_wetland}
 \alias{refuge_elevation_wetland}
-\title{Monthly water-surface elevation crosswalked to WET wetland extent, by refuge}
+\title{Monthly water-surface elevation crosswalked to WET wetland/lake extent, by area}
 \format{
 A tibble with columns:
 \itemize{
-\item \code{refuge}: one of \code{clear_lake}, \code{tule_lake}, \code{upper_klamath_lake}
+\item \code{name}: area id — same ids as \code{wet_surface_water$name}. One of
+\code{clear_lake_refuge}, \code{clear_lake_reservoir}, \code{tule_lake_refuge},
+\code{tule_lake}, \code{upper_klamath_lake_refuge}, \code{upper_klamath_lake}, or
+\code{gerber_reservoir}
+\item \code{boundary_type}: \code{"refuge"} or \code{"lake"} — which \code{rivermile}
+boundary layer this area's bbox came from (see \code{wet_surface_water})
 \item \code{is_decadal}: logical; \code{TRUE} for a 10-year decadal climatological month, \code{FALSE} for an actual year-month
 \item \code{era_str}: era label (e.g. \code{"2005-2014"} for decadal rows, or the year as a string for annual rows)
 \item \code{month_num}: integer month number (1-12)
@@ -15,12 +20,12 @@ A tibble with columns:
 \item \code{elevation_mean_ft}: mean water surface elevation (ft) across the assigned station(s), over the aggregation window
 \item \code{elevation_min_ft}: minimum daily elevation (ft) observed within the aggregation window
 \item \code{elevation_max_ft}: maximum daily elevation (ft) observed within the aggregation window
-\item \code{wet_mean_val}: mean WET surface water raster value within the refuge bbox (see
+\item \code{wet_mean_val}: mean WET surface water raster value within the area's bbox (see
 \code{wet_surface_water}) — the continuous water-probability/fraction signal; use this
 column for tracking wetland extent/intensity
-\item \code{wet_median_val}: median WET surface water raster value within the refuge bbox
-\item \code{wet_sd_val}: standard deviation of WET surface water raster values within the refuge bbox
-\item \code{wet_n_pixels}: number of non-NA WET pixels within the refuge bbox
+\item \code{wet_median_val}: median WET surface water raster value within the area's bbox
+\item \code{wet_sd_val}: standard deviation of WET surface water raster values within the area's bbox
+\item \code{wet_n_pixels}: number of non-NA WET pixels within the area's bbox
 }
 }
 \source{
@@ -31,19 +36,21 @@ Intermountain West Joint Venture (IWJV) WET dataset (\code{wet_surface_water})
 refuge_elevation_wetland
 }
 \description{
-Combines the water-surface-elevation record for each Klamath refuge's assigned
-station (from \code{teacup_diagram_data}) with that refuge's WET monthly surface water extent
-(\code{wet_surface_water}). One row per refuge-month, at whichever temporal resolution
+Combines the water-surface-elevation record for each Klamath refuge or lake's
+assigned station (from \code{teacup_diagram_data}) with that area's WET monthly surface water
+extent (\code{wet_surface_water}). One row per area-month, at whichever temporal resolution
 \code{wet_surface_water} provides: decadal climatological months (\code{is_decadal == TRUE})
 or actual year-months from 2022 onward (\code{is_decadal == FALSE}).
 
-The refuge/station crosswalk is a hand-curated lookup, not an automated nearest-neighbor
-match — only stations that are genuinely on-site or the obvious controlling structure for a
-refuge are assigned to it. Only three of the six Klamath refuges have a station assigned and
-therefore appear here: \code{clear_lake} (\code{CLK}), \code{tule_lake} (\code{TULC} and
-\code{TULC2}, averaged), and \code{upper_klamath_lake} (\code{11507001}). Bear Valley,
-Klamath Marsh, and Lower Klamath/Sheepy are excluded rather than matched to a distant proxy
-station — see \code{data-raw/data-exploration/refuge-elevation-wetland-crosswalk.Rmd}
-(Section 5, "Data gaps & caveats") for why each one is left out.
+The area/station crosswalk is a hand-curated lookup, not an automated nearest-neighbor match
+— only stations that are genuinely on-site or the obvious controlling structure for an area
+are assigned to it. Seven areas have a station assigned and therefore appear here:
+\code{clear_lake_refuge} and \code{clear_lake_reservoir} (\code{CLK}); \code{tule_lake_refuge}
+and \code{tule_lake} (\code{TULC} and \code{TULC2}, averaged); \code{upper_klamath_lake_refuge}
+and \code{upper_klamath_lake} (\code{11507001}); and \code{gerber_reservoir} (\code{GER},
+which has no matching refuge boundary). Bear Valley, Klamath Marsh, and Lower Klamath/Sheepy
+refuges, plus Lower Klamath Lake, are excluded rather than matched to a distant proxy station
+— see \code{data-raw/data-exploration/refuge-elevation-wetland-crosswalk.Rmd} (Section 3) for
+the full crosswalk and why each excluded area is left out.
 }
 \keyword{datasets}

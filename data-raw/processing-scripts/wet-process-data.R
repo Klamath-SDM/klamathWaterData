@@ -73,7 +73,7 @@ refuge_boundaries_buffered <- rivermile::klamath_refuges |>
   st_buffer(REFUGE_BUFFER_METERS) |>
   st_transform(4326)
 
-lake_boundaries_buffered <- rivermile::klamath_lakes |>
+lake_boundaries_buffered <- klamath_lakes |>
   inner_join(lake_lookup, by = "lake_name") |>
   st_transform(BUFFER_CRS) |>
   st_buffer(REFUGE_BUFFER_METERS) |>

@@ -7,13 +7,14 @@
 \format{
 A tibble with columns:
 \itemize{
-\item \code{name}: area id. Refuges (\code{boundary_type == "refuge"}): one of
-\code{upper_klamath_lake}, \code{clear_lake}, \code{tule_lake}, \code{bear_valley},
-\code{lower_klamath_sheepy}, or \code{klamath_marsh} (see note above on
-\code{bear_valley}). Lakes (\code{boundary_type == "lake"}): one of
-\code{upper_klamath_lake}, \code{lake_clear_lake_reservoir},
-\code{tule_lake}, \code{gerber_reservoir}, or \code{lower_klamath_lake} —
-always prefixed \code{lake_} so a lake id can never collide with a refuge id
+\item \code{name}: area id, built in \code{data-raw/processing-scripts/wet-process-data.R}.
+Refuges (\code{boundary_type == "refuge"}): always suffixed \code{_refuge} — one of
+\code{upper_klamath_lake_refuge}, \code{clear_lake_refuge}, \code{tule_lake_refuge},
+\code{bear_valley_refuge}, \code{lower_klamath_sheepy_refuge}, or
+\code{klamath_marsh_refuge} (see note above on \code{bear_valley_refuge}). Lakes
+(\code{boundary_type == "lake"}): never suffixed — one of \code{upper_klamath_lake},
+\code{clear_lake_reservoir}, \code{tule_lake}, \code{gerber_reservoir}, or
+\code{lower_klamath_lake}
 \item \code{boundary_type}: \code{"refuge"} or \code{"lake"} — which \code{rivermile}
 boundary layer this row's bbox came from
 \item \code{type}: product type; always \code{"Hydroperiod"} in this dataset
@@ -51,29 +52,21 @@ Venture (IWJV).
 Bounding boxes are derived from two authoritative \code{rivermile} boundary layers —
 \code{rivermile::klamath_refuges} (refuges) and \code{rivermile::klamath_lakes} (lakes) —
 each buffered by 0.5 miles and reduced to a bounding box before cropping the source rasters.
-A refuge and its "same" lake are not the same polygon (e.g. the \code{tule_lake} refuge
-boundary and the \code{lake_tule_lake} lake boundary cover different areas), so both appear
+A refuge and its "same" lake are not the same polygon (e.g. the \code{tule_lake_refuge}
+boundary and the \code{tule_lake} lake boundary cover different areas), so both appear
 as separate rows rather than being merged. See
 \code{data-raw/data-exploration/wet-data-exploration.Rmd} for exploratory analysis and
 \code{data-raw/processing-scripts/wet-process-data.R} for processing details, including the
 buffer distance and the refuge/lake lookups.
 
-\strong{Note on \code{bear_valley}}: all rows for this refuge are \code{NA}/zero-pixel by
-design, not a processing bug. Visual QC (raster vs. refuge boundary overlay, checked across
-multiple products/eras) confirmed the source WET rasters have no detected water anywhere
-inside the actual Bear Valley NWR boundary — it is a small, mostly upland/forested refuge,
-below this product's mapping resolution/threshold. An earlier version of this dataset used a
-hand-drawn bounding box that happened to clip the edge of an unrelated stream feature just
-northeast of the refuge, producing a handful of nonzero pixels that were never actually
-inside the refuge; the current \code{rivermile}-derived bbox is tighter and excludes that
-spillover.
-
-\strong{Note on \code{pct_wet}}: as with \code{wet_surface_water}, the underlying WET
-Hydroperiod raster is a continuous per-pixel value, not a binary mask, and true zero pixels
-are essentially absent inside a refuge boundary. \code{pct_wet} (\code{mean(value > 0)}) is
-exactly \code{1} for every non-\code{NA} row in this dataset — it carries no information here
-and should not be used to compare refuges or eras. \code{mean_val} (the average of the
-continuous per-pixel hydroperiod values) is the column that actually distinguishes
-shorter- vs. longer-duration water persistence.
+\strong{Note on \code{bear_valley_refuge}}: all rows for this refuge are \code{NA}/zero-pixel
+by design, not a processing bug. Visual QC (raster vs. refuge boundary overlay, checked
+across multiple products/eras) confirmed the source WET rasters have no detected water
+anywhere inside the actual Bear Valley NWR boundary — it is a small, mostly
+upland/forested refuge, below this product's mapping resolution/threshold. An earlier
+version of this dataset used a hand-drawn bounding box that happened to clip the edge of an
+unrelated stream feature just northeast of the refuge, producing a handful of nonzero pixels
+that were never actually inside the refuge; the current \code{rivermile}-derived bbox is
+tighter and excludes that spillover.
 }
 \keyword{datasets}
