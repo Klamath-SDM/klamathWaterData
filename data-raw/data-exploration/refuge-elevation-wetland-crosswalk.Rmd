@@ -57,8 +57,8 @@ and are excluded from the combined analysis.
    `data-raw/processing-scripts/wet-process-data.R`.
 2. **Elevation** is currently crosswalked from `teacup_diagram_data` as the default source
    (Section 4). This is a hand-curated, on-site-only crosswalk, not exhaustive — additional
-   gages at **Clear Lake** and **Upper Klamath Lake** will be explored as candidate additions
-   or alternatives.
+   candidate gages at **Upper Klamath Lake** are compared in
+   [Section 4.2](#comparing-upper-klamath-lake-elevation-gages). 
 3. See [Section 4.1](#maps-refuges-lakes-with-elevation-stations) for a map showing all
    stations against the refuge/lake boundaries.
 
@@ -265,39 +265,63 @@ leaflet() |>
 
 ```
 
-<!-- Split into two faceted maps — one panel per refuge, one panel per lake — each zoomed to its -->
-<!-- own boundary (`scales = "free"`) with the elevation stations overlaid for context. -->
 
-<!-- ```{r crosswalk-map-refuges, fig.height=8} -->
-<!-- stations_for_map <- stations_area_cross |> distinct(site, .keep_all = TRUE) |> filter(site != "MAL") -->
+## 4.2 Comparing Upper Klamath Lake elevation gages
 
-<!-- ggplot() + -->
-<!--   geom_sf(data = refuges_named, aes(fill = orgname), alpha = 0.5, color = "grey30") + -->
-<!--   geom_sf(data = stations_for_map, color = "black", size = 2) + -->
-<!--   geom_sf_text(data = stations_for_map, aes(label = site), nudge_y = 0.03, size = 3) + -->
-<!--   #facet_wrap(~orgname, scales = "free") + -->
-<!--   scale_fill_brewer(palette = "Set3", name = "Refuge", guide = "none") + -->
-<!--   labs( -->
-<!--     title = "Klamath Refuges & Teacup Diagram Elevation Stations", -->
-<!--     x = NULL, y = NULL -->
-<!--   ) + -->
-<!--   theme_minimal(base_size = 11) + -->
-<!--   theme(strip.text = element_text(size = 8, face = "bold")) -->
-<!-- ``` -->
+`water_level_gage` lists four USGS gages around Upper Klamath Lake, but only one of them
+(`11507001`, near Link River Dam) is used in the crosswalk above. Comparing all four's
+temporal coverage and values here to check whether `11507001` is still the best choice, or
+whether swapping to or supplementing it with another gage is worth exploring (see the note in
+Section 1). 
 
-<!-- ```{r crosswalk-map-lakes, fig.height=8} -->
-<!-- ggplot() + -->
-<!--   geom_sf(data = lakes_named, fill = "steelblue", alpha = 0.35, color = "steelblue4", linewidth = 0.6) + -->
-<!--   geom_sf(data = stations_for_map, color = "black", size = 2) + -->
-<!--   geom_sf_text(data = stations_for_map, aes(label = site), nudge_y = 0.03, size = 3) + -->
-<!--   #facet_wrap(~lake_name, scales = "free") + -->
-<!--   labs( -->
-<!--     title = "Klamath Lakes & Teacup Diagram Elevation Stations", -->
-<!--     x = NULL, y = NULL -->
-<!--   ) + -->
-<!--   theme_minimal(base_size = 11) + -->
-<!--   theme(strip.text = element_text(size = 8, face = "bold")) -->
-<!-- ``` -->
+```{r uk-gage-coverage}
+klamath_gages <- c("11505800", "11504300", "11505900", "11507001")
+
+klamath_elev_gages <- klamathWaterData::water_level_data |>
+  filter(gage_id %in% klamath_gages)
+
+klamath_elev_gages |>
+  group_by(gage_name, gage_id) |>
+  summarise(
+    start    = min(date),
+    end      = max(date),
+    n_obs    = n(),
+    min_ft   = round(min(value, na.rm = TRUE), 1),
+    max_ft   = round(max(value, na.rm = TRUE), 1),
+    .groups  = "drop"
+  ) |>
+  arrange(gage_id) |>
+  kable(caption = "Upper Klamath Lake candidate elevation gages — coverage and range")
+```
+
+```{r uk-gage-comparison-plot, fig.height=6}
+gage_short_labels <- c(
+  "11504300" = "Agency Lake",
+  "11505900" = "Rattlesnake Point",
+  "11505800" = "Rocky Point",
+  "11507001" = "Link River (K. Falls)"
+)
+
+klamath_elev_gages |>
+  mutate(gage_label = gage_short_labels[gage_id]) |>
+  ggplot(aes(x = date, y = value, color = gage_label)) +
+  geom_line(linewidth = 0.6, alpha = 0.85) +
+  scale_color_brewer(palette = "Set2", name = NULL) +
+  scale_y_continuous(labels = label_comma()) +
+  labs(
+    title    = "Upper Klamath Lake: Candidate Elevation Gages",
+    subtitle = "Daily water surface elevation — comparing temporal coverage and values",
+    x        = NULL,
+    y        = "Elevation (ft)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position  = "bottom",
+    plot.title       = element_text(face = "bold"),
+    plot.subtitle    = element_text(color = "grey40"),
+    panel.grid.minor = element_blank()
+  )
+```
 
 ---
 
