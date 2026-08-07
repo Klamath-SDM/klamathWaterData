@@ -4,15 +4,15 @@
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 94 rows and 8 columns
 #' \itemize{
-#'   \item{\code{location}: location associated where data was collected/where gage is located
-#'   \item{\code{gage_name}: name of the gaging station
-#'   \item{\code{gage_id}: unique identifier for the gage
-#'   \item{\code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,
+#'   \item \code{location}: location associated where data was collected/where gage is located
+#'   \item \code{gage_name}: name of the gaging station
+#'   \item \code{gage_id}: unique identifier for the gage
+#'   \item \code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,
 #'   Hoopa Valley Tribe (Tribal), USDA FS PIBO Monitoring Program)
-#'   \item{\code{latitude}: latitude coordinate of the gage location
-#'   \item{\code{longitude: longitude coordinate of the gage location
-#'   \item{\code{river_mile}: closest river mile location relative to river mouth or a reference point
-#'   \item{\code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
+#'   \item \code{latitude}: latitude coordinate of the gage location
+#'   \item \code{longitude}: longitude coordinate of the gage location
+#'   \item \code{river_mile}: closest river mile location relative to river mouth or a reference point
+#'   \item \code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
 #' }
 "temperature_gage"
 
@@ -33,20 +33,21 @@
 "temperature_data"
 
 #' @name ph_gage
+#' @title pH gages in the Klamath Basin watershed (HUC8 18010204)
 #' @description A dataset containing metadata for pH gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 124 rows and 8 columns
 #' \itemize{
-#'   \item{\code{location}: location associated where data was collected/where gage is located
-#'   \item{\code{gage_name}: name of the gaging station
-#'   \item{\code{gage_id}: anique identifier for the gage
-#'   \item{\code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,
-#'   Hoopa Valley Tribe (Tribal), Bureau of Reclamation", Klamath Tribes (Tribal), Yurok Tribe of the Yurok Reservation, California (Tribal),
-#'   California State Water Resources Control Board,  National Park Service Water Resources Division, EPA National Aquatic Resources Survey (NARS))
-#'   \item{\code{latitude}: latitude coordinate of the gage location
-#'   \item{\code{longitude: longitude coordinate of the gage location
-#'   \item{\code{river_mile}: closest river mile location relative to river mouth or a reference point
-#'   \item{\code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
+#'   \item \code{location}: location associated where data was collected/where gage is located
+#'   \item \code{gage_name}: name of the gaging station
+#'   \item \code{gage_id}: unique identifier for the gage
+#'   \item \code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,
+#'   Hoopa Valley Tribe (Tribal), Bureau of Reclamation, Klamath Tribes (Tribal), Yurok Tribe of the Yurok Reservation, California (Tribal),
+#'   California State Water Resources Control Board, National Park Service Water Resources Division, EPA National Aquatic Resources Survey (NARS))
+#'   \item \code{latitude}: latitude coordinate of the gage location
+#'   \item \code{longitude}: longitude coordinate of the gage location
+#'   \item \code{river_mile}: closest river mile location relative to river mouth or a reference point
+#'   \item \code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
 #' }
 "ph_gage"
 
@@ -67,19 +68,20 @@
 "ph_data"
 
 #' @name flow_gage
+#' @title Flow gages in the Klamath Basin watershed (HUC8 18010204)
 #' @description A dataset containing metadata for flow gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 49 rows and 8 columns
 #' \itemize{
-#'   \item{\code{location}: location associated where data was collected/where gage is located
-#'   \item{\code{gage_name}: name of the gaging station
-#'   \item{\code{gage_id}: unique identifier for the gage
-#'   \item{\code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, Quartz Valley Indian Community of the Quartz Valley Reservation of California (Tribal),
+#'   \item \code{location}: location associated where data was collected/where gage is located
+#'   \item \code{gage_name}: name of the gaging station
+#'   \item \code{gage_id}: unique identifier for the gage
+#'   \item \code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, Quartz Valley Indian Community of the Quartz Valley Reservation of California (Tribal),
 #'   Klamath Tribes (Tribal))
-#'   \item{\code{latitude}: latitude coordinate of the gage location
-#'   \item{\code{longitude: longitude coordinate of the gage location
-#'   \item{\code{river_mile}: closest river mile location relative to river mouth or a reference point
-#'   \item{\code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
+#'   \item \code{latitude}: latitude coordinate of the gage location
+#'   \item \code{longitude}: longitude coordinate of the gage location
+#'   \item \code{river_mile}: closest river mile location relative to river mouth or a reference point
+#'   \item \code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
 #' }
 "flow_gage"
 
@@ -100,18 +102,19 @@
 "flow_data"
 
 #' @name do_gage
+#' @title Dissolved oxygen gages in the Klamath Basin watershed (HUC8 18010204)
 #' @description A dataset containing metadata for dissolved oxygen gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 28 rows and 8 columns
 #' \itemize{
-#'   \item{\code{location}: location associated where data was collected/where gage is located
-#'   \item{\code{gage_name}: name of the gaging station
-#'   \item{\code{gage_id}: unique identifier for the gage
-#'   \item{\code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, Hoopa Valley Tribe (Tribal))
-#'   \item{\code{latitude}: latitude coordinate of the gage location
-#'   \item{\code{longitude: longitude coordinate of the gage location
-#'   \item{\code{river_mile}: closest river mile location relative to river mouth or a reference point
-#'   \item{\code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
+#'   \item \code{location}: location associated where data was collected/where gage is located
+#'   \item \code{gage_name}: name of the gaging station
+#'   \item \code{gage_id}: unique identifier for the gage
+#'   \item \code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, Hoopa Valley Tribe (Tribal))
+#'   \item \code{latitude}: latitude coordinate of the gage location
+#'   \item \code{longitude}: longitude coordinate of the gage location
+#'   \item \code{river_mile}: closest river mile location relative to river mouth or a reference point
+#'   \item \code{huc8}: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
 #' }
 "do_gage"
 
@@ -150,6 +153,7 @@
 #'   \item 11505800
 #'   \item 11507001
 #'   \item usbr tule lake sump 1a
+#' }
 #' @format A tibble with 30,084 rows and 8 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
@@ -211,6 +215,130 @@
 #'   }
 "dswe_monthly"
 
+#' @name wet_surface_water
+#' @title Monthly surface water extent estimates for wildlife refuges and lakes in the Klamath Basin
+#' @description Monthly estimates of open water extent derived from the Intermountain West
+#' Wetland Extent Tool (WET) raster dataset, summarized within bounding boxes for six wildlife
+#' refuges and five lakes/reservoirs in the Klamath Basin. The WET SurfaceWater product
+#' represents the probability or presence of open surface water for each pixel. Two temporal
+#' resolutions are available: decadal composites (10-year mean) covering 2005–2014 and
+#' 2015–2022, and individual monthly images from 2022 onward. Source rasters are distributed by
+#' the Intermountain West Joint Venture (IWJV).
+#'
+#' Bounding boxes are derived from two authoritative \code{rivermile} boundary layers —
+#' \code{rivermile::klamath_refuges} (refuges) and \code{rivermile::klamath_lakes} (lakes) —
+#' each buffered by 0.5 miles and reduced to a bounding box before cropping the source rasters.
+#' A refuge and its "same" lake are not the same polygon (e.g. the \code{tule_lake_refuge}
+#' boundary and the \code{tule_lake} lake boundary cover different areas), so both appear
+#' as separate rows rather than being merged. See
+#' \code{data-raw/data-exploration/wet-data-exploration.Rmd} for exploratory analysis and
+#' \code{data-raw/processing-scripts/wet-process-data.R} for processing details, including the
+#' buffer distance and the refuge/lake lookups.
+#'
+#' \strong{Note on \code{bear_valley_refuge}}: all rows for this refuge are \code{NA}/zero-pixel
+#' by design, not a processing bug. Visual QC (raster vs. refuge boundary overlay, checked
+#' across multiple products/eras) confirmed the source WET rasters have no detected water
+#' anywhere inside the actual Bear Valley NWR boundary — it is a small, mostly
+#' upland/forested refuge, below this product's mapping resolution/threshold. An earlier
+#' version of this dataset used a hand-drawn bounding box that happened to clip the edge of an
+#' unrelated stream feature just northeast of the refuge, producing a handful of nonzero pixels
+#' that were never actually inside the refuge; the current \code{rivermile}-derived bbox is
+#' tighter and excludes that spillover.
+#'
+#' @format A tibble with columns:
+#' \itemize{
+#'   \item \code{name}: area id, built in \code{data-raw/processing-scripts/wet-process-data.R}.
+#'     Refuges (\code{boundary_type == "refuge"}): always suffixed \code{_refuge} — one of
+#'     \code{upper_klamath_lake_refuge}, \code{clear_lake_refuge}, \code{tule_lake_refuge},
+#'     \code{bear_valley_refuge}, \code{lower_klamath_sheepy_refuge}, or
+#'     \code{klamath_marsh_refuge} (see note above on \code{bear_valley_refuge}). Lakes
+#'     (\code{boundary_type == "lake"}): never suffixed — one of \code{upper_klamath_lake},
+#'     \code{clear_lake_reservoir}, \code{tule_lake}, \code{gerber_reservoir}, or
+#'     \code{lower_klamath_lake}. The \code{_refuge} suffix means a refuge id can never
+#'     collide with a lake id even where they cover roughly the same feature (e.g.
+#'     \code{tule_lake_refuge} vs. \code{tule_lake})
+#'   \item \code{boundary_type}: \code{"refuge"} or \code{"lake"} — which \code{rivermile}
+#'     boundary layer this row's bbox came from
+#'   \item \code{type}: product type; always \code{"SurfaceWater"} in this dataset
+#'   \item \code{era_str}: era label as a character string (e.g., \code{"2005-2014"} for a
+#'     decadal composite or \code{"2022"} for an individual year)
+#'   \item \code{is_decadal}: logical; \code{TRUE} if the row represents a 10-year mean composite
+#'   \item \code{era_start}: integer start year of the era
+#'   \item \code{month_chr}: three-letter month abbreviation (e.g., \code{"JAN"})
+#'   \item \code{month_num}: integer month number (1–12)
+#'   \item \code{mean_val}: mean surface water raster value across all pixels within the area's
+#'     bbox (buffered 0.5 miles) — a continuous water-probability/fraction signal, roughly
+#'     between 0 and 1; this is the column to use for tracking extent/intensity
+#'   \item \code{median_val}: median surface water raster value within the area's bbox
+#'   \item \code{sd_val}: standard deviation of raster values within the area's bbox
+#'   \item \code{n_pixels}: number of non-NA pixels within the area's bbox
+#' }
+#' @source Intermountain West Joint Venture (IWJV) WET dataset \url{https://iwjv.org};
+#' refuge boundaries from \code{rivermile::klamath_refuges}; lake boundaries from
+#' \code{rivermile::klamath_lakes}
+"wet_surface_water"
+
+#' @name wet_hydroperiod
+#' @title Monthly hydroperiod estimates for wildlife refuges and lakes in the Klamath Basin
+#' @description Monthly estimates of hydroperiod duration derived from the Intermountain West
+#' Wetland Extent Tool (WET) raster dataset, summarized within bounding boxes for six wildlife
+#' refuges and five lakes/reservoirs in the Klamath Basin. The WET Hydroperiod product
+#' represents the duration or persistence of water at each pixel — higher values indicate longer
+#' hydroperiod duration. Data are available as decadal composites (10-year mean) covering four
+#' eras from 1984 to 2022. Source rasters are distributed by the Intermountain West Joint
+#' Venture (IWJV).
+#'
+#' Bounding boxes are derived from two authoritative \code{rivermile} boundary layers —
+#' \code{rivermile::klamath_refuges} (refuges) and \code{rivermile::klamath_lakes} (lakes) —
+#' each buffered by 0.5 miles and reduced to a bounding box before cropping the source rasters.
+#' A refuge and its "same" lake are not the same polygon (e.g. the \code{tule_lake_refuge}
+#' boundary and the \code{tule_lake} lake boundary cover different areas), so both appear
+#' as separate rows rather than being merged. See
+#' \code{data-raw/data-exploration/wet-data-exploration.Rmd} for exploratory analysis and
+#' \code{data-raw/processing-scripts/wet-process-data.R} for processing details, including the
+#' buffer distance and the refuge/lake lookups.
+#'
+#' \strong{Note on \code{bear_valley_refuge}}: all rows for this refuge are \code{NA}/zero-pixel
+#' by design, not a processing bug. Visual QC (raster vs. refuge boundary overlay, checked
+#' across multiple products/eras) confirmed the source WET rasters have no detected water
+#' anywhere inside the actual Bear Valley NWR boundary — it is a small, mostly
+#' upland/forested refuge, below this product's mapping resolution/threshold. An earlier
+#' version of this dataset used a hand-drawn bounding box that happened to clip the edge of an
+#' unrelated stream feature just northeast of the refuge, producing a handful of nonzero pixels
+#' that were never actually inside the refuge; the current \code{rivermile}-derived bbox is
+#' tighter and excludes that spillover.
+#'
+#' @format A tibble with columns:
+#' \itemize{
+#'   \item \code{name}: area id, built in \code{data-raw/processing-scripts/wet-process-data.R}.
+#'     Refuges (\code{boundary_type == "refuge"}): always suffixed \code{_refuge} — one of
+#'     \code{upper_klamath_lake_refuge}, \code{clear_lake_refuge}, \code{tule_lake_refuge},
+#'     \code{bear_valley_refuge}, \code{lower_klamath_sheepy_refuge}, or
+#'     \code{klamath_marsh_refuge} (see note above on \code{bear_valley_refuge}). Lakes
+#'     (\code{boundary_type == "lake"}): never suffixed — one of \code{upper_klamath_lake},
+#'     \code{clear_lake_reservoir}, \code{tule_lake}, \code{gerber_reservoir}, or
+#'     \code{lower_klamath_lake}
+#'   \item \code{boundary_type}: \code{"refuge"} or \code{"lake"} — which \code{rivermile}
+#'     boundary layer this row's bbox came from
+#'   \item \code{type}: product type; always \code{"Hydroperiod"} in this dataset
+#'   \item \code{era_str}: decadal era label (e.g., \code{"1984-1994"}, \code{"1995-2004"},
+#'     \code{"2005-2014"}, \code{"2015-2022"})
+#'   \item \code{is_decadal}: logical; always \code{TRUE} — hydroperiod data are decadal composites only
+#'   \item \code{era_start}: integer start year of the decadal era
+#'   \item \code{month_chr}: three-letter month abbreviation (e.g., \code{"JAN"})
+#'   \item \code{month_num}: integer month number (1–12)
+#'   \item \code{mean_val}: mean hydroperiod raster value across all pixels within the area's
+#'     bbox (buffered 0.5 miles); higher values indicate longer water persistence — this is the
+#'     column to use for comparing hydroperiod duration
+#'   \item \code{median_val}: median hydroperiod raster value within the area's bbox
+#'   \item \code{sd_val}: standard deviation of raster values within the area's bbox
+#'   \item \code{n_pixels}: number of non-NA pixels within the area's bbox
+#' }
+#' @source Intermountain West Joint Venture (IWJV) WET dataset \url{https://iwjv.org};
+#' refuge boundaries from \code{rivermile::klamath_refuges}; lake boundaries from
+#' \code{rivermile::klamath_lakes}
+"wet_hydroperiod"
+
 #' @name teacup_diagram_data
 #' @title Elevation, storage, and flow data from the USBR Klamath "Teacup" diagram
 #' @description Daily elevation, reservoir storage, and streamflow data for the monitoring
@@ -235,3 +363,48 @@
 #' }
 #' @source USBR PN Hydromet \url{https://www.usbr.gov/pn/hydromet/klamath/teacup.html}, USGS NWIS \url{https://waterservices.usgs.gov/}, Oregon Water Resources Department \url{https://apps.wrd.state.or.us/apps/sw/hydro_near_real_time/}
 "teacup_diagram_data"
+
+#' @name refuge_elevation_wetland
+#' @title Monthly water-surface elevation crosswalked to WET wetland/lake extent, by area
+#' @description Combines the water-surface-elevation record for each Klamath refuge or lake's
+#' assigned station (from \code{teacup_diagram_data}) with that area's WET monthly surface water
+#' extent (\code{wet_surface_water}). One row per area-month, at whichever temporal resolution
+#' \code{wet_surface_water} provides: decadal climatological months (\code{is_decadal == TRUE})
+#' or actual year-months from 2022 onward (\code{is_decadal == FALSE}).
+#'
+#' The area/station crosswalk is a hand-curated lookup, not an automated nearest-neighbor match
+#' — only stations that are genuinely on-site or the obvious controlling structure for an area
+#' are assigned to it. Seven areas have a station assigned and therefore appear here:
+#' \code{clear_lake_refuge} and \code{clear_lake_reservoir} (\code{CLK}); \code{tule_lake_refuge}
+#' and \code{tule_lake} (\code{TULC} and \code{TULC2}, averaged); \code{upper_klamath_lake_refuge}
+#' and \code{upper_klamath_lake} (\code{11507001}); and \code{gerber_reservoir} (\code{GER},
+#' which has no matching refuge boundary). Bear Valley, Klamath Marsh, and Lower Klamath/Sheepy
+#' refuges, plus Lower Klamath Lake, are excluded rather than matched to a distant proxy station
+#' — see \code{data-raw/data-exploration/refuge-elevation-wetland-crosswalk.Rmd} (Section 3) for
+#' the full crosswalk and why each excluded area is left out.
+#' @format A tibble with columns:
+#' \itemize{
+#'   \item \code{name}: area id — same ids as \code{wet_surface_water$name}. One of
+#'     \code{clear_lake_refuge}, \code{clear_lake_reservoir}, \code{tule_lake_refuge},
+#'     \code{tule_lake}, \code{upper_klamath_lake_refuge}, \code{upper_klamath_lake}, or
+#'     \code{gerber_reservoir}
+#'   \item \code{boundary_type}: \code{"refuge"} or \code{"lake"} — which \code{rivermile}
+#'     boundary layer this area's bbox came from (see \code{wet_surface_water})
+#'   \item \code{is_decadal}: logical; \code{TRUE} for a 10-year decadal climatological month, \code{FALSE} for an actual year-month
+#'   \item \code{era_str}: era label (e.g. \code{"2005-2014"} for decadal rows, or the year as a string for annual rows)
+#'   \item \code{month_num}: integer month number (1-12)
+#'   \item \code{month_chr}: three-letter month abbreviation (e.g. \code{"jan"})
+#'   \item \code{elevation_mean_ft}: mean water surface elevation (ft) across the assigned station(s), over the aggregation window
+#'   \item \code{elevation_min_ft}: minimum daily elevation (ft) observed within the aggregation window
+#'   \item \code{elevation_max_ft}: maximum daily elevation (ft) observed within the aggregation window
+#'   \item \code{wet_mean_val}: mean WET surface water raster value within the area's bbox (see
+#'     \code{wet_surface_water}) — the continuous water-probability/fraction signal; use this
+#'     column for tracking wetland extent/intensity
+#'   \item \code{wet_median_val}: median WET surface water raster value within the area's bbox
+#'   \item \code{wet_sd_val}: standard deviation of WET surface water raster values within the area's bbox
+#'   \item \code{wet_n_pixels}: number of non-NA WET pixels within the area's bbox
+#' }
+#' @source USBR PN Hydromet / USGS NWIS elevations (\code{teacup_diagram_data});
+#' Intermountain West Joint Venture (IWJV) WET dataset (\code{wet_surface_water})
+"refuge_elevation_wetland"
+

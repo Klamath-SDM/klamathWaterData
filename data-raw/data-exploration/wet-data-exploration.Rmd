@@ -1,0 +1,599 @@
+---
+title: "WET Data Exploration: Surface Water & Hydroperiod"
+author: "Maddee Wiggins"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+```
+
+```{r libraries}
+library(tidyverse)
+library(terra)
+library(ggplot2)
+library(scales)
+library(patchwork)
+library(knitr)
+```
+
+# Overview
+
+This document explores the Intermountain West WET (Wetland Extent Tool) raster dataset
+stored in `data-raw/intermountain-west-data/`. The dataset contains two product types:
+
+- **SurfaceWater**: monthly estimates of open water extent (probability/presence)
+- **Hydroperiod**: monthly estimates of how long water persists (hydroperiod duration)
+
+Both products are available at decadal time steps and, for SurfaceWater, as individual
+monthly images from 2022 onward.
+
+---
+
+# 1. Inventory & File Parsing
+
+```{r file-inventory}
+data_dir <- here::here("data-raw", "intermountain-west-data")
+
+tif_files <- list.files(data_dir, pattern = "\\.tif$", full.names = TRUE)
+
+# Parse filename metadata
+month_lookup <- c(
+  JAN = 1, FEB = 2, MAR = 3, APR = 4, MAY = 5, JUN = 6,
+  JUL = 7, AUG = 8, SEP = 9, OCT = 10, NOV = 11, DEC = 12
+)
+
+file_meta <- tibble(path = tif_files) |>
+  mutate(
+    filename  = basename(path) |> str_remove("\\.tif$"),
+    type      = case_when(
+      str_starts(filename, "SurfaceWater")  ~ "SurfaceWater",
+      str_starts(filename, "Hydroperiod")   ~ "Hydroperiod"
+    ),
+    rest      = str_remove(filename, type),
+    month_chr = str_extract(rest, "[A-Z]{3}$"),
+    era_str   = str_remove(rest, "[A-Z]{3}$"),
+    month_num = month_lookup[month_chr],
+    is_decadal = str_detect(era_str, "-"),
+    # For decadal: start year of the era; for annual: the single year
+    era_start = as.integer(str_extract(era_str, "^[0-9]{4}"))
+  )
+
+kable(
+  file_meta |>
+    count(type, is_decadal, era_str) |>
+    arrange(type, era_str),
+  caption = "File counts by product type and era"
+)
+```
+
+```{r era-summary}
+cat("Total files:", nrow(file_meta), "\n")
+cat("SurfaceWater files:", sum(file_meta$type == "SurfaceWater"), "\n")
+cat("Hydroperiod files: ", sum(file_meta$type == "Hydroperiod"), "\n\n")
+
+cat("SurfaceWater eras:\n")
+file_meta |> filter(type == "SurfaceWater") |> pull(era_str) |> unique() |> sort() |> paste(collapse = ", ") |> cat("\n\n")
+
+cat("Hydroperiod eras:\n")
+file_meta |> filter(type == "Hydroperiod") |> pull(era_str) |> unique() |> sort() |> paste(collapse = ", ") |> cat("\n")
+```
+
+---
+
+# 2. Raster Properties
+
+Check CRS, resolution, and extent from representative files.
+
+```{r raster-properties}
+check_raster_props <- function(path) {
+  r <- rast(path)
+  tibble(
+    file     = basename(path),
+    crs      = crs(r, describe = TRUE)$name,
+    nrow     = nrow(r),
+    ncol     = ncol(r),
+    res_x    = res(r)[1],
+    res_y    = res(r)[2],
+    xmin     = ext(r)$xmin,
+    xmax     = ext(r)$xmax,
+    ymin     = ext(r)$ymin,
+    ymax     = ext(r)$ymax,
+    val_min  = as.numeric(global(r, "min", na.rm = TRUE)),
+    val_max  = as.numeric(global(r, "max", na.rm = TRUE))
+  )
+}
+
+# Sample one SurfaceWater and one Hydroperiod file
+sw_sample  <- file_meta |> filter(type == "SurfaceWater") |> slice(1) |> pull(path)
+hp_sample  <- file_meta |> filter(type == "Hydroperiod")  |> slice(1) |> pull(path)
+
+props <- bind_rows(
+  check_raster_props(sw_sample),
+  check_raster_props(hp_sample)
+)
+
+kable(t(props), caption = "Raster properties for representative files")
+```
+
+---
+
+# 3. Load & Aggregate All Rasters
+
+Read each file, extract the mean pixel value across the scene, and build tidy
+summary data frames for both products.
+
+```{r load-rasters, cache=TRUE}
+extract_scene_summary <- function(path) {
+  r   <- rast(path)
+  vals <- values(r, na.rm = TRUE)
+  tibble(
+    mean_val   = mean(vals),
+    median_val = median(vals),
+    sd_val     = sd(vals),
+    pct_wet    = mean(vals > 0),    # fraction of pixels with any water
+    n_pixels   = length(vals)
+  )
+}
+
+message("Loading ", nrow(file_meta), " rasters — this may take a moment...")
+
+scene_stats <- file_meta |>
+  mutate(stats = map(path, extract_scene_summary)) |>
+  unnest(stats)
+
+sw_data <- scene_stats |> filter(type == "SurfaceWater")
+hp_data <- scene_stats |> filter(type == "Hydroperiod")
+
+cat("SurfaceWater dataset:", nrow(sw_data), "rows\n")
+cat("Hydroperiod dataset: ", nrow(hp_data), "rows\n")
+```
+
+---
+
+# 4. Surface Water Exploration
+
+## 4.1 Dataset summary
+
+```{r sw-summary}
+summary(sw_data |> select(era_str, month_num, mean_val, median_val, sd_val, pct_wet))
+```
+
+## 4.2 Mean surface water extent by month (decadal eras)
+
+```{r sw-decadal-monthly, fig.height=5}
+sw_decadal <- sw_data |> filter(is_decadal)
+
+ggplot(sw_decadal, aes(x = month_num, y = mean_val, color = era_str, group = era_str)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_color_brewer(palette = "Set2", name = "Era") +
+  labs(
+    title    = "Mean Surface Water Value by Month — Decadal Eras",
+    x        = "Month",
+    y        = "Mean raster value",
+    subtitle = "Each line = 10-year mean composite"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 4.3 Fraction of wet pixels by month (decadal eras)
+
+```{r sw-pct-wet-decadal, fig.height=5}
+ggplot(sw_decadal, aes(x = month_num, y = pct_wet, fill = era_str)) +
+  geom_col(position = "dodge") +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_brewer(palette = "Set2", name = "Era") +
+  labs(
+    title = "Fraction of Wet Pixels by Month — Decadal Eras",
+    x     = "Month",
+    y     = "% of pixels with water > 0"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 4.4 Annual time series (individual years 2022–2026)
+
+```{r sw-annual-ts, fig.height=5}
+sw_annual <- sw_data |> filter(!is_decadal)
+
+ggplot(sw_annual, aes(x = month_num, y = mean_val, color = factor(era_start), group = era_start)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_color_brewer(palette = "Dark2", name = "Year") +
+  labs(
+    title    = "Mean Surface Water Value by Month — Annual (2022–2026)",
+    x        = "Month",
+    y        = "Mean raster value",
+    subtitle = "Individual monthly composites"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 4.5 Wet fraction heatmap — annual years
+
+```{r sw-heatmap, fig.height=4}
+sw_annual |>
+  mutate(year = factor(era_start)) |>
+  ggplot(aes(x = month_num, y = year, fill = pct_wet)) +
+  geom_tile(color = "white") +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_distiller(palette = "Blues", direction = 1,
+                       labels = percent_format(), name = "% wet") +
+  labs(
+    title = "Surface Water Wet-Pixel Fraction Heatmap (2022–2026)",
+    x     = "Month",
+    y     = "Year"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 4.6 Value distribution — annual months
+
+```{r sw-violin, fig.height=5}
+sw_annual |>
+  mutate(month_lbl = factor(month.abb[month_num], levels = month.abb)) |>
+  ggplot(aes(x = month_lbl, y = mean_val, fill = month_lbl)) +
+  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75), alpha = 0.7, show.legend = FALSE) +
+  geom_jitter(width = 0.15, size = 2, alpha = 0.6) +
+  labs(
+    title = "Distribution of Mean Surface Water Values by Month (annual years)",
+    x     = "Month",
+    y     = "Mean scene value"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+---
+
+# 5. Hydroperiod Exploration
+
+## 5.1 Dataset summary
+
+```{r hp-summary}
+summary(hp_data |> select(era_str, month_num, mean_val, median_val, sd_val, pct_wet))
+```
+
+## 5.2 Mean hydroperiod value by month across eras
+
+```{r hp-monthly, fig.height=5}
+ggplot(hp_data, aes(x = month_num, y = mean_val, color = era_str, group = era_str)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_color_brewer(palette = "Set1", name = "Era") +
+  labs(
+    title    = "Mean Hydroperiod Value by Month — Decadal Eras",
+    x        = "Month",
+    y        = "Mean raster value",
+    subtitle = "Higher values indicate longer hydroperiod duration"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 5.3 Fraction of persistently wet pixels by month
+
+```{r hp-pct-wet, fig.height=5}
+ggplot(hp_data, aes(x = month_num, y = pct_wet, color = era_str, group = era_str)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_y_continuous(labels = percent_format()) +
+  scale_color_brewer(palette = "Set1", name = "Era") +
+  labs(
+    title = "Fraction of Pixels with Hydroperiod > 0 by Month",
+    x     = "Month",
+    y     = "% pixels > 0"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 5.4 Heatmap: mean hydroperiod by era × month
+
+```{r hp-heatmap, fig.height=4}
+hp_data |>
+  ggplot(aes(x = month_num, y = era_str, fill = mean_val)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_distiller(palette = "YlGnBu", direction = 1, name = "Mean value") +
+  labs(
+    title = "Hydroperiod Heatmap: Mean Value by Era × Month",
+    x     = "Month",
+    y     = "Era"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## 5.5 Era-to-era change in annual mean hydroperiod
+
+```{r hp-era-trend, fig.height=4}
+hp_annual_mean <- hp_data |>
+  group_by(era_str, era_start) |>
+  summarise(annual_mean = mean(mean_val), .groups = "drop")
+
+ggplot(hp_annual_mean, aes(x = era_start, y = annual_mean)) +
+  geom_line(color = "steelblue", linewidth = 1.2) +
+  geom_point(color = "steelblue", size = 4) +
+  geom_text(aes(label = era_str), vjust = -1, size = 3.5) +
+  expand_limits(y = 0) +
+  labs(
+    title = "Annual Mean Hydroperiod Value by Era (start year)",
+    x     = "Era start year",
+    y     = "Mean annual hydroperiod value"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+---
+
+# 6. Surface Water vs. Hydroperiod Comparison
+
+Compare the decadal eras common to both products (2005–2014 and 2015–2022).
+
+```{r comparison, fig.height=6}
+shared_eras <- c("2005-2014", "2015-2022")
+
+compare <- bind_rows(
+  sw_data  |> filter(era_str %in% shared_eras) |> mutate(product = "SurfaceWater"),
+  hp_data  |> filter(era_str %in% shared_eras) |> mutate(product = "Hydroperiod")
+)
+
+ggplot(compare, aes(x = month_num, y = mean_val, color = era_str, linetype = product)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_color_manual(values = c("2005-2014" = "#1b7837", "2015-2022" = "#762a83"),
+                     name = "Era") +
+  scale_linetype_manual(values = c("SurfaceWater" = "solid", "Hydroperiod" = "dashed"),
+                        name = "Product") +
+  facet_wrap(~product, scales = "free_y") +
+  labs(
+    title = "Surface Water vs. Hydroperiod: Shared Decadal Eras",
+    x     = "Month",
+    y     = "Mean raster value"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom")
+```
+
+```{r comparison-scatter, fig.height=5}
+sw_shared <- sw_data  |> filter(era_str %in% shared_eras) |>
+  select(era_str, month_num, sw_mean = mean_val)
+hp_shared <- hp_data  |> filter(era_str %in% shared_eras) |>
+  select(era_str, month_num, hp_mean = mean_val)
+
+joined <- inner_join(sw_shared, hp_shared, by = c("era_str", "month_num"))
+
+ggplot(joined, aes(x = sw_mean, y = hp_mean, color = era_str, label = month.abb[month_num])) +
+  geom_point(size = 3) +
+  ggrepel::geom_text_repel(size = 3.5, max.overlaps = 20) +
+  scale_color_manual(values = c("2005-2014" = "#1b7837", "2015-2022" = "#762a83"),
+                     name = "Era") +
+  labs(
+    title = "Surface Water vs. Hydroperiod: Shared Era Scatter",
+    x     = "Mean surface water value",
+    y     = "Mean hydroperiod value"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+---
+
+# 7. Representative Raster Maps
+
+Plot one layer from each product to visually inspect the spatial data.
+
+```{r map-sw, fig.height=5}
+sw_map_file <- file_meta |>
+  filter(type == "SurfaceWater", era_str == "2015-2022", month_chr == "JUL") |>
+  pull(path)
+
+sw_r <- rast(sw_map_file)
+sw_df <- as.data.frame(sw_r, xy = TRUE) |> setNames(c("x", "y", "value"))
+
+ggplot(sw_df, aes(x = x, y = y, fill = value)) +
+  geom_raster() +
+  scale_fill_distiller(palette = "Blues", direction = 1, na.value = "grey90",
+                       name = "SW value") +
+  coord_equal() +
+  labs(
+    title    = "Surface Water — 2015-2022 July",
+    subtitle = "Decadal composite",
+    x = "Longitude", y = "Latitude"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+```{r map-hp, fig.height=5}
+hp_map_file <- file_meta |>
+  filter(type == "Hydroperiod", era_str == "2015-2022", month_chr == "JUL") |>
+  pull(path)
+
+hp_r <- rast(hp_map_file)
+hp_df <- as.data.frame(hp_r, xy = TRUE) |> setNames(c("x", "y", "value"))
+
+ggplot(hp_df, aes(x = x, y = y, fill = value)) +
+  geom_raster() +
+  scale_fill_distiller(palette = "YlGnBu", direction = 1, na.value = "grey90",
+                       name = "HP value") +
+  coord_equal() +
+  labs(
+    title    = "Hydroperiod — 2015-2022 July",
+    subtitle = "Decadal composite",
+    x = "Longitude", y = "Latitude"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+# 8. Per-Area Processed Data (Refuges & Lakes)
+
+The processed datasets (`wet_surface_water`, `wet_hydroperiod`) contain per-area statistics
+extracted from each raster by cropping to bounding boxes (each buffered 0.5 miles) around
+**six Klamath refuges and five lakes/reservoirs** — `rivermile::klamath_refuges` and
+`rivermile::klamath_lakes` respectively. Each row's `name` identifies the area (refuge ids are
+suffixed `_refuge`, e.g. `clear_lake_refuge`; lake ids are not, e.g. `clear_lake_reservoir`),
+and `boundary_type` (`"refuge"` or `"lake"`) tells the two apart — see
+`data-raw/processing-scripts/wet-process-data.R` for how those ids are built, and
+`data-raw/data-exploration/refuge-elevation-wetland-crosswalk.Rmd` for how they're crosswalked
+to water-surface-elevation stations.
+
+Two things changed from the original 6-refuge-only version of this dataset: it now includes
+lakes as well, and it no longer carries a `pct_wet` column. That column was `mean(value > 0)`
+— a check for *any* nonzero signal, not "percent flooded" — and it turned out to saturate at
+`1` for nearly every row (the underlying raster is a continuous ~0–1 signal, not a binary
+mask), so it was dropped as uninformative. `mean_val` is the column that actually tracks
+extent/intensity.
+
+`bear_valley_refuge` is expected to be all-`NA` — visual QC confirmed the source rasters have
+no detected water anywhere inside that refuge's boundary in any product or era (it's a small,
+mostly upland/forested refuge, below this product's mapping resolution).
+
+## 8.1 Load & preview
+
+```{r load-processed}
+data("wet_surface_water", package = "klamathWaterData")
+data("wet_hydroperiod",   package = "klamathWaterData")
+
+cat("wet_surface_water:", nrow(wet_surface_water), "rows\n")
+cat("wet_hydroperiod:  ", nrow(wet_hydroperiod),   "rows\n\n")
+
+kable(
+  wet_surface_water |> count(name, boundary_type),
+  caption = "Areas represented in wet_surface_water"
+)
+
+kable(head(wet_surface_water), caption = "First rows of wet_surface_water")
+```
+
+## 8.2 Surface water — mean value by area & month (decadal eras)
+
+```{r sw-area-decadal, fig.height=10}
+sw_area_decadal <- wet_surface_water |> filter(is_decadal)
+
+ggplot(sw_area_decadal,
+       aes(x = month_num, y = mean_val, color = era_str, group = era_str)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 2) +
+  facet_wrap(~name, ncol = 3, scales = "free_y") +
+  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
+  scale_color_brewer(palette = "Set2", name = "Era") +
+  labs(
+    title    = "Mean Surface Water Value by Area & Month — Decadal Eras",
+    x        = "Month",
+    y        = "Mean raster value"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", strip.text = element_text(size = 8))
+```
+
+## 8.3 Surface water — annual time series by area (2022–present)
+
+```{r sw-area-annual, fig.height=10}
+sw_area_annual <- wet_surface_water |> filter(!is_decadal)
+
+ggplot(sw_area_annual,
+       aes(x = month_num, y = mean_val, color = factor(era_start), group = era_start)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 2) +
+  facet_wrap(~name, ncol = 3, scales = "free_y") +
+  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
+  scale_color_brewer(palette = "Dark2", name = "Year") +
+  labs(
+    title    = "Mean Surface Water Value by Area & Month — Annual",
+    x        = "Month",
+    y        = "Mean raster value"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", strip.text = element_text(size = 8))
+```
+
+## 8.4 Hydroperiod — mean value by area & month
+
+```{r hp-area-monthly, fig.height=10}
+ggplot(wet_hydroperiod,
+       aes(x = month_num, y = mean_val, color = era_str, group = era_str)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 2) +
+  facet_wrap(~name, ncol = 3, scales = "free_y") +
+  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
+  scale_color_brewer(palette = "Set1", name = "Era") +
+  labs(
+    title    = "Mean Hydroperiod Value by Area & Month",
+    x        = "Month",
+    y        = "Mean raster value",
+    subtitle = "Higher values indicate longer hydroperiod duration"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", strip.text = element_text(size = 8))
+```
+
+## 8.5 Cross-area comparison — annual mean surface water
+
+```{r sw-area-comparison, fig.height=7}
+sw_annual_mean <- wet_surface_water |>
+  group_by(name, boundary_type, era_str, is_decadal) |>
+  summarise(annual_mean_val = mean(mean_val, na.rm = TRUE), .groups = "drop")
+
+ggplot(sw_annual_mean,
+       aes(x = reorder(name, annual_mean_val), y = annual_mean_val,
+           fill = era_str)) +
+  geom_col(position = "dodge") +
+  scale_fill_brewer(palette = "Set2", name = "Era") +
+  coord_flip() +
+  facet_grid(boundary_type ~ ., scales = "free_y", space = "free_y") +
+  labs(
+    title = "Annual Mean Surface Water Value by Area",
+    x     = NULL,
+    y     = "Annual mean raster value"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(strip.text = element_text(face = "bold"))
+```
+
+## 8.6 Cross-area comparison — annual mean hydroperiod
+
+```{r hp-area-comparison, fig.height=7}
+hp_annual_mean <- wet_hydroperiod |>
+  group_by(name, boundary_type, era_str) |>
+  summarise(annual_mean_val = mean(mean_val, na.rm = TRUE), .groups = "drop")
+
+ggplot(hp_annual_mean,
+       aes(x = reorder(name, annual_mean_val), y = annual_mean_val,
+           fill = era_str)) +
+  geom_col(position = "dodge") +
+  scale_fill_brewer(palette = "Set1", name = "Era") +
+  coord_flip() +
+  facet_grid(boundary_type ~ ., scales = "free_y", space = "free_y") +
+  labs(
+    title = "Annual Mean Hydroperiod Value by Area",
+    x     = NULL,
+    y     = "Annual mean raster value"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(strip.text = element_text(face = "bold"))
+```
+
+---
+
+# 9. Session Info
+
+```{r session-info}
+sessionInfo()
+```

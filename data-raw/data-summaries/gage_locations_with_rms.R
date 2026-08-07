@@ -38,7 +38,7 @@ leaflet() |>
     fillColor = "green",
     color = "darkgreen",
     popup = ~paste0("Type: Temperature<br>",
-                    "River: ", stream, "<br>",
+                    "River: ", location, "<br>",
                     "River mile: ", river_mile, "<br>",
                     "Gage Name: ", gage_name),
     group = "Temperature gages"
@@ -50,7 +50,7 @@ leaflet() |>
     fillColor = "deepskyblue",
     color = "dodgerblue4",
     popup = ~paste0("Type: DO<br>",
-                    "River: ", stream, "<br>",
+                    "River: ", location, "<br>",
                     "River mile: ", river_mile, "<br>",
                     "Gage Name: ", gage_name),
     group = "DO gages"
@@ -62,7 +62,7 @@ leaflet() |>
     fillColor = "orange",
     color = "darkorange4",
     popup = ~paste0("Type: Flow<br>",
-                    "River: ", stream, "<br>",
+                    "River: ", location, "<br>",
                     "River mile: ", river_mile, "<br>",
                     "Gage Name: ", gage_name),
     group = "Flow gages"
@@ -74,7 +74,7 @@ leaflet() |>
     fillColor = "purple",
     color = "purple4",
     popup = ~paste0("Type: pH<br>",
-                    "River: ", stream, "<br>",
+                    "River: ", location, "<br>",
                     "River mile: ", river_mile, "<br>",
                     "Gage Name: ", gage_name),
     group = "pH gages"
