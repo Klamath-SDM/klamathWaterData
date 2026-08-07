@@ -442,10 +442,28 @@ ggplot(hp_df, aes(x = x, y = y, fill = value)) +
 
 ---
 
-# 8. Per-Refuge Processed Data
+# 8. Per-Area Processed Data (Refuges & Lakes)
 
-The processed datasets (`wet_surface_water`, `wet_hydroperiod`) contain per-refuge
-statistics extracted from each raster by cropping to six Klamath refuge bounding boxes.
+The processed datasets (`wet_surface_water`, `wet_hydroperiod`) contain per-area statistics
+extracted from each raster by cropping to bounding boxes (each buffered 0.5 miles) around
+**six Klamath refuges and five lakes/reservoirs** — `rivermile::klamath_refuges` and
+`rivermile::klamath_lakes` respectively. Each row's `name` identifies the area (refuge ids are
+suffixed `_refuge`, e.g. `clear_lake_refuge`; lake ids are not, e.g. `clear_lake_reservoir`),
+and `boundary_type` (`"refuge"` or `"lake"`) tells the two apart — see
+`data-raw/processing-scripts/wet-process-data.R` for how those ids are built, and
+`data-raw/data-exploration/refuge-elevation-wetland-crosswalk.Rmd` for how they're crosswalked
+to water-surface-elevation stations.
+
+Two things changed from the original 6-refuge-only version of this dataset: it now includes
+lakes as well, and it no longer carries a `pct_wet` column. That column was `mean(value > 0)`
+— a check for *any* nonzero signal, not "percent flooded" — and it turned out to saturate at
+`1` for nearly every row (the underlying raster is a continuous ~0–1 signal, not a binary
+mask), so it was dropped as uninformative. `mean_val` is the column that actually tracks
+extent/intensity.
+
+`bear_valley_refuge` is expected to be all-`NA` — visual QC confirmed the source rasters have
+no detected water anywhere inside that refuge's boundary in any product or era (it's a small,
+mostly upland/forested refuge, below this product's mapping resolution).
 
 ## 8.1 Load & preview
 
@@ -456,133 +474,120 @@ data("wet_hydroperiod",   package = "klamathWaterData")
 cat("wet_surface_water:", nrow(wet_surface_water), "rows\n")
 cat("wet_hydroperiod:  ", nrow(wet_hydroperiod),   "rows\n\n")
 
+kable(
+  wet_surface_water |> count(name, boundary_type),
+  caption = "Areas represented in wet_surface_water"
+)
+
 kable(head(wet_surface_water), caption = "First rows of wet_surface_water")
 ```
 
-## 8.2 Surface water — mean value by refuge & month (decadal eras)
+## 8.2 Surface water — mean value by area & month (decadal eras)
 
-```{r sw-refuge-decadal, fig.height=7}
-sw_refuge_decadal <- wet_surface_water |> filter(is_decadal)
+```{r sw-area-decadal, fig.height=10}
+sw_area_decadal <- wet_surface_water |> filter(is_decadal)
 
-ggplot(sw_refuge_decadal,
+ggplot(sw_area_decadal,
        aes(x = month_num, y = mean_val, color = era_str, group = era_str)) +
   geom_line(linewidth = 0.9) +
   geom_point(size = 2) +
-  facet_wrap(~refuge, ncol = 2, scales = "free_y") +
+  facet_wrap(~name, ncol = 3, scales = "free_y") +
   scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
   scale_color_brewer(palette = "Set2", name = "Era") +
   labs(
-    title    = "Mean Surface Water Value by Refuge & Month — Decadal Eras",
+    title    = "Mean Surface Water Value by Area & Month — Decadal Eras",
     x        = "Month",
     y        = "Mean raster value"
   ) +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom")
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", strip.text = element_text(size = 8))
 ```
 
-## 8.3 Surface water — % wet pixels by refuge & month (decadal eras)
+## 8.3 Surface water — annual time series by area (2022–present)
 
-```{r sw-refuge-pct-wet, fig.height=7}
-ggplot(sw_refuge_decadal,
-       aes(x = month_num, y = pct_wet, color = era_str, group = era_str)) +
-  geom_line(linewidth = 0.9) +
-  geom_point(size = 2) +
-  facet_wrap(~refuge, ncol = 2) +
-  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
-  scale_y_continuous(labels = percent_format()) +
-  scale_color_brewer(palette = "Set2", name = "Era") +
-  labs(
-    title = "Fraction of Wet Pixels by Refuge & Month — Decadal Eras",
-    x     = "Month",
-    y     = "% pixels with surface water > 0"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom")
-```
+```{r sw-area-annual, fig.height=10}
+sw_area_annual <- wet_surface_water |> filter(!is_decadal)
 
-## 8.4 Surface water — annual time series by refuge (2022–present)
-
-```{r sw-refuge-annual, fig.height=7}
-sw_refuge_annual <- wet_surface_water |> filter(!is_decadal)
-
-ggplot(sw_refuge_annual,
+ggplot(sw_area_annual,
        aes(x = month_num, y = mean_val, color = factor(era_start), group = era_start)) +
   geom_line(linewidth = 0.9) +
   geom_point(size = 2) +
-  facet_wrap(~refuge, ncol = 2, scales = "free_y") +
+  facet_wrap(~name, ncol = 3, scales = "free_y") +
   scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
   scale_color_brewer(palette = "Dark2", name = "Year") +
   labs(
-    title    = "Mean Surface Water Value by Refuge & Month — Annual",
+    title    = "Mean Surface Water Value by Area & Month — Annual",
     x        = "Month",
     y        = "Mean raster value"
   ) +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom")
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", strip.text = element_text(size = 8))
 ```
 
-## 8.5 Hydroperiod — mean value by refuge & month
+## 8.4 Hydroperiod — mean value by area & month
 
-```{r hp-refuge-monthly, fig.height=7}
+```{r hp-area-monthly, fig.height=10}
 ggplot(wet_hydroperiod,
        aes(x = month_num, y = mean_val, color = era_str, group = era_str)) +
   geom_line(linewidth = 0.9) +
   geom_point(size = 2) +
-  facet_wrap(~refuge, ncol = 2, scales = "free_y") +
+  facet_wrap(~name, ncol = 3, scales = "free_y") +
   scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
   scale_color_brewer(palette = "Set1", name = "Era") +
   labs(
-    title    = "Mean Hydroperiod Value by Refuge & Month",
+    title    = "Mean Hydroperiod Value by Area & Month",
     x        = "Month",
     y        = "Mean raster value",
     subtitle = "Higher values indicate longer hydroperiod duration"
   ) +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom")
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", strip.text = element_text(size = 8))
 ```
 
-## 8.6 Cross-refuge comparison — annual mean surface water
+## 8.5 Cross-area comparison — annual mean surface water
 
-```{r sw-refuge-comparison, fig.height=5}
+```{r sw-area-comparison, fig.height=7}
 sw_annual_mean <- wet_surface_water |>
-  group_by(refuge, era_str, is_decadal) |>
-  summarise(annual_mean_val = mean(mean_val, na.rm = TRUE),
-            annual_pct_wet  = mean(pct_wet,  na.rm = TRUE),
-            .groups = "drop")
+  group_by(name, boundary_type, era_str, is_decadal) |>
+  summarise(annual_mean_val = mean(mean_val, na.rm = TRUE), .groups = "drop")
 
 ggplot(sw_annual_mean,
-       aes(x = reorder(refuge, annual_mean_val), y = annual_mean_val,
+       aes(x = reorder(name, annual_mean_val), y = annual_mean_val,
            fill = era_str)) +
   geom_col(position = "dodge") +
   scale_fill_brewer(palette = "Set2", name = "Era") +
   coord_flip() +
+  facet_grid(boundary_type ~ ., scales = "free_y", space = "free_y") +
   labs(
-    title = "Annual Mean Surface Water Value by Refuge",
+    title = "Annual Mean Surface Water Value by Area",
     x     = NULL,
     y     = "Annual mean raster value"
   ) +
-  theme_minimal(base_size = 13)
+  theme_minimal(base_size = 12) +
+  theme(strip.text = element_text(face = "bold"))
 ```
 
-## 8.7 Cross-refuge comparison — annual mean hydroperiod
+## 8.6 Cross-area comparison — annual mean hydroperiod
 
-```{r hp-refuge-comparison, fig.height=5}
+```{r hp-area-comparison, fig.height=7}
 hp_annual_mean <- wet_hydroperiod |>
-  group_by(refuge, era_str) |>
+  group_by(name, boundary_type, era_str) |>
   summarise(annual_mean_val = mean(mean_val, na.rm = TRUE), .groups = "drop")
 
 ggplot(hp_annual_mean,
-       aes(x = reorder(refuge, annual_mean_val), y = annual_mean_val,
+       aes(x = reorder(name, annual_mean_val), y = annual_mean_val,
            fill = era_str)) +
   geom_col(position = "dodge") +
   scale_fill_brewer(palette = "Set1", name = "Era") +
   coord_flip() +
+  facet_grid(boundary_type ~ ., scales = "free_y", space = "free_y") +
   labs(
-    title = "Annual Mean Hydroperiod Value by Refuge",
+    title = "Annual Mean Hydroperiod Value by Area",
     x     = NULL,
     y     = "Annual mean raster value"
   ) +
-  theme_minimal(base_size = 13)
+  theme_minimal(base_size = 12) +
+  theme(strip.text = element_text(face = "bold"))
 ```
 
 ---
