@@ -1,0 +1,516 @@
+---
+title: "Elevation Crosswalk: USBR Hydromet/USGS Elevations & WET Surface Water Extent"
+author: "Maddee Wiggins"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+```
+
+```{r libraries}
+library(tidyverse)
+library(sf)
+library(ggplot2)
+library(scales)
+library(patchwork)
+library(knitr)
+library(leaflet)
+```
+
+# Overview
+
+This document crosswalks water-surface-**elevation** stations from `teacup_diagram_data`
+(https://www.usbr.gov/pn/hydromet/klamath/teacup.html) to Klamath Basin wildlife refuges
+(`rivermile::klamath_refuges`) and lakes/reservoirs (`rivermile::klamath_lakes`), then joins
+each matched station's monthly water level to the processed WET (Intermountain West Joint
+Venture (IWJV)) monthly surface water extent data (`wet_surface_water`) for that area. The goal
+is a combined monthly view — station water level alongside wetland/lake surface water extent —
+for areas with a relevant elevation gauge.
+
+The area/station crosswalk is a hand-curated lookup (Section 4); only stations that are
+actually on or clearly hydrologically tied to an area are assigned to it. `wet_surface_water`/
+`wet_hydroperiod` key on a `name` column with a `boundary_type` of `"refuge"` or `"lake"` — see
+`data-raw/processing-scripts/wet-process-data.R` for how those ids are built. **Bear Valley,
+Klamath Marsh, Lower Klamath/Sheepy refuges, and Lower Klamath Lake** have no station assigned
+and are excluded from the combined analysis.
+
+---
+
+# 1. Data processing notes
+
+1. **Surface water extent** (`wet_surface_water`/`wet_hydroperiod`) is calculated within a
+   **0.5-mile buffer** around each refuge/lake polygon (`rivermile::klamath_refuges` /
+   `rivermile::klamath_lakes`), not the raw polygon boundary itself — see
+   `data-raw/processing-scripts/wet-process-data.R`.
+2. **Elevation** is currently crosswalked from `teacup_diagram_data` as the default source
+   (Section 4). This is a hand-curated, on-site-only crosswalk, not exhaustive — additional
+   candidate gages at **Upper Klamath Lake** are compared in
+   [Section 4.2](#comparing-upper-klamath-lake-elevation-gages). 
+3. See [Section 4.1](#maps-refuges-lakes-with-elevation-stations) for a map showing all
+   stations against the refuge/lake boundaries.
+
+---
+
+# 2. Load data
+
+```{r load-data}
+data("wet_surface_water",    package = "klamathWaterData")
+data("teacup_diagram_data",  package = "klamathWaterData")
+
+refuges <- rivermile::klamath_refuges
+lakes <- rivermile::klamath_lakes 
+ 
+cat("wet_surface_water:  ", nrow(wet_surface_water),   "rows\n")
+cat("teacup_diagram_data:", nrow(teacup_diagram_data), "rows\n")
+cat("refuges:            ", nrow(refuges),             "features\n")
+cat("lakes:              ", nrow(lakes),               "features\n")
+
+kable(st_drop_geometry(refuges), caption = "rivermile::klamath_refuges")
+kable(st_drop_geometry(lakes),   caption = "rivermile::klamath_lakes")
+```
+
+---
+
+# 3. Elevation stations in `teacup_diagram_data`
+
+`teacup_diagram_data$measure_type` is one of `elevation`, `storage`, or `flow`. We keep only
+`elevation` — reservoir/lake water-surface elevation and gauge height, which is what can
+plausibly track an area's wetland/lake extent. `lat`/`long` are already included in this
+dataset (sourced from the USBR RISE API for USBR Hydromet sites, and
+`dataRetrieval::readNWISsite()` for USGS sites — see
+`data-raw/data-pull/teacup-diagram-data-pull.R`).
+
+```{r elevation-stations}
+elev_stations <- teacup_diagram_data |>
+  filter(measure_type == "elevation") |>
+  distinct(source, site, label, lat, long)
+
+stations_sf <- elev_stations |>
+  st_as_sf(coords = c("long", "lat"), crs = 4326, remove = FALSE)
+
+kable(elev_stations, caption = "Elevation stations available in teacup_diagram_data")
+```
+
+---
+
+# 4. Spatial crosswalk of elevation sites with refuges and lakes
+
+`wet_surface_water`/`wet_hydroperiod` identify each area with a `name` id built in
+`data-raw/processing-scripts/wet-process-data.R`: refuge ids are suffixed `_refuge` (e.g.
+`clear_lake_refuge`), lake ids are not (e.g. `clear_lake_reservoir`) — the two id lookups below
+mirror that script exactly so the crosswalk here lines up with the actual dataset.
+
+```{r area-id-lookup}
+refuge_id_lookup <- tribble(
+  ~name,                         ~orgname,
+  "upper_klamath_lake_refuge",   "upper klamath national wildlife refuge",
+  "clear_lake_refuge",           "clear lake national wildlife refuge",
+  "tule_lake_refuge",            "tule lake national wildlife refuge",
+  "bear_valley_refuge",          "bear valley national wildlife refuge",
+  "lower_klamath_sheepy_refuge", "lower klamath national wildlife refuge",
+  "klamath_marsh_refuge",        "klamath marsh national wildlife refuge"
+)
+
+lake_id_lookup <- tribble(
+  ~name,                   ~lake_name,
+  "clear_lake_reservoir",  "clear lake reservoir",
+  "gerber_reservoir",      "gerber reservoir",
+  "lower_klamath_lake",    "lower klamath lake",
+  "tule_lake",             "tule lake",
+  "upper_klamath_lake",    "upper klamath lake"
+)
+
+refuges_named <- refuges |> inner_join(refuge_id_lookup, by = "orgname")
+lakes_named   <- lakes   |> inner_join(lake_id_lookup,   by = "lake_name")
+```
+
+Each elevation station is assigned to an area only where it is genuinely on-site or the
+obvious controlling structure — not just the nearest point on a map:
+
+- **Tule Lake NWR** and **Tule Lake** (the lake itself) — `TULC` and `TULC2`, the Sump 1A and
+  Sump 1B forebay gauges inside the refuge boundary.
+- **Clear Lake NWR** and **Clear Lake Reservoir** — `CLK`, Clear Lake West Lobe, inside both
+  boundaries.
+- **Upper Klamath Lake NWR** and **Upper Klamath Lake** — `11507001`, the USGS lake-elevation
+  gauge near Link River Dam.
+- **Gerber Reservoir** — `GER`, the reservoir's own forebay elevation gauge (there is no
+  matching refuge boundary for Gerber, only the lake).
+- **Bear Valley, Klamath Marsh, Lower Klamath/Sheepy refuges, and Lower Klamath Lake** — no
+  station assigned.
+
+```{r crosswalk-table}
+crosswalk <- tribble(
+  ~name,                       ~site,
+  "tule_lake_refuge",          "TULC",
+  "tule_lake_refuge",          "TULC2",
+  "tule_lake",                 "TULC",
+  "tule_lake",                 "TULC2",
+  "upper_klamath_lake_refuge", "11507001",
+  "upper_klamath_lake",        "11507001",
+  "clear_lake_refuge",         "CLK",
+  "clear_lake_reservoir",      "CLK",
+  "gerber_reservoir",          "GER"
+)
+
+stations_area_cross <- stations_sf |>
+  left_join(crosswalk, by = "site")
+
+stations_area_cross |>
+  st_drop_geometry() |>
+  kable(caption = "Area x station crosswalk (NA = elevation station not assigned to an area)")
+```
+
+## 4.1 Maps: refuges & lakes with elevation stations
+
+```{r}
+# ---- teacup_diagram_data -> sf points, one row per station ----
+# teacup_diagram_data is a long daily time series (197k rows); collapse to
+# one point per station (some sites have multiple measure_types, e.g. GER
+# has both elevation and storage — combine those into one popup).
+teacup_diagram_sf <- klamathWaterData::teacup_diagram_data |>
+  filter(measure_type == "elevation") |> 
+  group_by(source, site, lat, long) |>
+  summarise(
+    measures = paste(sort(unique(measure_type)), collapse = ", "),
+    labels   = paste(unique(label), collapse = "<br>"),
+    .groups  = "drop"
+  ) |>
+  st_as_sf(coords = c("long", "lat"), crs = 4326, remove = FALSE)
+
+# ---- water_level_gage markers (from earlier session work) ----
+gages <- klamathWaterData::water_level_gage |>
+  mutate(
+    latitude  = if_else(gage_id == "usbr tule lake sump 1a", 41.878620, latitude),
+    longitude = if_else(gage_id == "usbr tule lake sump 1a", -121.545291, longitude),
+    marker_color = case_when(
+      agency == "USGS"                       ~ "steelblue",
+      agency == "u.s. bureau of reclamation" ~ "darkorange"
+    )
+  )
+
+# ---- refuges / lakes (lakes cleaned: Tule Lake's distant outlier part dropped — see wet-process-data.R) ----
+refuges <- rivermile::klamath_refuges
+
+# ---- map ----
+leaflet() |>
+  addProviderTiles(providers$CartoDB.Positron) |>
+  setView(lng = -121.8, lat = 42.1, zoom = 8) |>
+  addPolygons(
+    data = refuges,
+    color = "darkgreen", weight = 1.5, fillOpacity = 0.15,
+    label = ~orgname,
+    group = "Refuges"
+  ) |>
+  addPolygons(
+    data = lakes,
+    color = "darkblue", weight = 1.5, fillOpacity = 0.15,
+    label = ~lake_name,
+    group = "Lakes"
+  ) |>
+  addCircleMarkers(
+    data = gages,
+    lng = ~longitude, lat = ~latitude,
+    radius = 7,
+    color = ~marker_color,
+    stroke = FALSE,
+    fillOpacity = 0.85,
+    label = ~gage_name,
+    popup = ~paste0(
+      "<b>", gage_name, "</b><br>",
+      "Gage ID: ", gage_id, "<br>",
+      "Agency: ", agency, "<br>",
+      "Location: ", location
+    ),
+    group = "Water Level Gages"
+  ) |>
+  addCircleMarkers(
+    data = teacup_diagram_sf,
+    radius = 6,
+    color = "purple",
+    stroke = TRUE, weight = 1, opacity = 1,
+    fillOpacity = 0.6,
+    label = ~site,
+    popup = ~paste0(
+      "<b>", site, "</b><br>",
+      "Source: ", source, "<br>",
+      "Measures: ", measures, "<br>",
+      labels
+    ),
+    group = "Teacup Diagram Stations"
+  ) |>
+  addLegend(
+    position = "bottomright",
+    colors = c("steelblue", "darkorange", "purple"),
+    labels = c("USGS gage", "USBR gage", "Teacup diagram station"),
+    title = "Legend"
+  ) |>
+  addLayersControl(
+    overlayGroups = c("Refuges", "Lakes", "Water Level Gages", "Teacup Diagram Stations"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+
+```
+
+
+## 4.2 Comparing Upper Klamath Lake elevation gages
+
+`water_level_gage` lists four USGS gages around Upper Klamath Lake, but only one of them
+(`11507001`, near Link River Dam) is used in the crosswalk above. Comparing all four's
+temporal coverage and values here to check whether `11507001` is still the best choice, or
+whether swapping to or supplementing it with another gage is worth exploring (see the note in
+Section 1). 
+
+```{r uk-gage-coverage}
+klamath_gages <- c("11505800", "11504300", "11505900", "11507001")
+
+klamath_elev_gages <- klamathWaterData::water_level_data |>
+  filter(gage_id %in% klamath_gages)
+
+klamath_elev_gages |>
+  group_by(gage_name, gage_id) |>
+  summarise(
+    start    = min(date),
+    end      = max(date),
+    n_obs    = n(),
+    min_ft   = round(min(value, na.rm = TRUE), 1),
+    max_ft   = round(max(value, na.rm = TRUE), 1),
+    .groups  = "drop"
+  ) |>
+  arrange(gage_id) |>
+  kable(caption = "Upper Klamath Lake candidate elevation gages — coverage and range")
+```
+
+```{r uk-gage-comparison-plot, fig.height=6}
+gage_short_labels <- c(
+  "11504300" = "Agency Lake",
+  "11505900" = "Rattlesnake Point",
+  "11505800" = "Rocky Point",
+  "11507001" = "Link River (K. Falls)"
+)
+
+klamath_elev_gages |>
+  mutate(gage_label = gage_short_labels[gage_id]) |>
+  ggplot(aes(x = date, y = value, color = gage_label)) +
+  geom_line(linewidth = 0.6, alpha = 0.85) +
+  scale_color_brewer(palette = "Set2", name = NULL) +
+  scale_y_continuous(labels = label_comma()) +
+  labs(
+    title    = "Upper Klamath Lake: Candidate Elevation Gages",
+    subtitle = "Daily water surface elevation — comparing temporal coverage and values",
+    x        = NULL,
+    y        = "Elevation (ft)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position  = "bottom",
+    plot.title       = element_text(face = "bold"),
+    plot.subtitle    = element_text(color = "grey40"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+---
+
+# 5. Monthly water level & WET surface water extent
+
+`wet_surface_water` has two temporal structures: decadal composites (`is_decadal == TRUE`, one
+value per calendar month averaged over a 10-year era) and individual calendar months from 2022
+onward (`is_decadal == FALSE`, `era_start` is the actual year). We match each structure to the
+elevation record at the same resolution: a decadal climatological monthly mean for decadal rows,
+and the actual year-month mean for annual rows. Where an area has multiple stations (Tule
+Lake's two sumps), their monthly values are averaged together first. Alongside the mean we also
+keep the min/max elevation observed within each aggregation window, used for the range ribbon in
+[Section 6.1](#ribbon). Joining directly on `name` — the same id `wet_surface_water` uses —
+means both refuges and lakes fall out of one join, with no separate refuge/lake handling needed.
+
+```{r monthly-area-xwalk}
+elev_xwalk_data <- teacup_diagram_data |>
+  filter(measure_type == "elevation") |>
+  # many-to-many is expected: TULC/TULC2 map to both tule_lake_refuge and tule_lake,
+  # 11507001 maps to both upper_klamath_lake_refuge and upper_klamath_lake, CLK maps to
+  # both clear_lake_refuge and clear_lake_reservoir
+  inner_join(crosswalk, by = "site", relationship = "many-to-many")
+
+elev_monthly_decadal <- elev_xwalk_data |>
+  mutate(year = year(date), month_num = month(date)) |>
+  mutate(era_str = case_when(
+    year >= 2005 & year <= 2014 ~ "2005-2014",
+    year >= 2015 & year <= 2022 ~ "2015-2022",
+    TRUE ~ NA_character_
+  )) |>
+  filter(!is.na(era_str)) |>
+  group_by(name, era_str, month_num) |>
+  summarise(elevation_mean_ft = mean(value, na.rm = TRUE),
+            elevation_min_ft  = min(value, na.rm = TRUE),
+            elevation_max_ft  = max(value, na.rm = TRUE), .groups = "drop") |>
+  mutate(is_decadal = TRUE)
+
+elev_monthly_annual <- elev_xwalk_data |>
+  mutate(year = year(date), month_num = month(date)) |>
+  filter(year >= 2022) |>
+  group_by(name, era_start = year, month_num) |>
+  summarise(elevation_mean_ft = mean(value, na.rm = TRUE),
+            elevation_min_ft  = min(value, na.rm = TRUE),
+            elevation_max_ft  = max(value, na.rm = TRUE), .groups = "drop") |>
+  mutate(is_decadal = FALSE)
+
+combined_decadal <- wet_surface_water |>
+  filter(is_decadal) |>
+  inner_join(elev_monthly_decadal, by = c("name", "is_decadal", "era_str", "month_num"))
+
+combined_annual <- wet_surface_water |>
+  filter(!is_decadal) |>
+  inner_join(elev_monthly_annual, by = c("name", "is_decadal", "era_start", "month_num"))
+
+combined_monthly <- bind_rows(combined_decadal, combined_annual) |>
+  arrange(name, is_decadal, era_start, month_num)
+
+plot_areas <- sort(unique(combined_monthly$name))
+
+cat("Combined monthly rows (decadal):", nrow(combined_decadal), "\n")
+cat("Combined monthly rows (annual): ", nrow(combined_annual), "\n")
+cat("Areas represented:", paste(plot_areas, collapse = ", "), "\n")
+
+kable(head(combined_monthly, 10), caption = "combined_monthly — first rows")
+```
+
+## 5.1 Package dataset: `refuge_elevation_wetland`
+
+`combined_decadal` and `combined_annual` are working objects scoped to this document. For
+downstream use in the package, they're combined (via `combined_monthly`) into a single, tidy,
+renamed dataset — one row per area-month, elevation and WET columns clearly distinguished by
+prefix, `boundary_type` carried through from `wet_surface_water` — and saved as
+`refuge_elevation_wetland`.
+
+```{r package-dataset}
+refuge_elevation_wetland <- combined_monthly |>
+  transmute(
+    name,
+    boundary_type,
+    is_decadal,
+    era_str,
+    era_start,
+    month_num,
+    month_chr,
+    elevation_mean_ft,
+    elevation_min_ft,
+    elevation_max_ft,
+    wet_mean_val   = mean_val,
+    wet_median_val = median_val,
+    wet_sd_val     = sd_val,
+    wet_n_pixels   = n_pixels
+  ) |>
+  arrange(name, is_decadal, era_start, month_num) |>
+  mutate(month_chr = tolower(month_chr)) |>
+  select(-era_start)
+
+glimpse(refuge_elevation_wetland)
+kable(head(refuge_elevation_wetland, 10), caption = "refuge_elevation_wetland — first rows")
+
+usethis::use_data(refuge_elevation_wetland, overwrite = TRUE)
+```
+
+---
+
+# 6. Combined monthly plots
+
+Dual view of station elevation and WET mean surface water value for the areas with an assigned
+station: Clear Lake NWR & Reservoir, Tule Lake NWR & the lake itself, Upper Klamath Lake NWR &
+the lake itself, and Gerber Reservoir.
+
+```{r combined-decadal-plot, fig.width=16, fig.height=8}
+combined_decadal |>
+  filter(name %in% plot_areas) |>
+  select(name, era_str, month_num, elevation_mean_ft, mean_val) |>
+  pivot_longer(c(elevation_mean_ft, mean_val), names_to = "metric", values_to = "value") |>
+  mutate(metric = recode(metric,
+                         elevation_mean_ft = "Water surface elevation (ft)",
+                         mean_val           = "WET mean surface water value")) |>
+  ggplot(aes(x = month_num, y = value, color = era_str, group = era_str)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 2) +
+  facet_wrap(vars(metric, name), scales = "free_y", ncol = length(plot_areas)) +
+  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
+  scale_color_brewer(palette = "Set2", name = "Era") +
+  labs(
+    title = "Monthly Water Surface Elevation vs. WET Surface Water — Decadal Composites",
+    x = "Month", y = NULL
+  ) +
+  theme_minimal(base_size = 9) +
+  theme(legend.position = "bottom", strip.text = element_text(size = 7))
+```
+
+Annual monthly values (2022–present):
+
+```{r combined-annual-plot, fig.width=16, fig.height=8}
+combined_annual |>
+  filter(name %in% plot_areas) |>
+  select(name, era_start, month_num, elevation_mean_ft, mean_val) |>
+  pivot_longer(c(elevation_mean_ft, mean_val), names_to = "metric", values_to = "value") |>
+  mutate(metric = recode(metric,
+                         elevation_mean_ft = "Mean water surface elevation (ft)",
+                         mean_val           = "WET mean surface water value")) |>
+  ggplot(aes(x = month_num, y = value, color = factor(era_start), group = era_start)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 2) +
+  facet_wrap(vars(metric, name), scales = "free_y", ncol = length(plot_areas)) +
+  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
+  scale_color_brewer(palette = "Dark2", name = "Year") +
+  labs(
+    title = "Monthly Water Surface Elevation vs. WET Surface Water — Annual (2022–present)",
+    x = "Month", y = NULL
+  ) +
+  theme_minimal(base_size = 9) +
+  theme(legend.position = "bottom", strip.text = element_text(size = 7))
+```
+
+## 6.1 Elevation range within each decadal month {#ribbon}
+
+The decadal composites average 10 years of daily elevation into one monthly value, which can
+hide how much a reservoir actually swings within that window. Plotting the min–max range
+alongside the mean shows that spread directly.
+
+```{r elevation-range-ribbon, fig.height=10}
+combined_decadal |>
+  filter(name %in% plot_areas) |>
+  ggplot(aes(x = month_num, group = era_str)) +
+  geom_ribbon(aes(ymin = elevation_min_ft, ymax = elevation_max_ft, fill = era_str), alpha = 0.25) +
+  geom_line(aes(y = elevation_mean_ft, color = era_str), linewidth = 1) +
+  facet_wrap(~name, scales = "free_y", ncol = 2) +
+  scale_x_continuous(breaks = c(1, 4, 7, 10), labels = month.abb[c(1, 4, 7, 10)]) +
+  scale_color_brewer(palette = "Set2", name = "Era") +
+  scale_fill_brewer(palette = "Set2", name = "Era") +
+  labs(
+    title    = "Decadal Elevation: Monthly Mean with Min–Max Range",
+    subtitle = "Ribbon spans the min/max daily elevation observed within each decadal-month window",
+    x = "Month", y = "Water surface elevation (ft)"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom")
+```
+
+```{r}
+knitr::knit_exit()
+```
+
+---
+
+# 7. Session info
+
+```{r session-info}
+sessionInfo()
+```

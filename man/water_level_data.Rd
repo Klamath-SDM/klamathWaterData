@@ -21,6 +21,13 @@ A tibble with 30,084 rows and 8 columns:
 water_level_data
 }
 \description{
-
+Lake water surface elevation (ft) data from the following gages:
+\itemize{
+\item 11505900
+\item 11504300
+\item 11505800
+\item 11507001
+\item usbr tule lake sump 1a
+}
 }
 \keyword{datasets}
