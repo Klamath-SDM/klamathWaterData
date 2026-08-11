@@ -2,7 +2,7 @@
 #' @title Temperature gages in the Klamath Basin watershed (HUC8 18010204)
 #' @description A dataset containing metadata for temperature gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
-#' @format A tibble with 94 rows and 8 columns
+#' @format A tibble with 96 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -18,8 +18,8 @@
 
 #' @name temperature_data
 #' @title Publicly available temperature data in the Klamath Basin watershed (HUC8 18010204)
-#' @description Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
-#' @format A tibble with 348,642 rows and 8 columns
+#' @description Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX and USFWS.
+#' @format A tibble with 414,312 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -87,8 +87,8 @@
 
 #' @name flow_data
 #' @title Publicly available flow data in the Klamath Basin watershed (HUC8 18010204)
-#' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
-#' @format A tibble with 114,654 rows and 8 columns
+#' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX and USBR data portals.
+#' @format A tibble with 128,113 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -105,7 +105,7 @@
 #' @title Dissolved oxygen gages in the Klamath Basin watershed (HUC8 18010204)
 #' @description A dataset containing metadata for dissolved oxygen gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
-#' @format A tibble with 28 rows and 8 columns
+#' @format A tibble with 131 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -121,7 +121,7 @@
 #' @name do_data
 #' @title Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC8 18010204)
 #' @description Mean, min and max dissolved oxygen data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
-#' @format A tibble with 160,456 rows and 8 columns
+#' @format A tibble with 365,162 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -153,15 +153,16 @@
 #'   \item 11505800
 #'   \item 11507001
 #'   \item usbr tule lake sump 1a
-#' }
-#' @format A tibble with 30,084 rows and 8 columns:
+#'   \item usbr-lrs
+#'   \item usbr-clk
+#' @format A tibble with 66,371 rows and 8 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
 #'   \item \code{gage_id}: unique identifier for the gage
 #'   \item \code{variable_name}: variable measured: "water level"
 #'   \item \code{value}: observed value of the temperature (numeric)
-#'   \item \code{unit}: units of measurement: feet
+#'   \item \code{unit}: units of measurement: feet, feet above sea level - USBR datum
 #'   \item \code{statistic}: summary statistic type: "mean"
 #'   \item \code{date}: date of the observation
 #'   }
@@ -179,8 +180,10 @@
 #'   \item 11505800
 #'   \item 11507001
 #'   \item usbr tule lake sump 1a
+#'   \item usbr-lrs
+#'   \item usbr-clk
 #'   }
-#' @format A tibble with 5 rows and 7 columns:
+#' @format A tibble with 7 rows and 7 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station

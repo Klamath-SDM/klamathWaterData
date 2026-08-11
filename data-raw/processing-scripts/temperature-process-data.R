@@ -6,6 +6,7 @@ library(purrr)
 library(pins)
 library(rivermile)
 library(sf)
+library(janitor)
 
 # raw data will be pulled from S3 bucket. These data is originally retrieved on temperature-data-pull.R
 
@@ -236,28 +237,150 @@ temperature_gage_usgs <- rivermile::find_nearest_river_miles(gage_temperature_us
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
   glimpse()
 
+### USFWS ----
+
+# pulling raw data -- This data was shared by Tylor Daley from USFWS
+# TEMPERATURE data
+#  scott river
+# sckr gage
+sckr_data_raw <- read_csv("data-raw/temp-data/water_temp_usfws_sckr.csv") |>
+  clean_names() |>
+  mutate(date = as.Date(date, format = "%m/%d/%Y")) |>
+  group_by(date) |>
+  summarise(mean_temp = mean(value, na.rm = TRUE), # calculating min, max and mean since data is hourly
+            min_temp  = min(value, na.rm = TRUE),
+            max_temp  = max(value, na.rm = TRUE),
+            .groups = "drop") |>
+  pivot_longer(cols = c(mean_temp, min_temp, max_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |>
+  mutate(statistic = case_when(
+    statistic == "mean_temp" ~ "mean",
+    statistic == "min_temp"  ~ "min",
+    statistic == "max_temp"  ~ "max",
+    TRUE ~ statistic),
+    variable_name = "temperature",
+    unit = "celsius") |> glimpse()
+
+sckr_metadata_raw <- read_csv("data-raw/temp-data/sckr_metadata.csv") |>
+  slice(1) |>
+  glimpse()
+
+# info_cols <- sckr_metadata_raw |>
+#   mutate(location = waterbody,
+#          gage_name = site_name,
+#          gage_id = organization_site_id) |>
+#   select(location, gage_name, gage_id) |> glimpse()
+
+#  shasta river
+# shkr gage
+shkr_data_raw <- read_csv("data-raw/temp-data/water_temp_usfws_shkr.csv") |>
+  clean_names() |>
+  mutate(date = as.Date(date, format = "%m/%d/%Y")) |>
+  filter(!is.na(value)) |>
+  group_by(date) |>
+  summarise(mean_temp = mean(value, na.rm = TRUE), # calculating min, max and mean since data is hourly
+            min_temp  = min(value, na.rm = TRUE),
+            max_temp  = max(value, na.rm = TRUE),
+            .groups = "drop") |>
+  pivot_longer(cols = c(mean_temp, min_temp, max_temp),
+               names_to = "statistic",
+               values_to = "value",
+               values_drop_na = TRUE) |>
+  mutate(statistic = case_when(
+    statistic == "mean_temp" ~ "mean",
+    statistic == "min_temp"  ~ "min",
+    statistic == "max_temp"  ~ "max",
+    TRUE ~ statistic),
+    variable_name = "temperature",
+    unit = "celsius") |> glimpse()
+
+shkr_metadata_raw <- read_csv("data-raw/temp-data/shkr_metadata.csv") |>
+  slice(1)
+
+#### water data table ----
+# shkr
+temperature_data_shkr <- bind_cols(shkr_data_raw, shkr_metadata_raw |>
+                                     mutate(location = waterbody,
+                                            gage_name = site_name,
+                                            gage_id = organization_site_id) |>
+                                     select(location, gage_name, gage_id)) |>
+  mutate(stream = location) |>
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date)
+
+# sckr
+temperature_data_sckr <- bind_cols(sckr_data_raw, sckr_metadata_raw |>
+                                     mutate(location = waterbody,
+                                            gage_name = site_name,
+                                            gage_id = organization_site_id)) |>
+  mutate(stream = location) |>
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date)
+
+# combine both shkr and sckr
+temperature_data_usfws <- bind_rows(temperature_data_shkr, temperature_data_sckr) |> glimpse()
+
+# TODO check rivermile package
+# temperature_data_usfws <- rivermile::find_nearest_river_miles(temperature_data_usfws) |>
+#   mutate(longitude = st_coordinates(temperature_data_usfws)[, 1],
+#          latitude = st_coordinates(temperature_data_usfws)[, 2]) |>
+#   st_drop_geometry() |>
+#   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
+#   glimpse()
+
+#### monitoring site table ----
+# shkr
+temperature_gage_shkr <- shkr_metadata_raw |>
+  mutate(stream = waterbody,
+         gage_name = site_name,
+         gage_id = organization_site_id,
+         agency = organization_name,
+         latitude = lat,
+         longitude = long,
+         river_mile = NA,
+         # stream = waterbody,# TODO look into rivermile package
+         huc8 = 18010207) |>
+  select(stream, gage_name, gage_id, agency, latitude, longitude, river_mile, huc8)
+
+# sckr
+temperature_gage_sckr <- sckr_metadata_raw |>
+  mutate(stream = waterbody,
+         gage_name = site_name,
+         gage_id = organization_site_id,
+         agency = organization_name,
+         latitude = lat,
+         longitude = long,
+         river_mile = NA,
+         # stream = waterbody,# TODO look into rivermile package
+         huc8 = 18010208) |>
+  select(stream, gage_name, gage_id, agency, latitude, longitude, river_mile, huc8)
+
+#  combine shkr and sckr
+temperature_gage_usfws <- bind_rows(temperature_gage_shkr, temperature_gage_sckr) |> glimpse()
 
 
 # combine gage and data files ---------------------------------------------
 temperature_data <- temperature_data_wqx |>
-  mutate(variable_name = "temperature",
+  mutate(date = as.Date(date),
+         variable_name = "temperature",
          statistic = tolower(statistic),
          unit = "celsius",
-         value = as.numeric(value),
-         date = as.Date(date)) |>
-  bind_rows(temperature_data_usgs |>
+         value = as.numeric(value)) |>
+  bind_rows(temperature_data_usfws, temperature_data_usgs |>
               mutate(gage_id = as.character(gage_id))) |>
   mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
+  filter(!is.na(location) & !is.na(gage_name)) |>
   glimpse()
 
 temperature_gage <- temperature_gage_usgs |>
   mutate(gage_id = as.character(gage_id)) |>
-  bind_rows(temperature_gage_wqx) |>
+  bind_rows(temperature_gage_wqx, temperature_gage_usfws) |>
   mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
+  filter(!is.na(location)) |>
   glimpse()
 
 ### saves clean data to aws

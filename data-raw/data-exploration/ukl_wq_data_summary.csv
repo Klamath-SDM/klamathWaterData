@@ -1,0 +1,46 @@
+location,gage_id,gage_name,min_date,max_date,parameters,n_records,latitude,longitude
+agency lake,klamathtribes_wqx-kl0011,AGENCY LAKE NORTH,2014-04-23,2018-10-23,pH,209,42.560556,-121.947444
+agency lake,klamathtribes_wqx-kl0010,AGENCY LAKE SOUTH,2014-04-23,2018-10-23,pH,175,42.523583,-121.984278
+upper klamath lake,422820122032100,Fish Banks West - Fbw,2014-07-10,2017-09-20,pH,453,42.47225,-122.0559444
+upper klamath lake,422622122004000,Mid-North - Lower  - Mdnl,2003-06-27,2026-07-06,"dissolved oxygen, pH, temperature",18577,42.43916489,-122.0122388
+upper klamath lake,422622122004003,Mid-North - Upper  - Mdnu,2004-06-24,2026-07-06,"dissolved oxygen, pH, temperature",18135,42.43916489,-122.0122388
+upper klamath lake,422305121553800,Mid-Trench - Lower   -  Mdtl,2004-06-18,2026-07-01,"dissolved oxygen, pH, temperature",17840,42.3846892,-121.9286044
+upper klamath lake,422305121553803,Mid-Trench - Upper   - Mdtu,2004-09-02,2026-07-01,"dissolved oxygen, pH, temperature",17863,42.3846892,-121.9286044
+upper klamath lake,422042121513100,Rattlesnake Point  -  Rpt,2005-06-02,2026-07-01,"dissolved oxygen, pH, temperature",17950,42.34475205,-121.8598427
+upper klamath lake,klamathtribes_wqx-kl0009,UPPER KLAMATH LAKE AT COON POINT,2014-04-23,2018-10-23,pH,289,42.435722,-122.028194
+upper klamath lake,klamathtribes_wqx-kl0006,UPPER KLAMATH LAKE AT EAGLE RIDGE,2014-04-23,2018-10-23,pH,500,42.422083,-121.943278
+upper klamath lake,klamathtribes_wqx-kl0001,UPPER KLAMATH LAKE AT FREMONT BRIDGE,2014-01-13,2018-10-23,pH,331,42.23861,-121.80588
+upper klamath lake,klamathtribes_wqx-kl0005,UPPER KLAMATH LAKE AT MID-LAKE,2014-04-23,2018-10-23,pH,258,42.369083,-121.848694
+upper klamath lake,klamathtribes_wqx-kl0008,UPPER KLAMATH LAKE AT MID-LAKE NORTH,2014-04-23,2018-10-23,pH,263,42.441361,-121.998833
+upper klamath lake,klamathtribes_wqx-kl0003,UPPER KLAMATH LAKE AT NORTH BUCK ISLAND,2014-04-23,2018-10-23,pH,206,42.308389,-121.856222
+upper klamath lake,klamathtribes_wqx-kl0002,UPPER KLAMATH LAKE AT PELICAN MARINA,2014-04-23,2018-10-23,pH,210,42.241722,-121.822306
+upper klamath lake,klamathtribes_wqx-kl0007,UPPER KLAMATH LAKE AT SHOAL WATER BAY,2014-04-23,2018-10-23,pH,230,42.40725,-121.963083
+upper klamath lake,klamathtribes_wqx-kl0004,UPPER KLAMATH LAKE AT WOCUS BAY,2014-04-23,2018-10-23,pH,184,42.32689,-121.919922
+upper klamath lake,422830121595700,Ukl01,2002-06-08,2002-08-31,dissolved oxygen,141,42.4749559,-122.0002585
+upper klamath lake,422848122004700,Ukl01-03,2003-06-06,2004-08-03,dissolved oxygen,372,42.47976733,-122.0140798
+upper klamath lake,422724121584600,Ukl02,2002-06-22,2002-09-07,dissolved oxygen,117,42.4565704,-121.980638
+upper klamath lake,422727121592400,Ukl02-03,2003-06-06,2004-09-30,dissolved oxygen,651,42.4574425,-121.9911273
+upper klamath lake,422646121570600,Ukl03,2002-06-08,2002-09-30,dissolved oxygen,336,42.44584035,-121.9526814
+upper klamath lake,422605121552700,Ukl04,2002-06-27,2002-09-30,dissolved oxygen,285,42.4346853,-121.9252608
+upper klamath lake,422708121550800,Ukl04-03,2003-06-07,2004-09-30,dissolved oxygen,765,42.45210996,-121.919986
+upper klamath lake,422817122014800,Ukl05,2002-07-13,2002-09-30,dissolved oxygen,204,42.4713306,-122.0310593
+upper klamath lake,422840122030200,Ukl05-03,2003-06-11,2004-09-30,dissolved oxygen,762,42.4775524,-122.051685
+upper klamath lake,422711122003700,Ukl06,2002-07-12,2002-09-30,dissolved oxygen,192,42.4530229,-122.0115334
+upper klamath lake,422727122013700,Ukl06-03,2003-06-06,2004-09-30,dissolved oxygen,795,42.4572754,-122.0280173
+upper klamath lake,422606121592600,Ukl07,2002-07-18,2002-09-30,dissolved oxygen,186,42.4348902,-121.9915603
+upper klamath lake,422501121581400,Ukl08,2002-07-17,2002-09-30,dissolved oxygen,210,42.4167658,-121.9717287
+upper klamath lake,422500121581800,Ukl08-03,2003-06-13,2004-09-30,dissolved oxygen,747,42.41658249,-121.9728482
+upper klamath lake,422700122022400,Ukl09,2002-06-08,2002-09-30,dissolved oxygen,342,42.4497476,-122.0411842
+upper klamath lake,422714122034100,Ukl09-03,2003-06-11,2004-09-30,dissolved oxygen,708,42.45383059,-122.0624349
+upper klamath lake,422555122011800,Ukl10,2002-06-08,2002-09-30,dissolved oxygen,339,42.4319371,-122.0228861
+upper klamath lake,422609122021200,Ukl10-03,2003-06-06,2004-09-30,dissolved oxygen,792,42.43566464,-122.037795
+upper klamath lake,422432122005700,Ukl11,2002-06-14,2002-09-26,dissolved oxygen,213,42.4086127,-122.0169883
+upper klamath lake,422502122011400,Ukl11-03,2003-06-13,2004-09-30,dissolved oxygen,717,42.4170819,-122.0217108
+upper klamath lake,422515121594200,Ukl12-03,2003-06-13,2004-09-30,dissolved oxygen,729,42.4206099,-121.9961268
+upper klamath lake,422610121580500,Ukl13-03,2003-06-19,2004-09-30,dissolved oxygen,678,42.4360543,-121.9690429
+upper klamath lake,422549121562300,Ukl14-03,2003-06-14,2004-09-30,dissolved oxygen,729,42.43013805,-121.9408474
+upper klamath lake,422733122042500,Ukl17-04,2004-07-10,2004-09-30,dissolved oxygen,228,42.4589414,-122.074852
+upper klamath lake,422620122004300,Upper Klamath Lake - Mid-North Fish Cage - Mdnfc,2017-07-08,2017-09-20,dissolved oxygen,73,42.43891667,-122.01188889
+upper klamath lake,422039121513700,Upper Klamath Lake - Rattlesnake Point Fish Cage,2017-06-29,2017-09-20,dissolved oxygen,78,42.34427778,-121.8601389
+upper klamath lake,421935121551200,"Upper Klamath Lake at Howard Bay, or",2022-04-21,2026-07-01,"dissolved oxygen, pH, temperature",4757,42.32638889,-121.9199722
+upper klamath lake,422719121571400,Williamson River Outlet - Wmr,2014-05-29,2026-07-01,temperature,5629,42.45524844,-121.9549039
