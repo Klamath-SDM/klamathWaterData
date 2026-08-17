@@ -1,5 +1,6 @@
 library(tidyverse)
 library(httr)
+library(jsonlite)
 library(lubridate)
 library(dataRetrieval)
 
@@ -49,30 +50,89 @@ END_DATE   <- Sys.Date() - 1
 # directly if current/near-real-time values are needed.
 # ------------------------------------------------------------
 
-# lat/long sourced from the USBR RISE API (data.usbr.gov/rise/api/location),
-# which catalogs each Hydromet cbtt under a named Reclamation location.
+# lat/long are looked up live from the USBR RISE API
+# (data.usbr.gov/rise/api/location), which catalogs each Hydromet cbtt
+# under a named Reclamation location, e.g. "Gerber Reservoir and Dam (GER)".
+# Two steps: search Klamath-region locations to map cbtt -> RISE id, then
+# fetch each matched location individually for its point coordinates (the
+# search/list endpoint mixes point and polygon geometries across records,
+# which breaks a naive data-frame flatten of locationCoordinates).
+#
 # NOTE: LRD ("Lost River Reservoir and Diversion Dam", RISE id 7307) is used
 # as the archived-data proxy for the teacup's "LRDO" circle, but RISE shows
 # these are technically two distinct points ~0.6 mi apart along the same
 # channel: LRDO is "Lost River Diversion Channel at C-G Canal Crossing"
 # (RISE id 7324, 42.140669 / -121.682313) downstream of the LRD dam site
 # used here (42.142822 / -121.672895).
-usbr_stations <- tribble(
-  ~site,   ~parameter, ~label,                                            ~measure_type, ~lat,       ~long,
-  "GER",   "FB",       "Gerber Reservoir - Forebay Elevation (ft)",       "Elevation",   42.201271, -121.129795,
-  "GER",   "AF",       "Gerber Reservoir - Storage (acre-ft)",            "Storage",     42.201271, -121.129795,
-  "CLK",   "FB",       "Clear Lake West Lobe - Forebay Elevation (ft)",   "Elevation",   41.846626, -121.209623,
-  "CLK",   "AF",       "Clear Lake West Lobe - Storage (acre-ft)",        "Storage",     41.846626, -121.209623,
-  "MAL",   "GD",       "Malone Reservoir - Gage Height (ft)",             "Elevation",   42.005769, -121.223952,
-  "TULC",  "FB",       "Tule Lake Sump 1A - Forebay Elevation (ft)",      "Elevation",   41.878620, -121.545291,
-  "TULC2", "FB",       "Tule Lake Sump 1B - Forebay Elevation (ft)",      "Elevation",   41.853279, -121.492546,
-  "LVNO",  "QJ",       "Langell Valley North Canal - Flow (cfs)",         "Flow",        42.134649, -121.198025,
-  "MHPO",  "QP",       "Miller Hill Pump Plant - Flow (cfs)",             "Flow",        42.142778, -121.751389,
-  "LRD",   "QD",       "Lost River Diversion - Flow (cfs)",               "Flow",        42.142822, -121.672895,
-  "HRPO",  "QD",       "Lost River at Harpold Dam - Flow (cfs)",          "Flow",        42.169507, -121.453355,
-  "LRS",   "QD",       "Clear Lake East Lobe / Lost River - Flow (cfs)",  "Flow",        41.926030, -121.075876,
-  "CHRO",  "QD",       "Cherry Creek - Flow (cfs)",                       "Flow",        42.598333, -122.095556
+RISE_BASE <- "https://data.usbr.gov/rise/api"
+
+usbr_cbtt_codes <- c(
+  "GER", "CLK", "MAL", "TULC", "TULC2",
+  "LVNO", "MHPO", "LRD", "HRPO", "LRS", "CHRO"
 )
+
+fetch_rise_klamath_cbtt <- function() {
+  resp <- GET(
+    paste0(RISE_BASE, "/location"),
+    query = list(itemsPerPage = 200, locationRegionName = "Klamath"),
+    add_headers(Accept = "application/vnd.api+json")
+  )
+  stop_for_status(resp)
+
+  search_data <- content(resp, as = "text", encoding = "UTF-8") |>
+    fromJSON(simplifyDataFrame = FALSE) |>
+    pluck("data")
+
+  map_dfr(search_data, function(loc) {
+    attrs <- loc$attributes
+    tibble(rise_id = attrs[["_id"]], location_name = attrs$locationName)
+  }) |>
+    mutate(cbtt = str_match(str_trim(location_name), "\\(([A-Za-z0-9]+)\\)$")[, 2])
+}
+
+fetch_rise_coords <- function(rise_id) {
+  resp <- GET(
+    paste0(RISE_BASE, "/location/", rise_id),
+    add_headers(Accept = "application/vnd.api+json")
+  )
+  stop_for_status(resp)
+
+  attrs <- content(resp, as = "text", encoding = "UTF-8") |>
+    fromJSON(simplifyDataFrame = FALSE) |>
+    pluck("data", "attributes")
+
+  coords <- attrs$locationCoordinates$coordinates
+  tibble(long = coords[[1]], lat = coords[[2]])
+}
+
+usbr_coords <- fetch_rise_klamath_cbtt() |>
+  filter(cbtt %in% usbr_cbtt_codes) |>
+  mutate(coords = map(rise_id, fetch_rise_coords)) |>
+  unnest(coords) |>
+  select(site = cbtt, lat, long)
+
+missing_cbtt <- setdiff(usbr_cbtt_codes, usbr_coords$site)
+if (length(missing_cbtt) > 0) {
+  warning("RISE lookup missing coordinates for: ", paste(missing_cbtt, collapse = ", "))
+}
+
+usbr_stations <- tribble(
+  ~site,   ~parameter, ~label,                                            ~measure_type,
+  "GER",   "FB",       "Gerber Reservoir - Forebay Elevation (ft)",       "Elevation",
+  "GER",   "AF",       "Gerber Reservoir - Storage (acre-ft)",            "Storage",
+  "CLK",   "FB",       "Clear Lake West Lobe - Forebay Elevation (ft)",   "Elevation",
+  "CLK",   "AF",       "Clear Lake West Lobe - Storage (acre-ft)",        "Storage",
+  "MAL",   "GD",       "Malone Reservoir - Gage Height (ft)",             "Elevation",
+  "TULC",  "FB",       "Tule Lake Sump 1A - Forebay Elevation (ft)",      "Elevation",
+  "TULC2", "FB",       "Tule Lake Sump 1B - Forebay Elevation (ft)",      "Elevation",
+  "LVNO",  "QJ",       "Langell Valley North Canal - Flow (cfs)",         "Flow",
+  "MHPO",  "QP",       "Miller Hill Pump Plant - Flow (cfs)",             "Flow",
+  "LRD",   "QD",       "Lost River Diversion - Flow (cfs)",               "Flow",
+  "HRPO",  "QD",       "Lost River at Harpold Dam - Flow (cfs)",          "Flow",
+  "LRS",   "QD",       "Clear Lake East Lobe / Lost River - Flow (cfs)",  "Flow",
+  "CHRO",  "QD",       "Cherry Creek - Flow (cfs)",                       "Flow"
+) |>
+  left_join(usbr_coords, by = "site")
 
 BASE_URL  <- "https://www.usbr.gov/pn-bin/webarccsv.pl"
 SLEEP_SEC <- 1
