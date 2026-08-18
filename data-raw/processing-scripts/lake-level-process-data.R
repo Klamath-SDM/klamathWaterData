@@ -207,31 +207,42 @@ tule_elevation <- bind_rows(tule_elev, tule_elev_early)
 water_level_data <- bind_rows(tule_elevation, water_level_data_usgs, water_level_data_usbr) |> glimpse()
 
 #### water data gage table ----
+#  clk and lsr gage data
+
+lrs_gage_data <- lrs_coords |>
+  mutate(gage_name = tolower(location),
+         location = "clear lake",
+         gage_id = "usbr-lsr",
+         agency = "usbr",
+         latitude = lat,
+         longitude = long,
+         river_mile = NA,
+         huc8 = "18010204") |>
+  select(location, gage_name, gage_id, agency, latitude, longitude, river_mile, huc8) |>
+  glimpse()
+
+clk_gage_data <- clk_coords |>
+  mutate(gage_name = tolower(location),
+         location = "clear lake",
+         gage_id = "usbr-clk",
+         agency = "usbr",
+         latitude = lat,
+         longitude = long,
+         river_mile = NA,
+         huc8 = "18010204") |>
+  select(location, gage_name, gage_id, agency, latitude, longitude, river_mile, huc8) |>
+  glimpse()
+
+
 water_level_gage <- water_level_gage_usgs |>
+  bind_rows(clk_gage_data, lrs_gage_data) |>
   add_row(location = "tule lake",
           gage_name = "usbr tule lake sump 1a surface elevations",
           gage_id = "usbr tule lake sump 1a",
           agency = "u.s. bureau of reclamation",
-          latitude = NA_integer_,
-          longitude = NA_integer_,
+          latitude = 41.87862,
+          longitude = -121.5453,
           huc8 = "18010203") |>
-  add_row(
-    location = "clear lake",
-    gage_name = "usbr clear lake west lobe",
-    gage_id = "clk",
-    agency = "u.s. bureau of reclamation",
-    latitude = NA_integer_,
-    longitude = NA_integer_,
-    huc8 = "18010204") |>
-  add_row(
-    location = "clear lake",
-    gage_name = "usbr clear lake reservoir east lobe",
-    gage_id = "lrs",
-    agency = "u.s. bureau of reclamation",
-    latitude = NA_integer_,
-    longitude = NA_integer_,
-    huc8 = "18010204") |>
-  mutate(huc8 = as.numeric(huc8)) |>
   glimpse()
 
 
