@@ -5,6 +5,7 @@ library(tidyr)
 library(purrr)
 library(pins)
 library(janitor)
+library(stringr)
 
 # the goal of this script is to pull flow data from different sources and save into aws bucket. Pulling last 10 years of flow data
 
@@ -78,12 +79,12 @@ url <- paste0(
   "&before=2025-12-31"
 )
 
-raw <- readLines(url, warn = FALSE)
+wilk_pull <- readLines(url, warn = FALSE)
 
 # Header is the line containing "Datetime"
-hdr <- grep("Datetime", raw)[1]
+hdr <- grep("Datetime", wilk_pull)[1]
 
-wilc <- read.csv(text = paste(raw[hdr:length(raw)], collapse = "\n"),
+wilc <- read.csv(text = paste(wilk_pull[hdr:length(wilk_pull)], collapse = "\n"),
                  stringsAsFactors = FALSE, check.names = FALSE)
 
 usbr_flow_data <- wilc |>
@@ -99,6 +100,28 @@ usbr_flow_data <- wilc |>
          ) |>
   select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
   glimpse()
+
+
+parse_rise_location_meta <- function(wilk_pull) {
+  loc_hdr  <- grep('^"Location","State","Coordinates', wilk_pull)
+  meta_row <- wilk_pull[loc_hdr + 1]
+
+  fields <- read.csv(text = paste(wilk_pull[loc_hdr], meta_row, sep = "\n"),
+                     stringsAsFactors = FALSE, check.names = FALSE)
+
+  coords <- str_match(fields$`Coordinates (long, lat)`, "\\(([-0-9.]+), ([-0-9.]+)\\)")
+
+  tibble(
+    location      = fields$Location,
+    state         = fields$State,
+    long          = as.numeric(coords[, 2]),
+    lat           = as.numeric(coords[, 3]),
+    timezone      = fields$Timezone,
+    location_type = fields$`Location Type`
+  )
+}
+
+wilc_coords <- parse_rise_location_meta(wilk_pull)
 
 
 ##### save raw data into aws bucket water-quality/data-raw/
