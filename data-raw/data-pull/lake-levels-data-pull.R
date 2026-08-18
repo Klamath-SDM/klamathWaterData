@@ -83,7 +83,7 @@ parse_rise_location_meta <- function(lrs_level_raw) {
   )
 }
 
-lrs_coords  <- parse_rise_location_meta(lrs_pull)
+lrs_coords  <- parse_rise_location_meta(lrs_level_raw)
 
 ## Clear Lake West Lobe (CLK) ----
 clk_level_url <- paste0(
