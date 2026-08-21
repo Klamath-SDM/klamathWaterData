@@ -72,16 +72,74 @@ unmatched_gage_ids <- setdiff(unique(flow_data$gage_id), flow_gage$gage_id)
 
 `flow_data` covers **`r format(min(flow_data$date), "%B %Y")` through
 `r format(max(flow_data$date), "%B %Y")`**, with `r format(nrow(flow_data), big.mark = ",")`
-records from `r n_distinct(flow_data$gage_id)` gages. Per the dataset's own
-documentation, raw records were pulled from three sources: **USGS** (via NWIS daily
-values), the **Water Quality Exchange / Water Quality Portal (WQX)** (tribal
-monitoring programs), and **USBR** data portals. Reporting frequency differs sharply
-by source - USGS gages report daily mean flow, while the WQX-sourced tribal sites are
-periodic grab samples roughly twice a month:
+records from `r n_distinct(flow_data$gage_id)` gages.
+
+Data sources include: 
+
+- USGS (via NWIS daily values)
+- Water Quality Exchange / Water Quality Portal (WQX)
+- U.S. Bureau of Reclamation
+
+
+Data collection frequency:
+
+- USGS gages report daily mean flow,
+- WQX-sourced tribal sites are periodic grab samples roughly twice a month:
 
 ```{r}
-kable(source_summary, col.names = c("Source / agency", "Gages", "Records", "Earliest date", "Latest date", "Typical frequency"))
+# kable(source_summary, col.names = c("Source / agency", "Gages", "Records", "Earliest date", "Latest date", "Typical frequency"))
 ```
+
+```{r}
+source_summary <- flow_data |>
+  left_join(flow_gage |> select(gage_id, agency), by = "gage_id") |>
+  mutate(
+    agency = ifelse(
+      is.na(agency),
+      "USBR (gage not yet in flow_gage metadata)",
+      agency
+    )
+  ) |>
+  group_by(agency) |>
+  summarize(
+    gage_ids = paste(sort(unique(gage_id)), collapse = ", "),
+    n_gages = n_distinct(gage_id),
+    n_records = n(),
+    min_date = min(date),
+    max_date = max(date),
+    median_gap_days = median(
+      as.numeric(
+        unlist(
+          sapply(
+            split(date, gage_id),
+            \(x) diff(sort(unique(x)))
+          )
+        )
+      ),
+      na.rm = TRUE
+    ),
+    .groups = "drop"
+  ) |>
+  mutate(
+    typical_frequency = classify_frequency(median_gap_days)
+  ) |>
+  select(-median_gap_days) |>
+  arrange(desc(n_records))
+
+kable(
+  source_summary,
+  col.names = c(
+    "Source / agency",
+    "Gage IDs",
+    "Gages",
+    "Records",
+    "Earliest date",
+    "Latest date",
+    "Typical frequency"
+  )
+)
+```
+
 
 `r if (length(unmatched_gage_ids) > 0) paste0("**Note:** ", length(unmatched_gage_ids), " gage_id(s) present in flow_data (", paste(unmatched_gage_ids, collapse = ", "), ") have no matching row in flow_gage, so they carry no agency/location/huc8/coordinates and do not appear on the map or in any sub-basin tab below.")`
 
