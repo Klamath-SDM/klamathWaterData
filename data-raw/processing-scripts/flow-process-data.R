@@ -226,8 +226,22 @@ gage_flow_usgs <- rivermile::find_nearest_river_miles(gage_flow_usgs_clean) |>
   glimpse()
 
 ### USBR ----
+#### water data table ----
 usbr_flow_data <- usbr_flow_data |>
   rename(stream = location) |>
+  glimpse()
+
+#### monitoring site table ----
+usbr_coords <- wilc_coords |>
+  mutate(gage_name = tolower(location),
+         location = "willow Creek",
+         gage_id = "usbr-wilc",
+         agency = "usbr",
+         latitude = lat,
+         longitude = long,
+         river_mile = NA,
+         huc8 = "18010204") |>
+  select(location, gage_name, gage_id, agency, latitude, longitude, river_mile, huc8) |>
   glimpse()
 
 # combine gage and data files ---------------------------------------------
@@ -241,7 +255,7 @@ flow_data <- flow_wqx |>
   glimpse()
 
 flow_gage <- gage_flow_wqx |>
-  bind_rows(gage_flow_usgs) |>
+  bind_rows(gage_flow_usgs, usbr_coords) |>
   # These two sites didn't overlap the NHD line for the Scott River so marking their RM as NA
   mutate(river_mile = case_when(gage_name == "Scott River at Gaging Station" ~ NA,
                                 gage_name == "Scott River South Fork" ~ NA,

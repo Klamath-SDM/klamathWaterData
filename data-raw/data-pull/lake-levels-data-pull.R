@@ -1,11 +1,6 @@
 library(tidyverse)
-library(dplyr)
 library(dataRetrieval)
-library(tidyr)
-library(purrr)
 library(pins)
-
-# the goal of this script is to pull Lake water surface elevation data from different sources. Pulling 1996-2025 data
 
 #  USGS data ----
 start_date <- "1996-01-01"
@@ -67,8 +62,23 @@ clear_lake_dam_channel <- data.frame(
 )
 
 ## Pull location metadata ----
-#  TODO - is this info available?
+parse_rise_location_meta <- function(lrs_level_raw) {
+  loc_hdr  <- grep('^"Location","State","Coordinates', lrs_level_raw)
+  meta_row <- lrs_level_raw[loc_hdr + 1]
+  fields <- read.csv(text = paste(lrs_level_raw[loc_hdr], meta_row, sep = "\n"),
+                     stringsAsFactors = FALSE, check.names = FALSE)
+  coords <- str_match(fields$`Coordinates (long, lat)`, "\\(([-0-9.]+), ([-0-9.]+)\\)")
+  tibble(
+    location      = fields$Location,
+    state         = fields$State,
+    long          = as.numeric(coords[, 2]),
+    lat           = as.numeric(coords[, 3]),
+    timezone      = fields$Timezone,
+    location_type = fields$`Location Type`
+  )
+}
 
+lrs_coords  <- parse_rise_location_meta(lrs_level_raw)
 
 ## Clear Lake West Lobe (CLK) ----
 clk_level_url <- paste0(
@@ -104,8 +114,16 @@ clear_lake_west <- data.frame(
   value = as.numeric(clk[["Result"]])
 )
 
+
+##  gage_data ----
+clk_coords  <- parse_rise_location_meta(clk_level_raw)
+
+
+
 #  bind both USBR gages
 usbr_lake_level <- bind_rows(clear_lake_dam_channel, clear_lake_west) |> glimpse()
+
+
 
 ##### save raw data into aws bucket water-quality/data-raw/
 

@@ -183,7 +183,7 @@
 #'   \item usbr-lrs
 #'   \item usbr-clk
 #'   }
-#' @format A tibble with 7 rows and 7 columns:
+#' @format A tibble with 8 rows and 7 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
