@@ -1,11 +1,6 @@
 library(tidyverse)
-library(dplyr)
 library(dataRetrieval)
-library(tidyr)
-library(purrr)
 library(pins)
-
-# the goal of this script is to pull Lake water surface elevation data from different sources. Pulling 1996-2025 data
 
 #  USGS data ----
 start_date <- "1996-01-01"

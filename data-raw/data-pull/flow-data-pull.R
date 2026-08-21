@@ -1,13 +1,7 @@
 library(tidyverse)
-library(dplyr)
 library(dataRetrieval)
-library(tidyr)
-library(purrr)
 library(pins)
 library(janitor)
-library(stringr)
-
-# the goal of this script is to pull flow data from different sources and save into aws bucket. Pulling last 10 years of flow data
 
 # Define aws bucket (klamath-sdm)
 # wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/data-raw/")
