@@ -2,6 +2,7 @@
 title: "Flow Data"
 author: "Badhia Yunes Katz"
 date: "August 2026"
+output: html_document
 ---
 
 ```{r, include = FALSE}
@@ -87,10 +88,6 @@ Data collection frequency:
 - WQX-sourced tribal sites are periodic grab samples roughly twice a month:
 
 ```{r}
-# kable(source_summary, col.names = c("Source / agency", "Gages", "Records", "Earliest date", "Latest date", "Typical frequency"))
-```
-
-```{r}
 source_summary <- flow_data |>
   left_join(flow_gage |> select(gage_id, agency), by = "gage_id") |>
   mutate(
@@ -140,6 +137,9 @@ kable(
 )
 ```
 
+Note: The note below will get updated when joined to main since flow_data changes have recently been
+merged into main form a different branch. This comment should be resolved once this branch is joined.
+Keeping as a placeholder. 
 
 `r if (length(unmatched_gage_ids) > 0) paste0("**Note:** ", length(unmatched_gage_ids), " gage_id(s) present in flow_data (", paste(unmatched_gage_ids, collapse = ", "), ") have no matching row in flow_gage, so they carry no agency/location/huc8/coordinates and do not appear on the map or in any sub-basin tab below.")`
 
@@ -198,7 +198,7 @@ stream_groups <- setNames(as.list(huc8_codes), basin_label(huc8_codes))
 group_colors <- setNames(RColorBrewer::brewer.pal(max(3, length(stream_groups)), "Paired")[seq_along(stream_groups)], names(stream_groups))
 ```
 
-## All flow gages
+## Map showing all flow gages
 
 ```{r}
 gage_map_data <- flow_gage |>
@@ -218,7 +218,7 @@ leaflet(gage_map_data) |>
   addLegend(position = "bottomright", pal = group_pal, values = ~group, title = "HUC8 sub-basin")
 ```
 
-## Flow by sub-basin {.tabset .tabset-fade .tabset-pills}
+## Flow summary by sub-basin {.tabset .tabset-fade .tabset-pills}
 
 ```{r, include=FALSE}
 # shared helper used by every tab below: filter flow_data/flow_gage down to one
