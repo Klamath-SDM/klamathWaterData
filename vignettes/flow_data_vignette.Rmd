@@ -32,10 +32,58 @@ colors_full <-  c("#9A8822", "#F5CDB4", "#F8AFA8", "#FDDDA0", "#74A089", #Royal 
 ## Overview
 
 This vignette summarizes `flow_data`, the packaged flow dataset for the Klamath Basin
-watershed, along with its companion metadata table `flow_gage`. For each stream
-grouping, a date-coverage plot and a summary of the available date range are provided
+watershed, along with its companion metadata table `flow_gage`. Gages are grouped by
+their 8-digit Hydrologic Unit Code (`huc8`) sub-basin - each tab below is one HUC8
+sub-basin. For each sub-basin, a date-coverage plot and a summary of the available date range are provided
 to give an easy visual reference for data availability and to highlight gaps.
 
+```{r, include = FALSE}
+classify_frequency <- function(median_gap_days) {
+  case_when(
+    median_gap_days <= 2 ~ "daily",
+    median_gap_days <= 10 ~ "weekly",
+    median_gap_days <= 20 ~ "biweekly (roughly twice a month)",
+    median_gap_days <= 40 ~ "monthly",
+    TRUE ~ "irregular"
+  )
+}
+
+# gage_ids present in flow_data but missing from flow_gage get an explicit
+# label here instead of silently becoming NA - see the callout below the
+# source table
+source_summary <- flow_data |>
+  left_join(flow_gage |> select(gage_id, agency), by = "gage_id") |>
+  mutate(agency = ifelse(is.na(agency), "USBR (gage not yet in flow_gage metadata)", agency)) |>
+  group_by(agency) |>
+  summarize(
+    n_gages = n_distinct(gage_id),
+    n_records = n(),
+    min_date = min(date),
+    max_date = max(date),
+    median_gap_days = median(as.numeric(unlist(sapply(split(date, gage_id), \(x) diff(sort(unique(x)))))), na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(typical_frequency = classify_frequency(median_gap_days)) |>
+  select(-median_gap_days) |>
+  arrange(desc(n_records))
+
+unmatched_gage_ids <- setdiff(unique(flow_data$gage_id), flow_gage$gage_id)
+```
+
+`flow_data` covers **`r format(min(flow_data$date), "%B %Y")` through
+`r format(max(flow_data$date), "%B %Y")`**, with `r format(nrow(flow_data), big.mark = ",")`
+records from `r n_distinct(flow_data$gage_id)` gages. Per the dataset's own
+documentation, raw records were pulled from three sources: **USGS** (via NWIS daily
+values), the **Water Quality Exchange / Water Quality Portal (WQX)** (tribal
+monitoring programs), and **USBR** data portals. Reporting frequency differs sharply
+by source - USGS gages report daily mean flow, while the WQX-sourced tribal sites are
+periodic grab samples roughly twice a month:
+
+```{r}
+kable(source_summary, col.names = c("Source / agency", "Gages", "Records", "Earliest date", "Latest date", "Typical frequency"))
+```
+
+`r if (length(unmatched_gage_ids) > 0) paste0("**Note:** ", length(unmatched_gage_ids), " gage_id(s) present in flow_data (", paste(unmatched_gage_ids, collapse = ", "), ") have no matching row in flow_gage, so they carry no agency/location/huc8/coordinates and do not appear on the map or in any sub-basin tab below.")`
 
 `flow_data` columns:
 
@@ -57,49 +105,49 @@ to give an easy visual reference for data availability and to highlight gaps.
   - `huc8`: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
 
 ```{r, include=FALSE}
-# an additional grouping for the upper basin tributaries and the handful of
-# gages in flow_gage that don't currently have a `location` assigned
-stream_groups <- list(
-  "Klamath River (mainstem)" = c("klamath river"),
-  "Trinity River" = c("trinity river", "sf trinity river"),
-  "Scott River" = c("scott river", "shackleford creek", "mill creek", "middle creek",
-                     "kelsey creek", "canyon creek", "boulder creek", "tompkins creek",
-                     "willow creek"),
-  "Shasta River" = c("shasta river"),
-  "Salmon River" = c("salmon river"),
-  "Indian Creek" = c("indian creek"),
-  "Link, Williamson & Sprague Basin" = c("link river", "williamson river", "sprague river",
-                                          "north fork sprague river", "south fork sprague river",
-                                          "sycan river")
+# HUC8 -> official sub-basin name, for every HUC8 that appears in flow_gage.
+huc8_basin_names <- c(
+  "18010201" = "Williamson",
+  "18010202" = "Sprague",
+  "18010203" = "Upper Klamath Lake",
+  "18010204" = "Lost",
+  "18010205" = "Butte",
+  "18010206" = "Upper Klamath",
+  "18010207" = "Shasta",
+  "18010208" = "Scott",
+  "18010209" = "Lower Klamath",
+  "18010210" = "Salmon",
+  "18010211" = "Trinity",
+  "18010212" = "South Fork Trinity"
 )
 
-# gages in flow_gage with no `location` assigned (e.g. Oregon canal/drain sites) -
-# identified by gage_id since `location` is NA for these rows
-unassigned_gage_ids <- flow_gage |>
-  filter(is.na(location)) |>
-  pull(gage_id)
+basin_label <- function(huc8) {
+  huc8_chr <- as.character(huc8)
+  name <- huc8_basin_names[huc8_chr]
+  ifelse(is.na(name), paste("HUC8", huc8_chr), paste0(name, " (HUC8 ", huc8_chr, ")"))
+}
 
-# a small, high-contrast qualitative palette (one hue per stream group) - the
-# muted colors_full palette above works fine for coloring individual gages
-# within a facet, but its similar-looking tones make it hard to tell stream
-# groups apart at a glance on the map, so groups get their own palette instead
-group_names <- c(names(stream_groups), "Other / unassigned")
-group_colors <- setNames(RColorBrewer::brewer.pal(length(group_names), "Dark2"), group_names)
+huc8_codes <- flow_gage |>
+  filter(!is.na(huc8)) |>
+  distinct(huc8) |>
+  arrange(huc8) |>
+  pull(huc8)
+
+# one group per sub-basin actually present in flow_gage, named list of huc8 codes
+stream_groups <- setNames(as.list(huc8_codes), basin_label(huc8_codes))
+
+# a high-contrast qualitative palette (one hue per sub-basin) - the muted
+group_colors <- setNames(RColorBrewer::brewer.pal(max(3, length(stream_groups)), "Paired")[seq_along(stream_groups)], names(stream_groups))
 ```
 
 ## All flow gages
 
 ```{r}
-group_lookup <- stream_groups |>
-  purrr::imap(\(locations, group) tibble(location = locations, group = group)) |>
-  bind_rows()
-
 gage_map_data <- flow_gage |>
-  left_join(group_lookup, by = "location") |>
-  mutate(group = ifelse(gage_id %in% unassigned_gage_ids, "Other / unassigned", group)) |>
+  mutate(group = basin_label(huc8)) |>
   filter(!is.na(latitude), !is.na(longitude))
 
-group_pal <- colorFactor(palette = group_colors[group_names], domain = gage_map_data$group)
+group_pal <- colorFactor(palette = group_colors[names(stream_groups)], domain = gage_map_data$group)
 
 leaflet(gage_map_data) |>
   addTiles() |>
@@ -109,20 +157,21 @@ leaflet(gage_map_data) |>
     radius = 5, stroke = FALSE, fillOpacity = 0.8,
     label = ~paste0(gage_name, " (", gage_id, ")")
   ) |>
-  addLegend(position = "bottomright", pal = group_pal, values = ~group, title = "Stream group")
+  addLegend(position = "bottomright", pal = group_pal, values = ~group, title = "HUC8 sub-basin")
 ```
 
-## Flow by stream {.tabset .tabset-fade .tabset-pills}
+## Flow by sub-basin {.tabset .tabset-fade .tabset-pills}
 
 ```{r, include=FALSE}
 # shared helper used by every tab below: filter flow_data/flow_gage down to one
-# stream group, plot date coverage per gage, and summarize the date range per gage
-flow_group_data <- function(locations) {
-  flow_data |> filter(location %in% locations)
+# HUC8 sub-basin (by its gage_ids), plot date coverage per gage, and summarize
+# the date range per gage
+flow_group_gages <- function(huc8_code) {
+  flow_gage |> filter(huc8 == huc8_code)
 }
 
-flow_group_gages <- function(locations) {
-  flow_gage |> filter(location %in% locations)
+flow_group_data <- function(huc8_code) {
+  flow_data |> filter(gage_id %in% flow_group_gages(huc8_code)$gage_id)
 }
 
 plot_date_coverage <- function(df) {
@@ -148,183 +197,20 @@ summarize_date_range <- function(df) {
 }
 ```
 
-### Klamath River (mainstem)
+```{r, results = "asis"}
+for (group in names(stream_groups)) {
+  huc8 <- stream_groups[[group]]
 
-```{r}
-kable(flow_group_gages(stream_groups[["Klamath River (mainstem)"]]) |>
-        select(gage_name, gage_id, agency, river_mile))
-```
+  cat("### ", group, "\n\n")
+  cat("\n\n#### Gages\n\n")
+  print(kable(flow_group_gages(huc8) |> select(location, gage_name, gage_id, agency, river_mile)))
 
-#### Date coverage
+  cat("\n\n#### Date coverage\n\n")
+  print(plot_date_coverage(flow_group_data(huc8)))
 
-```{r}
-plot_date_coverage(flow_group_data(stream_groups[["Klamath River (mainstem)"]]))
-```
+  cat("\n\n#### Date range summary\n\n")
+  print(kable(summarize_date_range(flow_group_data(huc8))))
 
-#### Date range summary
-
-```{r}
-kable(summarize_date_range(flow_group_data(stream_groups[["Klamath River (mainstem)"]])))
-```
-
-### Trinity River
-
-```{r}
-kable(flow_group_gages(stream_groups[["Trinity River"]]) |>
-        select(gage_name, gage_id, agency, river_mile))
-```
-
-#### Date coverage
-
-```{r}
-plot_date_coverage(flow_group_data(stream_groups[["Trinity River"]]))
-```
-
-#### Date range summary
-
-```{r}
-kable(summarize_date_range(flow_group_data(stream_groups[["Trinity River"]])))
-```
-
-### Scott River
-
-Includes the mainstem Scott River gages along with the smaller Quartz Valley
-Indian Community-monitored tributaries (Shackleford, Mill, Middle, Kelsey, Canyon,
-Boulder, and Tompkins Creeks, and Willow Creek).
-
-```{r}
-kable(flow_group_gages(stream_groups[["Scott River"]]) |>
-        select(gage_name, gage_id, agency, river_mile))
-```
-
-#### Date coverage
-
-```{r}
-plot_date_coverage(flow_group_data(stream_groups[["Scott River"]]))
-```
-
-#### Date range summary
-
-```{r}
-kable(summarize_date_range(flow_group_data(stream_groups[["Scott River"]])))
-```
-
-### Shasta River
-
-```{r}
-kable(flow_group_gages(stream_groups[["Shasta River"]]) |>
-        select(gage_name, gage_id, agency, river_mile))
-```
-
-#### Date coverage
-
-```{r}
-plot_date_coverage(flow_group_data(stream_groups[["Shasta River"]]))
-```
-
-#### Date range summary
-
-```{r}
-kable(summarize_date_range(flow_group_data(stream_groups[["Shasta River"]])))
-```
-
-### Salmon River
-
-```{r}
-kable(flow_group_gages(stream_groups[["Salmon River"]]) |>
-        select(gage_name, gage_id, agency, river_mile))
-```
-
-#### Date coverage
-
-```{r}
-plot_date_coverage(flow_group_data(stream_groups[["Salmon River"]]))
-```
-
-#### Date range summary
-
-```{r}
-kable(summarize_date_range(flow_group_data(stream_groups[["Salmon River"]])))
-```
-
-### Indian Creek
-
-```{r}
-kable(flow_group_gages(stream_groups[["Indian Creek"]]) |>
-        select(gage_name, gage_id, agency, river_mile))
-```
-
-#### Date coverage
-
-```{r}
-plot_date_coverage(flow_group_data(stream_groups[["Indian Creek"]]))
-```
-
-#### Date range summary
-
-```{r}
-kable(summarize_date_range(flow_group_data(stream_groups[["Indian Creek"]])))
-```
-
-### Link, Williamson & Sprague Basin
-
-Upper basin tributaries: Link River, Williamson River, and the Sprague River
-system (mainstem, North Fork, South Fork, and Sycan River).
-
-```{r}
-kable(flow_group_gages(stream_groups[["Link, Williamson & Sprague Basin"]]) |>
-        select(gage_name, gage_id, agency, river_mile))
-```
-
-#### Date coverage
-
-```{r}
-plot_date_coverage(flow_group_data(stream_groups[["Link, Williamson & Sprague Basin"]]))
-```
-
-#### Date range summary
-
-```{r}
-kable(summarize_date_range(flow_group_data(stream_groups[["Link, Williamson & Sprague Basin"]])))
-```
-
-### Other / unassigned gages
-
-`flow_gage` includes a some of stations that are not located on a stream, therefore `location`
-is unassigned (mostly Oregon canal/drain sites near Klamath Falls, plus one Scott Valley
-reservation site). They're listed here by `gage_id` rather than by stream grouping.
-
-```{r}
-kable(flow_gage |> filter(gage_id %in% unassigned_gage_ids) |>
-        select(gage_name, gage_id, agency, river_mile))
-```
-
-#### Date coverage
-
-```{r}
-flow_data |>
-  filter(gage_id %in% unassigned_gage_ids) |>
-  ggplot(aes(x = date, y = value, color = gage_name)) +
-  geom_line() +
-  scale_color_manual(values = colors_full) +
-  facet_wrap(~gage_name) +
-  theme_minimal() +
-  theme(legend.position = "none", axis.text.x = element_text(angle = 90, hjust = 1)) +
-  labs(title = "Flow vs Date by Gage", x = "Date", y = "Flow (cfs)")
-```
-
-#### Date range summary
-
-```{r}
-flow_data |>
-  filter(gage_id %in% unassigned_gage_ids) |>
-  group_by(gage_name, gage_id) |>
-  summarize(
-    min_date = min(date),
-    max_date = max(date),
-    record_count = n(),
-    .groups = "drop"
-  ) |>
-  arrange(gage_name) |>
-  kable()
+  cat("\n\n")
+}
 ```
