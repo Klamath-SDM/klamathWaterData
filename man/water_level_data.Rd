@@ -3,16 +3,16 @@
 \docType{data}
 \name{water_level_data}
 \alias{water_level_data}
-\title{Lake water surface elevation data from four different USGS gages, and one USBR monitoring site across the Klamath Basin}
+\title{Lake water surface elevation data from four different USGS gages, and six USBR monitoring sites across the Klamath Basin}
 \format{
-A tibble with 30,084 rows and 8 columns:
+A tibble with 116,994 rows and 8 columns:
 \itemize{
 \item \code{location}: location associated where data was collected/where gage is located
 \item \code{gage_name}: name of the gaging station
 \item \code{gage_id}: unique identifier for the gage
 \item \code{variable_name}: variable measured: "water level"
 \item \code{value}: observed value of the temperature (numeric)
-\item \code{unit}: units of measurement: feet
+\item \code{unit}: units of measurement: feet, feet above sea level - USBR datum
 \item \code{statistic}: summary statistic type: "mean"
 \item \code{date}: date of the observation
 }
@@ -27,7 +27,12 @@ Lake water surface elevation (ft) data from the following gages:
 \item 11504300
 \item 11505800
 \item 11507001
-\item usbr tule lake sump 1a
+\item usbr-tulc (Sump 1A; combines TID Daily Report data, 1986-2021, with USBR Hydromet data, 2024-present)
+\item usbr-tulc2 (Tule Lake Sump 1B, USBR Hydromet)
+\item usbr-ger (Gerber Reservoir, USBR Hydromet)
+\item usbr-mal (Malone Reservoir, USBR Hydromet)
+\item usbr-lrs
+\item usbr-clk (Clear Lake West Lobe, USBR Hydromet)
 }
 }
 \keyword{datasets}

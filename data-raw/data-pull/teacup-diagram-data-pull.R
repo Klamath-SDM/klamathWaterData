@@ -49,146 +49,47 @@ END_DATE   <- Sys.Date() - 1
 # directly if current/near-real-time values are needed.
 # ------------------------------------------------------------
 
-# lat/long sourced from the USBR RISE API (data.usbr.gov/rise/api/location),
-# which catalogs each Hydromet cbtt under a named Reclamation location.
-# NOTE: LRD ("Lost River Reservoir and Diversion Dam", RISE id 7307) is used
-# as the archived-data proxy for the teacup's "LRDO" circle, but RISE shows
-# these are technically two distinct points ~0.6 mi apart along the same
-# channel: LRDO is "Lost River Diversion Channel at C-G Canal Crossing"
-# (RISE id 7324, 42.140669 / -121.682313) downstream of the LRD dam site
-# used here (42.142822 / -121.672895).
+# lat/long pulled live from the USBR RISE API (see fetch_rise_klamath_locations()
+# in usbr-hydromet-pull-helpers.R), which catalogs each Hydromet cbtt under a
+# named Reclamation location, rather than hand-transcribed here.
+# NOTE: LRD ("Lost River Reservoir and Diversion Dam") is used as the
+# archived-data proxy for the teacup's "LRDO" circle, but RISE shows these
+# are technically two distinct points ~0.6 mi apart along the same channel:
+# LRDO is "Lost River Diversion Channel at C-G Canal Crossing" (42.140669 /
+# -121.682313) downstream of the LRD dam site used here (42.142822 /
+# -121.672895).
+source("data-raw/data-pull/usbr-hydromet-pull-helpers.R")
+
+rise_klamath_locations <- fetch_rise_klamath_locations()
+
 usbr_stations <- tribble(
-  ~site,   ~parameter, ~label,                                            ~measure_type, ~lat,       ~long,
-  "GER",   "FB",       "Gerber Reservoir - Forebay Elevation (ft)",       "Elevation",   42.201271, -121.129795,
-  "GER",   "AF",       "Gerber Reservoir - Storage (acre-ft)",            "Storage",     42.201271, -121.129795,
-  "CLK",   "FB",       "Clear Lake West Lobe - Forebay Elevation (ft)",   "Elevation",   41.846626, -121.209623,
-  "CLK",   "AF",       "Clear Lake West Lobe - Storage (acre-ft)",        "Storage",     41.846626, -121.209623,
-  "MAL",   "GD",       "Malone Reservoir - Gage Height (ft)",             "Elevation",   42.005769, -121.223952,
-  "TULC",  "FB",       "Tule Lake Sump 1A - Forebay Elevation (ft)",      "Elevation",   41.878620, -121.545291,
-  "TULC2", "FB",       "Tule Lake Sump 1B - Forebay Elevation (ft)",      "Elevation",   41.853279, -121.492546,
-  "LVNO",  "QJ",       "Langell Valley North Canal - Flow (cfs)",         "Flow",        42.134649, -121.198025,
-  "MHPO",  "QP",       "Miller Hill Pump Plant - Flow (cfs)",             "Flow",        42.142778, -121.751389,
-  "LRD",   "QD",       "Lost River Diversion - Flow (cfs)",               "Flow",        42.142822, -121.672895,
-  "HRPO",  "QD",       "Lost River at Harpold Dam - Flow (cfs)",          "Flow",        42.169507, -121.453355,
-  "LRS",   "QD",       "Clear Lake East Lobe / Lost River - Flow (cfs)",  "Flow",        41.926030, -121.075876,
-  "CHRO",  "QD",       "Cherry Creek - Flow (cfs)",                       "Flow",        42.598333, -122.095556
-)
-
-BASE_URL  <- "https://www.usbr.gov/pn-bin/webarccsv.pl"
-SLEEP_SEC <- 1
-UA <- "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+  ~site,   ~parameter, ~label,                                            ~measure_type,
+  "GER",   "FB",       "Gerber Reservoir - Forebay Elevation (ft)",       "Elevation",
+  "GER",   "AF",       "Gerber Reservoir - Storage (acre-ft)",            "Storage",
+  "CLK",   "FB",       "Clear Lake West Lobe - Forebay Elevation (ft)",   "Elevation",
+  "CLK",   "AF",       "Clear Lake West Lobe - Storage (acre-ft)",        "Storage",
+  "MAL",   "GD",       "Malone Reservoir - Gage Height (ft)",             "Elevation",
+  "TULC",  "FB",       "Tule Lake Sump 1A - Forebay Elevation (ft)",      "Elevation",
+  "TULC2", "FB",       "Tule Lake Sump 1B - Forebay Elevation (ft)",      "Elevation",
+  "LVNO",  "QJ",       "Langell Valley North Canal - Flow (cfs)",         "Flow",
+  "MHPO",  "QP",       "Miller Hill Pump Plant - Flow (cfs)",             "Flow",
+  "LRD",   "QD",       "Lost River Diversion - Flow (cfs)",               "Flow",
+  "HRPO",  "QD",       "Lost River at Harpold Dam - Flow (cfs)",          "Flow",
+  "LRS",   "QD",       "Clear Lake East Lobe / Lost River - Flow (cfs)",  "Flow",
+  "CHRO",  "QD",       "Cherry Creek - Flow (cfs)",                       "Flow"
+) |>
+  left_join(rise_klamath_locations, by = "site")
 
 # ------------------------------------------------------------
-# Parse webarccsv.pl response
+# Pull/parse webarccsv.pl responses (shared with lake-levels and flow
+# pull scripts; see usbr-hydromet-pull-helpers.R)
 # ------------------------------------------------------------
-
-parse_webarccsv <- function(raw_text, station_params) {
-  lines <- strsplit(raw_text, "\n")[[1]]
-
-  begin_idx <- which(grepl("^BEGIN DATA", lines, ignore.case = TRUE))
-  if (length(begin_idx) == 0) {
-    message("  [parse] No 'BEGIN DATA' marker found")
-    return(NULL)
-  }
-
-  data_lines <- lines[(begin_idx + 1):length(lines)]
-  data_lines <- data_lines[nzchar(trimws(data_lines))]
-  if (length(data_lines) < 2) return(NULL)
-
-  header_line <- data_lines[1]
-  data_lines  <- data_lines[-1]
-
-  col_names <- trimws(strsplit(header_line, ",")[[1]])
-
-  df_raw <- tryCatch(
-    read.csv(
-      text             = paste(data_lines, collapse = "\n"),
-      header           = FALSE,
-      col.names        = col_names,
-      colClasses       = "character",
-      stringsAsFactors = FALSE,
-      fill             = TRUE,
-      strip.white      = TRUE
-    ),
-    error = function(e) {
-      message("  [parse] read.csv error: ", conditionMessage(e))
-      NULL
-    }
-  )
-  if (is.null(df_raw) || ncol(df_raw) < 2) return(NULL)
-
-  date_col     <- col_names[1]
-  dates_parsed <- mdy(trimws(df_raw[[date_col]]))
-  n_dates      <- length(dates_parsed)
-  df_col_names <- names(df_raw)
-
-  find_col <- function(site, param) {
-    key_space <- paste(site, param)
-    key_dot   <- paste(site, param, sep = ".")
-    m <- which(col_names == key_space)
-    if (length(m) > 0) return(df_col_names[m[1]])
-    m <- which(df_col_names == key_dot)
-    if (length(m) > 0) return(df_col_names[m[1]])
-    m <- which(toupper(df_col_names) == toupper(key_dot))
-    if (length(m) > 0) return(df_col_names[m[1]])
-    m <- which(grepl(site, df_col_names, ignore.case = TRUE) &
-                 grepl(param, df_col_names, ignore.case = TRUE))
-    if (length(m) > 0) return(df_col_names[m[1]])
-    NA_character_
-  }
-
-  long_list <- lapply(seq_len(nrow(station_params)), function(i) {
-    row       <- station_params[i, ]
-    col_match <- find_col(row$site, row$parameter)
-    if (is.na(col_match)) return(NULL)
-
-    vals <- suppressWarnings(as.numeric(trimws(df_raw[[col_match]])))
-    if (length(vals) != n_dates) vals <- rep(NA_real_, n_dates)
-
-    tibble(
-      site         = row$site,
-      parameter    = row$parameter,
-      label        = row$label,
-      measure_type = row$measure_type,
-      lat          = row$lat,
-      long         = row$long,
-      date         = dates_parsed,
-      value        = vals
-    )
-  })
-
-  long_list <- Filter(Negate(is.null), long_list)
-  if (length(long_list) == 0) return(NULL)
-
-  bind_rows(long_list) |> filter(!is.na(date))
-}
-
-fetch_usbr_batch <- function(batch_df, start_date, end_date) {
-  param_string <- paste(paste(batch_df$site, batch_df$parameter), collapse = ",")
-  message("Fetching USBR Hydromet batch: ", paste(unique(batch_df$site), collapse = ", "))
-
-  resp <- tryCatch(
-    GET(
-      BASE_URL,
-      query = list(
-        parameter = param_string,
-        syer      = year(start_date),  smnth = month(start_date), sdy = day(start_date),
-        eyer      = year(end_date),    emnth = month(end_date),   edy = day(end_date),
-        format    = "2"
-      ),
-      add_headers(`User-Agent` = UA, `Referer` = "https://www.usbr.gov/pn/hydromet/klamath/teacup.html"),
-      timeout(120)
-    ),
-    error = function(e) { warning("  HTTP error: ", conditionMessage(e)); NULL }
-  )
-  Sys.sleep(SLEEP_SEC)
-
-  if (is.null(resp) || status_code(resp) != 200) return(NULL)
-  parse_webarccsv(content(resp, as = "text", encoding = "UTF-8"), batch_df)
-}
 
 usbr_batches <- split(usbr_stations, ceiling(seq_len(nrow(usbr_stations)) / 14))
-usbr_data <- map_dfr(usbr_batches, fetch_usbr_batch, start_date = START_DATE, end_date = END_DATE)
+usbr_data <- map_dfr(usbr_batches, fetch_usbr_batch, start_date = START_DATE, end_date = END_DATE) |>
+  # fetch_usbr_batch()/parse_webarccsv() are shared with other pull scripts and
+  # don't carry measure_type themselves - join it back from usbr_stations.
+  left_join(usbr_stations |> select(site, parameter, measure_type), by = c("site", "parameter"))
 
 # ------------------------------------------------------------
 # 2. USGS NWIS gauges embedded in the teacup diagram

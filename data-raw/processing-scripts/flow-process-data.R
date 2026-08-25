@@ -1,7 +1,5 @@
 library(tidyverse)
-library(dplyr)
 library(dataRetrieval)
-library(tidyr)
 library(purrr)
 library(pins)
 library(rivermile)
@@ -59,13 +57,11 @@ all_wqx_flow_data <- all_wqx_flow_data |>
 # check for naming assigned
 all_wqx_flow_data |>
   select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |>
-  distinct() |>
-  view()
+  distinct()
 
 # check
 missing_names_wqx <- all_wqx_flow_data |>
-  filter(is.na(waterbody_name)) |>
-  view()
+  filter(is.na(waterbody_name))
 
 table(missing_names_wqx$monitoring_location_name) # only 2 names that did not catch on function. This a source for checking those names https://www.waterqualitydata.us/provider/STORET/QVIR/
 
@@ -78,8 +74,7 @@ mutate(waterbody_name = case_when(
 # QVIR-SRES (Shackleford at Reservation) does not seem to be located on a stream (https://www.google.com/maps/place/41%C2%B021'13.0%22N+122%C2%B034'58.8%22W/@41.3542763,-122.587643,2087m/data=!3m1!1e3!4m4!3m3!8m2!3d41.3536!4d-122.583?authuser=0&entry=ttu&g_ep=EgoyMDI1MDIyNi4xIKXMDSoASAFQAw%3D%3D)
 all_wqx_flow_data_clean |>
   select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |>
-  distinct() |>
-  view()
+  distinct()
 
 #### Flow data table ----
 flow_wqx <- all_wqx_flow_data_clean |>
@@ -181,7 +176,7 @@ flow_processed_data_usgs <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by =
   glimpse()
 
 flow_processed_data_usgs |>  #checking function
-  select(gage_name, waterbody_name) |> distinct() |> view()
+  select(gage_name, waterbody_name) |> distinct()
 
 # fixing names
 flow_processed_data_usgs_clean <- flow_processed_data_usgs |>
@@ -194,7 +189,7 @@ flow_usgs <- flow_processed_data_usgs_clean |>
   glimpse()
 
 flow_processed_data_usgs_clean |>  #check
-  select(gage_name, waterbody_name) |> distinct() |> view()
+  select(gage_name, waterbody_name) |> distinct()
 
 flow_usgs <- flow_processed_data_usgs_clean |>
   mutate(gage_id = site_no,
@@ -231,13 +226,60 @@ usbr_flow_data <- usbr_flow_data |>
   glimpse()
 
 # combine gage and data files ---------------------------------------------
+
+site_with_little_data <- flow_data |>
+  group_by(gage_name) |>
+  summarise(min_date = min(date),
+            max_date = max(date),
+            n = n()) |>
+  filter(n > 10) |>
+  pull(gage_name)
+
 flow_data <- flow_wqx |>
   mutate(date = as.Date(date)) |>
   bind_rows(flow_usgs |>
-              mutate(gage_id = as.character(gage_id)), usbr_flow_data) |>
+              mutate(gage_id = as.character(gage_id)), usbr_flow_data,
+            usbr_hydromet_flow_data, owrd_flow_data) |>
   mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
+  filter(gage_name %in% site_with_little_data) |>
+  filter(!is.na(value)) |>
+  filter(value != 998877.00 & value >= 0) |>  # this removes outlier in sbr-hrpo
+  glimpse()
+
+# USBR Hydromet / OWRD gages missing from flow_gage - see flow-data-pull.R.
+# Not run through gage_data_format()/find_nearest_river_miles() (river_mile
+# left NA), same treatment as the existing Willow Creek (usbr-wilc) USBR gage.
+# USBR lat/long come from rise_klamath_locations (pulled live - see
+# flow-data-pull.R); OWRD's two sites have no equivalent live coordinate
+# source available, so they stay hand-transcribed here (matches
+# teacup-diagram-data-pull.R's own OWRD block). huc8 determined by spatial
+# join against rivermile::klamath_hucs (point-in-polygon on lat/long) rather
+# than hand-transcribed.
+flow_gage_usbr_owrd <- usbr_hydromet_flow_data |>
+  bind_rows(owrd_flow_data) |>
+  distinct(location, gage_name, gage_id) |>
+  mutate(
+    agency = if_else(gage_id %in% c("11495600", "11495900"),
+                      "Oregon Water Resources Department",
+                      "Bureau of Reclamation"),
+    site = toupper(str_remove(gage_id, "^usbr-"))) |>
+  left_join(rise_klamath_locations, by = "site") |>
+  mutate(
+    latitude = case_when(
+      gage_id == "11495600" ~ 42.42,     gage_id == "11495900" ~ 42.496528,
+      .default = lat),
+    longitude = case_when(
+      gage_id == "11495600" ~ -121.056389, gage_id == "11495900" ~ -121.006925,
+      .default = long),
+    river_mile = NA_real_) |>
+  select(-site, -lat, -long) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326, remove = FALSE) |>
+  st_join(klamath_hucs |> st_transform(4326), join = st_intersects) |>
+  st_drop_geometry() |>
+  select(-name) |>
+  mutate(huc8 = as.numeric(huc8)) |>
   glimpse()
 
 flow_gage <- gage_flow_wqx |>
@@ -250,8 +292,21 @@ flow_gage <- gage_flow_wqx |>
   mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
+  bind_rows(flow_gage_usbr_owrd) |>
   glimpse()
 
+ggplot(data = flow_data, aes(x = date, y = value)) +
+  geom_line() +
+  facet_wrap(~gage_id, scales = "free") +
+  theme_minimal()
+
+flow_data |>
+  group_by(gage_name) |>
+  summarise(min_date = min(date),
+            max_date = max(date),
+            min_val = min(value),
+            max_val = max(value),
+            n = n())
 
 # save data
 # wq_processed_data |> pins::pin_write(flow_data,
