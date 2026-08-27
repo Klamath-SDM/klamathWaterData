@@ -25,6 +25,7 @@ library(leaflet)
 library(knitr)
 library(RColorBrewer)
 library(rivermile)
+library(sf)
 
 colors_full <-  c("#9A8822", "#F5CDB4", "#F8AFA8", "#FDDDA0", "#74A089", #Royal 2
                   "#899DA4", "#C93312", "#DC863B", # royal 1 (- 3)
@@ -186,6 +187,15 @@ basin_label <- function(huc8) {
   ifelse(is.na(name), paste("HUC8", huc8_chr), paste0(name, " (HUC8 ", huc8_chr, ")"))
 }
 
+# name only, no HUC8 code - used where the code isn't needed to disambiguate
+# (e.g. gage_map_data$group). Tab headings still use basin_label() above since
+# huc8, not the name, is the actual grouping key there.
+basin_name_only <- function(huc8) {
+  huc8_chr <- as.character(huc8)
+  name <- huc8_basin_names[huc8_chr]
+  ifelse(is.na(name), paste("HUC8", huc8_chr), name)
+}
+
 huc8_codes <- flow_gage |>
   filter(!is.na(huc8)) |>
   distinct(huc8) |>
@@ -203,10 +213,21 @@ group_colors <- setNames(RColorBrewer::brewer.pal(max(3, length(stream_groups)),
 
 ```{r}
 gage_map_data <- flow_gage |>
-  mutate(group = basin_label(huc8)) |>
+  mutate(group = basin_name_only(huc8)) |>
   filter(!is.na(latitude), !is.na(longitude))
 
 group_pal <- colorFactor(palette = group_colors[names(stream_groups)], domain = gage_map_data$group)
+
+# one label per sub-basin, placed inside that sub-basin's actual HUC8 boundary
+# (not the centroid of its gages - some sub-basins, e.g. Butte, have a
+# boundary but no flow gages at all, so a gage-based centroid can't cover
+# them). st_point_on_surface(), unlike st_centroid(), always returns a point
+# that falls inside the polygon, which matters for elongated/concave basins.
+huc_label_points <- sf::st_point_on_surface(rivermile::klamath_hucs)
+huc_label_coords <- sf::st_coordinates(huc_label_points)
+group_label_points <- rivermile::klamath_hucs |>
+  sf::st_drop_geometry() |>
+  mutate(group = name, lng = huc_label_coords[, "X"], lat = huc_label_coords[, "Y"])
 
 leaflet(gage_map_data) |>
   addTiles() |>
@@ -222,7 +243,16 @@ leaflet(gage_map_data) |>
     color = "red",
     radius = 5, stroke = FALSE, fillOpacity = 0.8,
     label = ~paste0(gage_name, " (", gage_id, ")")
-  ) 
+  ) |>
+  addLabelOnlyMarkers(
+    data = group_label_points,
+    lng = ~lng, lat = ~lat,
+    label = ~group,
+    labelOptions = labelOptions(
+      noHide = TRUE, textOnly = TRUE, direction = "center",
+      style = list("font-weight" = "bold", "font-size" = "13px", "text-shadow" = "1px 1px 2px white, -1px -1px 2px white")
+    )
+  )
 ```
 
 ## Flow summary by sub-basin {.tabset .tabset-fade .tabset-pills}
