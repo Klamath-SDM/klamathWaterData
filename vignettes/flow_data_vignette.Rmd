@@ -3,6 +3,10 @@ title: "Flow Data"
 author: "Badhia Yunes Katz"
 date: "August 2026"
 output: html_document
+vignette: >
+  %\VignetteIndexEntry{Flow Data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
@@ -20,6 +24,7 @@ library(ggplot2)
 library(leaflet)
 library(knitr)
 library(RColorBrewer)
+library(rivermile)
 
 colors_full <-  c("#9A8822", "#F5CDB4", "#F8AFA8", "#FDDDA0", "#74A089", #Royal 2
                   "#899DA4", "#C93312", "#DC863B", # royal 1 (- 3)
@@ -137,10 +142,6 @@ kable(
 )
 ```
 
-Note: The note below will get updated when joined to main since flow_data changes have recently been
-merged into main form a different branch. This comment should be resolved once this branch is joined.
-Keeping as a placeholder. 
-
 `r if (length(unmatched_gage_ids) > 0) paste0("**Note:** ", length(unmatched_gage_ids), " gage_id(s) present in flow_data (", paste(unmatched_gage_ids, collapse = ", "), ") have no matching row in flow_gage, so they carry no agency/location/huc8/coordinates and do not appear on the map or in any sub-basin tab below.")`
 
 `flow_data` columns:
@@ -209,13 +210,19 @@ group_pal <- colorFactor(palette = group_colors[names(stream_groups)], domain = 
 
 leaflet(gage_map_data) |>
   addTiles() |>
+    addPolygons(
+    data = rivermile::klamath_hucs,
+    fill = FALSE,
+    color = "black",
+    weight = 2,
+    opacity = 0.7
+  ) |>
   addCircleMarkers(
     lng = ~longitude, lat = ~latitude,
-    color = ~group_pal(group),
+    color = "red",
     radius = 5, stroke = FALSE, fillOpacity = 0.8,
     label = ~paste0(gage_name, " (", gage_id, ")")
-  ) |>
-  addLegend(position = "bottomright", pal = group_pal, values = ~group, title = "HUC8 sub-basin")
+  ) 
 ```
 
 ## Flow summary by sub-basin {.tabset .tabset-fade .tabset-pills}
@@ -236,7 +243,7 @@ plot_date_coverage <- function(df) {
   df |> ggplot(aes(x = date, y = value, color = gage_name)) +
     geom_line() +
     scale_color_manual(values = colors_full) +
-    facet_wrap(~gage_name) +
+    facet_wrap(~gage_name, scales = "free_y") +
     theme_minimal() +
     theme(legend.position = "none", axis.text.x = element_text(angle = 90, hjust = 1)) +
     labs(title = "Flow vs Date by Gage", x = "Date", y = "Flow (cfs)")
@@ -261,7 +268,13 @@ for (group in names(stream_groups)) {
 
   cat("### ", group, "\n\n")
   cat("\n\n#### Gages\n\n")
-  print(kable(flow_group_gages(huc8) |> select(location, gage_name, gage_id, agency, river_mile)))
+  print(
+  kable(
+    flow_group_gages(huc8) |>
+      mutate(river_mile = round(river_mile)) |>
+      select(location, gage_name, gage_id, agency, river_mile)
+  )
+)
 
   cat("\n\n#### Date coverage\n\n")
   print(plot_date_coverage(flow_group_data(huc8)))
