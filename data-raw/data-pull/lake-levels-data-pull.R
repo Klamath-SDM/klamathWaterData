@@ -8,8 +8,9 @@ library(pins)
 # the goal of this script is to pull Lake water surface elevation data from different sources. Pulling 1996-2025 data
 
 #  USGS data ----
-start_date <- "1996-01-01"
-end_date <- "2025-12-31"
+# Standardized pull window - every source below uses this same start/end date.
+start_date <- as.Date("1996-01-01")
+end_date   <- as.Date("2025-12-31")
 
 #### usgs lake water surface data ----
 ukl_levels_1 <- dataRetrieval::readNWISdv(11505900, parameterCd = "72275", start_date , end_date)
@@ -63,8 +64,8 @@ usbr_hydromet_elev_stations <- tribble(
 
 usbr_hydromet_elev_raw <- fetch_usbr_batch(
   usbr_hydromet_elev_stations,
-  start_date = as.Date("1990-10-01"),
-  end_date   = Sys.Date() - 1
+  start_date = start_date,
+  end_date   = end_date
 )
 
 ##### save raw data into aws bucket water-quality/data-raw/

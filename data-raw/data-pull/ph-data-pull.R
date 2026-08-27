@@ -9,16 +9,19 @@ library(pins)
 # Define aws bucket (klamath-sdm)
 wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/data-raw/")
 
+# Standardized pull window - matches lake-levels/flow/teacup-diagram pulls.
+start_date <- as.Date("1996-01-01")
+end_date   <- as.Date("2025-12-31")
 
 ### WQX data pull -----
 #### ph data pull----
 huc_code <- "180102" # huc code for Klamath basin
 
 # DO data
-wqx_ph_data <- readWQPdata(huc = huc_code,                       
+wqx_ph_data <- readWQPdata(huc = huc_code,
                            characteristicName = "pH",
-                           startDateLo = "2014-01-01",               
-                           startDateHi = "2025-01-01") 
+                           startDateLo = start_date,
+                           startDateHi = end_date)
 
 # gage data has already been pulled in temp data pull script
 
@@ -46,7 +49,6 @@ usgs_gages <- unique(klamath_sites$site_no)
 head(usgs_gages)
 
 # Define parameters
-start_date <- "2014-01-01"
 parameterCd <- "00400"  # pH
 statCd <- c("00001", "00002", "00003")  # Min, Max, Mean pH
 
@@ -58,11 +60,12 @@ for (gage in usgs_gages) {
   message(paste("Pulling pH data for gage:", gage))
   try({
     ph_data <- readNWISdv(
-      siteNumbers = gage, 
-      parameterCd = parameterCd, 
-      statCd = statCd, 
-      startDate = start_date
-    ) 
+      siteNumbers = gage,
+      parameterCd = parameterCd,
+      statCd = statCd,
+      startDate = start_date,
+      endDate = end_date
+    )
     
     # Add gage ID column
     ph_data <- ph_data |> 

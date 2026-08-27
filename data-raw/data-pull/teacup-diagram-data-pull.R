@@ -29,8 +29,9 @@ library(dataRetrieval)
 # diagram are excluded — they report weather, not elevation/flow.
 # ============================================================
 
-START_DATE <- as.Date("1990-10-01")
-END_DATE   <- Sys.Date() - 1
+# Standardized pull window - matches lake-levels-data-pull.R / flow-data-pull.R.
+start_date <- as.Date("1996-01-01")
+end_date   <- as.Date("2025-12-31")
 
 # ------------------------------------------------------------
 # 1. USBR Hydromet stations embedded in the teacup diagram
@@ -86,7 +87,7 @@ usbr_stations <- tribble(
 # ------------------------------------------------------------
 
 usbr_batches <- split(usbr_stations, ceiling(seq_len(nrow(usbr_stations)) / 14))
-usbr_data <- map_dfr(usbr_batches, fetch_usbr_batch, start_date = START_DATE, end_date = END_DATE) |>
+usbr_data <- map_dfr(usbr_batches, fetch_usbr_batch, start_date = start_date, end_date = end_date) |>
   # fetch_usbr_batch()/parse_webarccsv() are shared with other pull scripts and
   # don't carry measure_type themselves - join it back from usbr_stations.
   left_join(usbr_stations |> select(site, parameter, measure_type), by = c("site", "parameter"))
@@ -104,7 +105,7 @@ usbr_data <- map_dfr(usbr_batches, fetch_usbr_batch, start_date = START_DATE, en
 # images with no CSV/JSON API). Both are excluded here; Spencer Creek
 # (11510000, data through 1932) and Sycan River (11499100, data
 # through 1991) are legitimate but long-discontinued USGS gauges kept
-# below — they'll simply return no rows if START_DATE is after their
+# below — they'll simply return no rows if start_date is after their
 # end_date.
 # ------------------------------------------------------------
 
@@ -134,8 +135,8 @@ fetch_usgs_site <- function(site_no, parm_cd) {
     readNWISdv(
       siteNumbers = site_no,
       parameterCd = parm_cd,
-      startDate   = START_DATE,
-      endDate     = END_DATE
+      startDate   = start_date,
+      endDate     = end_date
     ),
     error = function(e) {
       warning("  USGS pull failed for ", site_no, "/", parm_cd, ": ", conditionMessage(e))
@@ -173,7 +174,7 @@ usgs_data <- usgs_raw |> filter(!is.na(date))
 # 3. add OWRD data:
 # ------------------------------------------------------------
 
-sf_sprague <- whychusModel::get_owrd_hydro(11495600, START_DATE, END_DATE , "MDF") |>
+sf_sprague <- whychusModel::get_owrd_hydro(11495600, start_date, end_date , "MDF") |>
   transmute(
     source       = "OWRD",
     site         = as.character(station_nbr),
@@ -186,7 +187,7 @@ sf_sprague <- whychusModel::get_owrd_hydro(11495600, START_DATE, END_DATE , "MDF
     value        = mean_daily_flow_cfs
   ) |>
   filter(!is.na(value))
-nf_sprague <- whychusModel::get_owrd_hydro(11495900, START_DATE, END_DATE , "MDF") |>
+nf_sprague <- whychusModel::get_owrd_hydro(11495900, start_date, end_date , "MDF") |>
   transmute(
     source       = "OWRD",
     site         = as.character(station_nbr),

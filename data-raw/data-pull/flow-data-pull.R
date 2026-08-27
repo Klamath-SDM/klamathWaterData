@@ -3,6 +3,8 @@ library(dataRetrieval)
 library(purrr)
 library(pins)
 library(janitor)
+library(httr)
+library(xml2)
 
 # the goal of this script is to pull flow data from different sources and save into aws bucket.
 
@@ -152,32 +154,96 @@ usbr_hydromet_flow_data <- usbr_hydromet_flow_raw |>
   glimpse()
 
 ## OWRD flow gages - missing from flow_data ----
-# SF Sprague River nr Bly (11495600) and NF Sprague River (11495900) are on
-# the teacup diagram but have no usable USGS NWIS record (see
-# teacup-diagram-data-pull.R for details), so they're pulled directly from
-# OWRD via whychusModel::get_owrd_hydro(), same as there.
-owrd_flow_data <- bind_rows(
-  whychusModel::get_owrd_hydro(11495600, start_date, end_date, "MDF") |>
+# OWRD "near real time" gaging stations in the Klamath basin, station type =
+# discharge, from https://apps.wrd.state.or.us/apps/sw/hydro_near_real_time/.
+# None of these have a usable USGS NWIS record in this script's usgs_gages
+# (above) - same rationale as the original two entries here (SF/NF Sprague
+# River nr Bly). Stations that DO already have USGS coverage in usgs_gages
+# (11501000, 11502500, 11507500, 11509500, 11510700, 11499100, 11504115) are
+# deliberately excluded to avoid a duplicate/colliding series under the same
+# station number.
+#
+# Five stations that were not pulled:
+#   - 11504210 (Cherry Creek nr Klamath Agency, OR) - USBR site
+#   - 11514500 (Keene Creek nr Ashland, OR) - hyatt dam and reservoir. There is discharge here from
+#   a USBR gage but it doesn't seem necessary. we can add this in later if necessary:
+#   https://www.usbr.gov/pn-bin/v1/instant.pl?list=HYA&format=dfcgi
+#   - 11484200 (Lost R at Bonanza) and 11498500 (Long Cr nr Silver Lake, OR) - these are
+#   only stage
+#
+# lat/long pulled live from OWRD's own KML station feed
+# (near_real_time_gage_station_kml.aspx) rather than hand-transcribed.
+fetch_owrd_coord <- function(station_nbr) {
+  url <- paste0(
+    "https://apps.wrd.state.or.us/apps/sw/hydro_near_real_time/near_real_time_gage_station_kml.aspx",
+    "?sn_start=", station_nbr
+  )
+  kml <- xml2::read_xml(content(GET(url), as = "text", encoding = "UTF-8"))
+  for (pm in xml2::xml_find_all(kml, ".//Placemark")) {
+    desc <- xml2::xml_text(xml2::xml_find_first(pm, ".//description"))
+    if (grepl(paste0("Station Number: ", station_nbr, "<br>"), desc, fixed = TRUE)) {
+      coords <- strsplit(trimws(xml2::xml_text(xml2::xml_find_first(pm, ".//coordinates"))), ",")[[1]]
+      return(tibble(site = station_nbr, long = as.numeric(coords[1]), lat = as.numeric(coords[2])))
+    }
+  }
+  tibble(site = station_nbr, long = NA_real_, lat = NA_real_)
+}
+
+owrd_station_list <- tribble(
+  ~site,      ~location,                   ~gage_name,
+  "11495600", "sf sprague river",          "sf sprague river nr bly, or",
+  "11495900", "nf sprague river",          "n fk sprague r ab sric cn nr bly, or",
+  "11491400", "williamson river",          "williamson r bl sheep cr nr lenz, or",
+  "11493500", "williamson river",          "williamson r nr klamath agency, or",
+  "11494000", "williamson river",          "williamson r ab spring cr nr klamath agency, or",
+  "11494100", "larkin creek",              "larkin cr nr chiloquin, or",
+  "11494200", "spring creek",              "spring cr nr chiloquin, or",
+  "11494510", "williamson river",          "williamson r ab sprague r nr chiloquin, or",
+  "11494950", "south fork sprague river",  "s fk sprague r at sprague r park nr bly, or",
+  "11497500", "sprague river",             "sprague r nr beatty, or",
+  "11497550", "sprague river",             "sprague r bl brown cr nr beatty, or",
+  "11500400", "trout creek",               "trout cr nr lone pine",
+  "11500500", "sprague river",             "sprague r at lone pine, or",
+  "11502550", "williamson river",          "williamson r at modoc pt rd, nr chiloquin, or",
+  "11502950", "sun creek",                 "sun cr at ranger sta nr fort klamath, or",
+  "11502980", "wood river",                "wood r bl sun cr nr fort klamath, or",
+  "11503000", "annie spring",              "annie spring nr crater lake, or",
+  "11503500", "annie creek",               "annie cr nr ft klamath",
+  "11504103", "wood river",                "wood r ab crooked cr, nr klamath agency, or",
+  "11504109", "crooked creek",             "crooked cr nr klamath agency, or",
+  "11504120", "sevenmile creek",           "sevenmile cr bl dry cr nr fort klamath",
+  "11510000", "spencer creek",             "spencer cr nr keno, or"
+)
+
+owrd_coords <- map_dfr(owrd_station_list$site, fetch_owrd_coord)
+owrd_stations <- owrd_station_list |> left_join(owrd_coords, by = "site")
+
+owrd_flow_data <- map_dfr(seq_len(nrow(owrd_stations)), function(i) {
+  station <- owrd_stations[i, ]
+  message("Pulling OWRD data for station: ", station$site)
+  result <- tryCatch(
+    whychusModel::get_owrd_hydro(station$site, start_date, end_date, "MDF"),
+    error = function(e) { message("  failed: ", conditionMessage(e)); NULL }
+  )
+  # OWRD's server occasionally returns an HTML error page instead of data for
+  # a given station/parameter combination (get_owrd_hydro() doesn't detect
+  # this itself, so it's parsed into a malformed 1-column result) - skip
+  # rather than error out the whole pull.
+  if (is.null(result) || !"station_nbr" %in% names(result)) {
+    message("  no usable data returned for station ", station$site)
+    return(NULL)
+  }
+  result |>
     transmute(
-      location = "sf sprague river",
-      gage_name = "sf sprague river nr bly, or",
-      gage_id = as.character(station_nbr),
-      variable_name = "flow",
-      value = mean_daily_flow_cfs,
-      unit = "cfs",
-      statistic = "mean",
-      date = mdy(record_date)),
-  whychusModel::get_owrd_hydro(11495900, start_date, end_date, "MDF") |>
-    transmute(
-      location = "nf sprague river",
-      gage_name = "n fk sprague r ab sric cn nr bly, or",
+      location = station$location,
+      gage_name = station$gage_name,
       gage_id = as.character(station_nbr),
       variable_name = "flow",
       value = mean_daily_flow_cfs,
       unit = "cfs",
       statistic = "mean",
       date = mdy(record_date))
-) |>
+}) |>
   filter(!is.na(value)) |>
   glimpse()
 

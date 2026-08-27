@@ -17,11 +17,15 @@ wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", pref
 
 huc_code <- "180102" # huc code for Klamath basin
 
+# Standardized pull window - matches lake-levels/flow/teacup-diagram pulls.
+start_date <- as.Date("1996-01-01")
+end_date   <- as.Date("2025-12-31")
+
 #### temperature data ----
 wqx_temp_data <- readWQPdata(huc = huc_code,
                          characteristicName = "Temperature, water",
-                         startDateLo = "2014-01-01",
-                         startDateHi = "2025-01-01")
+                         startDateLo = start_date,
+                         startDateHi = end_date)
 ####  gage data ----
 wqx_gage_data <- whatWQPsites(huc = huc_code)  # this gage data pull can serve other parameters since it covers all sites with this huc code (Klamath basin)
 
@@ -44,7 +48,6 @@ usgs_gages <- c(
   "420024121132800", "420535121143800", "11485000") # pulling data for keno stretch and Lost river
 
 # Define the parameters
-start_date <- "2014-01-01"
 parameter_code <- "00010"  # Temperature parameter code
 stat_codes <- c("00001", "00002", "00003")  # Min, Max, Mean code
 
@@ -59,7 +62,8 @@ for (gage in usgs_gages) {
       siteNumbers = gage,
       parameterCd = parameter_code,
       statCd = stat_codes,
-      startDate = start_date
+      startDate = start_date,
+      endDate = end_date
     )
 
     temp_data <- temp_data |>
