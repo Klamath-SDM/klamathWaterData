@@ -1,0 +1,317 @@
+---
+title: "Flow Data"
+author: "Badhia Yunes Katz"
+date: "August 2026"
+output: html_document
+vignette: >
+  %\VignetteIndexEntry{Flow Data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  comment = "#>",
+  fig.width = 8, fig.height = 5)
+
+library(klamathWaterData)
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+library(knitr)
+library(RColorBrewer)
+library(rivermile)
+library(sf)
+
+colors_full <-  c("#9A8822", "#F5CDB4", "#F8AFA8", "#FDDDA0", "#74A089", #Royal 2
+                  "#899DA4", "#C93312", "#DC863B", # royal 1 (- 3)
+                  "#F1BB7B", "#FD6467", "#5B1A18", # Grand Budapest 1 (-4)
+                  "#D8B70A", "#02401B", "#A2A475", # Cavalcanti 1
+                  "#E6A0C4", "#C6CDF7", "#D8A499", "#7294D4", #Grand Budapest 2
+                  "#9986A5", "#EAD3BF", "#AA9486", "#B6854D", "#798E87" # Isle of dogs 2 altered slightly
+)
+```
+
+## Overview
+
+This vignette summarizes `flow_data`, the packaged flow dataset for the Klamath Basin
+watershed, along with its companion metadata table `flow_gage`. Gages are grouped by
+their 8-digit Hydrologic Unit Code (`huc8`) sub-basin - each tab below is one HUC8
+sub-basin. For each sub-basin, a date-coverage plot and a summary of the available date range are provided
+to give an easy visual reference for data availability and to highlight gaps.
+
+```{r, include = FALSE}
+classify_frequency <- function(median_gap_days) {
+  case_when(
+    median_gap_days <= 2 ~ "daily",
+    median_gap_days <= 10 ~ "weekly",
+    median_gap_days <= 20 ~ "biweekly (roughly twice a month)",
+    median_gap_days <= 40 ~ "monthly",
+    TRUE ~ "irregular"
+  )
+}
+
+# gage_ids present in flow_data but missing from flow_gage get an explicit
+# label here instead of silently becoming NA - see the callout below the
+# source table
+source_summary <- flow_data |>
+  left_join(flow_gage |> select(gage_id, agency), by = "gage_id") |>
+  mutate(agency = ifelse(is.na(agency), "USBR (gage not yet in flow_gage metadata)", agency)) |>
+  group_by(agency) |>
+  summarize(
+    n_gages = n_distinct(gage_id),
+    n_records = n(),
+    min_date = min(date),
+    max_date = max(date),
+    median_gap_days = median(as.numeric(unlist(sapply(split(date, gage_id), \(x) diff(sort(unique(x)))))), na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(typical_frequency = classify_frequency(median_gap_days)) |>
+  select(-median_gap_days) |>
+  arrange(desc(n_records))
+
+unmatched_gage_ids <- setdiff(unique(flow_data$gage_id), flow_gage$gage_id)
+```
+
+`flow_data` covers **`r format(min(flow_data$date), "%B %Y")` through
+`r format(max(flow_data$date), "%B %Y")`**, with `r format(nrow(flow_data), big.mark = ",")`
+records from `r n_distinct(flow_data$gage_id)` gages.
+
+Data sources include: 
+
+- USGS (via NWIS daily values)
+- Water Quality Exchange / Water Quality Portal (WQX)
+- U.S. Bureau of Reclamation
+
+
+Data collection frequency:
+
+- USGS gages report daily mean flow,
+- WQX-sourced tribal sites are periodic grab samples roughly twice a month:
+
+```{r}
+source_summary <- flow_data |>
+  left_join(flow_gage |> select(gage_id, agency), by = "gage_id") |>
+  mutate(
+    agency = ifelse(
+      is.na(agency),
+      "USBR (gage not yet in flow_gage metadata)",
+      agency
+    )
+  ) |>
+  group_by(agency) |>
+  summarize(
+    gage_ids = paste(sort(unique(gage_id)), collapse = ", "),
+    n_gages = n_distinct(gage_id),
+    n_records = n(),
+    min_date = min(date),
+    max_date = max(date),
+    median_gap_days = median(
+      as.numeric(
+        unlist(
+          sapply(
+            split(date, gage_id),
+            \(x) diff(sort(unique(x)))
+          )
+        )
+      ),
+      na.rm = TRUE
+    ),
+    .groups = "drop"
+  ) |>
+  mutate(
+    typical_frequency = classify_frequency(median_gap_days)
+  ) |>
+  select(-median_gap_days) |>
+  arrange(desc(n_records))
+
+kable(
+  source_summary,
+  col.names = c(
+    "Source / agency",
+    "Gage IDs",
+    "Gages",
+    "Records",
+    "Earliest date",
+    "Latest date",
+    "Typical frequency"
+  )
+)
+```
+
+`r if (length(unmatched_gage_ids) > 0) paste0("**Note:** ", length(unmatched_gage_ids), " gage_id(s) present in flow_data (", paste(unmatched_gage_ids, collapse = ", "), ") have no matching row in flow_gage, so they carry no agency/location/huc8/coordinates and do not appear on the map or in any sub-basin tab below.")`
+
+`flow_data` columns:
+
+  - `location`: stream/waterbody associated with the gage
+  - `gage_name`: name of the gaging station
+  - `gage_id`: unique identifier for the gage
+  - `variable_name`: variable measured ("flow")
+  - `value`: observed flow value (numeric)
+  - `unit`: units of measurement (cfs)
+  - `statistic`: summary statistic type ("mean")
+  - `date`: date of the observation
+
+`flow_gage` columns:
+
+  - `location`, `gage_name`, `gage_id`: same as above
+  - `agency`: agency responsible for operating or maintaining the gage
+  - `latitude`, `longitude`: gage location
+  - `river_mile`: closest river mile relative to river mouth or a reference point
+  - `huc8`: 8-digit Hydrologic Unit Code identifying the sub-basin where the gage is located
+
+```{r, include=FALSE}
+# HUC8 -> official sub-basin name, for every HUC8 that appears in flow_gage.
+huc8_basin_names <- c(
+  "18010201" = "Williamson",
+  "18010202" = "Sprague",
+  "18010203" = "Upper Klamath Lake",
+  "18010204" = "Lost",
+  "18010205" = "Butte",
+  "18010206" = "Upper Klamath",
+  "18010207" = "Shasta",
+  "18010208" = "Scott",
+  "18010209" = "Lower Klamath",
+  "18010210" = "Salmon",
+  "18010211" = "Trinity",
+  "18010212" = "South Fork Trinity"
+)
+
+basin_label <- function(huc8) {
+  huc8_chr <- as.character(huc8)
+  name <- huc8_basin_names[huc8_chr]
+  ifelse(is.na(name), paste("HUC8", huc8_chr), paste0(name, " (HUC8 ", huc8_chr, ")"))
+}
+
+# name only, no HUC8 code - used where the code isn't needed to disambiguate
+# (e.g. gage_map_data$group). Tab headings still use basin_label() above since
+# huc8, not the name, is the actual grouping key there.
+basin_name_only <- function(huc8) {
+  huc8_chr <- as.character(huc8)
+  name <- huc8_basin_names[huc8_chr]
+  ifelse(is.na(name), paste("HUC8", huc8_chr), name)
+}
+
+huc8_codes <- flow_gage |>
+  filter(!is.na(huc8)) |>
+  distinct(huc8) |>
+  arrange(huc8) |>
+  pull(huc8)
+
+# one group per sub-basin actually present in flow_gage, named list of huc8 codes
+stream_groups <- setNames(as.list(huc8_codes), basin_label(huc8_codes))
+
+# a high-contrast qualitative palette (one hue per sub-basin) - the muted
+group_colors <- setNames(RColorBrewer::brewer.pal(max(3, length(stream_groups)), "Paired")[seq_along(stream_groups)], names(stream_groups))
+```
+
+## Map showing all flow gages
+
+```{r}
+gage_map_data <- flow_gage |>
+  mutate(group = basin_name_only(huc8)) |>
+  filter(!is.na(latitude), !is.na(longitude))
+
+group_pal <- colorFactor(palette = group_colors[names(stream_groups)], domain = gage_map_data$group)
+
+# one label per sub-basin, placed inside that sub-basin's actual HUC8 boundary
+# (not the centroid of its gages - some sub-basins, e.g. Butte, have a
+# boundary but no flow gages at all, so a gage-based centroid can't cover
+# them). st_point_on_surface(), unlike st_centroid(), always returns a point
+# that falls inside the polygon, which matters for elongated/concave basins.
+huc_label_points <- sf::st_point_on_surface(rivermile::klamath_hucs)
+huc_label_coords <- sf::st_coordinates(huc_label_points)
+group_label_points <- rivermile::klamath_hucs |>
+  sf::st_drop_geometry() |>
+  mutate(group = name, lng = huc_label_coords[, "X"], lat = huc_label_coords[, "Y"])
+
+leaflet(gage_map_data) |>
+  addTiles() |>
+    addPolygons(
+    data = rivermile::klamath_hucs,
+    fill = FALSE,
+    color = "black",
+    weight = 2,
+    opacity = 0.7
+  ) |>
+  addCircleMarkers(
+    lng = ~longitude, lat = ~latitude,
+    color = "red",
+    radius = 5, stroke = FALSE, fillOpacity = 0.8,
+    label = ~paste0(gage_name, " (", gage_id, ")")
+  ) |>
+  addLabelOnlyMarkers(
+    data = group_label_points,
+    lng = ~lng, lat = ~lat,
+    label = ~group,
+    labelOptions = labelOptions(
+      noHide = TRUE, textOnly = TRUE, direction = "center",
+      style = list("font-weight" = "bold", "font-size" = "13px", "text-shadow" = "1px 1px 2px white, -1px -1px 2px white")
+    )
+  )
+```
+
+## Flow summary by sub-basin {.tabset .tabset-fade .tabset-pills}
+
+```{r, include=FALSE}
+# shared helper used by every tab below: filter flow_data/flow_gage down to one
+# HUC8 sub-basin (by its gage_ids), plot date coverage per gage, and summarize
+# the date range per gage
+flow_group_gages <- function(huc8_code) {
+  flow_gage |> filter(huc8 == huc8_code)
+}
+
+flow_group_data <- function(huc8_code) {
+  flow_data |> filter(gage_id %in% flow_group_gages(huc8_code)$gage_id)
+}
+
+plot_date_coverage <- function(df) {
+  df |> ggplot(aes(x = date, y = value, color = gage_name)) +
+    geom_line() +
+    scale_color_manual(values = colors_full) +
+    facet_wrap(~gage_name, scales = "free_y") +
+    theme_minimal() +
+    theme(legend.position = "none", axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(title = "Flow vs Date by Gage", x = "Date", y = "Flow (cfs)")
+}
+
+summarize_date_range <- function(df) {
+  df |>
+    group_by(gage_name, gage_id) |>
+    summarize(
+      min_date = min(date),
+      max_date = max(date),
+      record_count = n(),
+      .groups = "drop"
+    ) |>
+    arrange(gage_name)
+}
+```
+
+```{r, results = "asis"}
+for (group in names(stream_groups)) {
+  huc8 <- stream_groups[[group]]
+
+  cat("### ", group, "\n\n")
+  cat("\n\n#### Gages\n\n")
+  print(
+  kable(
+    flow_group_gages(huc8) |>
+      mutate(river_mile = round(river_mile)) |>
+      select(location, gage_name, gage_id, agency, river_mile)
+  )
+)
+
+  cat("\n\n#### Date coverage\n\n")
+  print(plot_date_coverage(flow_group_data(huc8)))
+
+  cat("\n\n#### Date range summary\n\n")
+  print(kable(summarize_date_range(flow_group_data(huc8))))
+
+  cat("\n\n")
+}
+```
