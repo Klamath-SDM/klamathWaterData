@@ -1,7 +1,5 @@
 library(tidyverse)
-library(dplyr)
 library(dataRetrieval)
-library(tidyr)
 library(purrr)
 library(pins)
 
@@ -24,7 +22,12 @@ wqx_do_data <- readWQPdata(huc = huc_code,
                              startDateLo = start_date,
                              startDateHi = end_date)
 
-# gage data has already been pulled in temp data pull script
+# gage data - this gage data pull can serve other parameters since it covers
+# all sites with this huc code (Klamath basin); matches flow-data-pull.R and
+# temperature-data-pull.R's own wqx_gage_data pulls. Pulled here directly
+# rather than assumed to already exist from one of those other scripts
+# having run first in the same session (do-process-data.R depends on this).
+wqx_gage_data <- whatWQPsites(huc = huc_code)
 
 ### USGS data pull -----
 #### do data pull----
@@ -36,9 +39,13 @@ klamath_hucs_1 <- c("18010201", "18010202", "18010203", "18010204",
 
 klamath_hucs_2 <- c("18010211", "18010212")  # Remaining HUC-8 codes
 
-# Retrieve sites for each batch
-klamath_sites_1 <- whatNWISsites(huc = klamath_hucs_1)
-klamath_sites_2 <- whatNWISsites(huc = klamath_hucs_2)
+# Retrieve sites for each batch - filtered to sites that actually report
+# dissolved oxygen (parameterCd) up front. Without this filter these two
+# calls return every USGS site of any kind in these 12 HUC8s (~2,824 sites,
+# most with no DO data at all), and the per-site pull below would waste a
+# network round-trip on each one; filtering drops that to ~466 sites.
+klamath_sites_1 <- whatNWISsites(huc = klamath_hucs_1, parameterCd = "00300")
+klamath_sites_2 <- whatNWISsites(huc = klamath_hucs_2, parameterCd = "00300")
 
 # Combine both datasets
 klamath_sites <- bind_rows(klamath_sites_1, klamath_sites_2)
@@ -53,32 +60,30 @@ head(usgs_gages)
 parameterCd <- "00300"  # Dissolved Oxygen
 statCd <- c("00001", "00002", "00003")  # Min, Max, Mean DO
 
-# Empty list to store dataframes
-all_do_data <- list()
+# Pull DV data in batches rather than one site at a time - readNWISdv()
+# accepts multiple site numbers per call, and NWIS's dv service handles a
+# comma-joined site list in a single request. This replaces one network
+# round-trip per site (up to ~466 of them) with one per ~50 sites, matching
+# the batch size already used for the gage metadata pull below.
+do_site_batches <- split(usgs_gages, ceiling(seq_along(usgs_gages) / 50))
 
-# Loop through each gage and pull DO data
-for (gage in usgs_gages) {
-  message(paste("Pulling DO data for gage:", gage))
-  try({
-    do_data <- readNWISdv(
-      siteNumbers = gage,
+all_do_data <- map(do_site_batches, function(batch) {
+  message("Pulling DO data for ", length(batch), " sites...")
+  tryCatch(
+    readNWISdv(
+      siteNumbers = batch,
       parameterCd = parameterCd,
       statCd = statCd,
       startDate = start_date,
       endDate = end_date
-    )
-
-    # Add gage ID column
-    do_data <- do_data |>
-      mutate(gage_id = gage)
-
-    # Store in list
-    all_do_data[[gage]] <- do_data
-  }, silent = TRUE)
-}
+    ),
+    error = function(e) { message("  batch failed: ", conditionMessage(e)); NULL }
+  )
+})
 
 # Combine all gage data into one dataframe
-usgs_do_data <- bind_rows(all_do_data)
+usgs_do_data <- bind_rows(all_do_data) |>
+  mutate(gage_id = site_no)
 
 # View the data
 glimpse(usgs_do_data)

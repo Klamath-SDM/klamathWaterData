@@ -172,22 +172,10 @@ usbr_hydromet_flow_data <- usbr_hydromet_flow_raw |>
 #   only stage
 #
 # lat/long pulled live from OWRD's own KML station feed
-# (near_real_time_gage_station_kml.aspx) rather than hand-transcribed.
-fetch_owrd_coord <- function(station_nbr) {
-  url <- paste0(
-    "https://apps.wrd.state.or.us/apps/sw/hydro_near_real_time/near_real_time_gage_station_kml.aspx",
-    "?sn_start=", station_nbr
-  )
-  kml <- xml2::read_xml(content(GET(url), as = "text", encoding = "UTF-8"))
-  for (pm in xml2::xml_find_all(kml, ".//Placemark")) {
-    desc <- xml2::xml_text(xml2::xml_find_first(pm, ".//description"))
-    if (grepl(paste0("Station Number: ", station_nbr, "<br>"), desc, fixed = TRUE)) {
-      coords <- strsplit(trimws(xml2::xml_text(xml2::xml_find_first(pm, ".//coordinates"))), ",")[[1]]
-      return(tibble(site = station_nbr, long = as.numeric(coords[1]), lat = as.numeric(coords[2])))
-    }
-  }
-  tibble(site = station_nbr, long = NA_real_, lat = NA_real_)
-}
+# (near_real_time_gage_station_kml.aspx) rather than hand-transcribed. See
+# owrd-pull-helpers.R (shared with temperature-process-data.R, which also
+# pulls a subset of these same stations for water temperature).
+source("data-raw/data-pull/owrd-pull-helpers.R")
 
 owrd_station_list <- tribble(
   ~site,      ~location,                   ~gage_name,

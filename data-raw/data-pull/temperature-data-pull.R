@@ -6,10 +6,9 @@ library(purrr)
 library(pins)
 library(paws)
 
-# the goal of this script is to pull temperature data from different sources and save into aws bucket. Pulling last 10 years of temp data
+# the goal of this script is to pull temperature data from different sources and save into aws bucket.
 
 # Define aws bucket (klamath-sdm)
-
 
 ### WQX data pull -----
 # raw temperature data in aws bucket
@@ -83,19 +82,19 @@ usgs_temp_gage_data <- readNWISsite(usgs_gages)
 
 ### WQX
 # temp data
-wq_data_raw |> pins::pin_write(wqx_temp_data,
-                               type = "csv",
-                               title = "wqx_temperature")
-# gage data
-wq_data_raw |> pins::pin_write(wqx_gage_data,
-                               type = "csv",
-                               title = "wqx_temperature")
-### USGS
-# temp data
-wq_data_raw |> pins::pin_write(usgs_temp_data,
-                               type = "csv",
-                               title = "usgs_temperature")
-# gage data
-wq_data_raw |> pins::pin_write(usgs_temp_gage_data,
-                               type = "csv",
-                               title = "usgs_temperature_gage")
+# wq_data_raw |> pins::pin_write(wqx_temp_data,
+#                                type = "csv",
+#                                title = "wqx_temperature")
+# # gage data
+# wq_data_raw |> pins::pin_write(wqx_gage_data,
+#                                type = "csv",
+#                                title = "wqx_temperature")
+# ### USGS
+# # temp data
+# wq_data_raw |> pins::pin_write(usgs_temp_data,
+#                                type = "csv",
+#                                title = "usgs_temperature")
+# # gage data
+# wq_data_raw |> pins::pin_write(usgs_temp_gage_data,
+#                                type = "csv",
+#                                title = "usgs_temperature_gage")
