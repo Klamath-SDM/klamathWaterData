@@ -1,0 +1,295 @@
+---
+title: "Fish Screening Exploration - K3RP Keno Reach"
+author: "Badhia Yunes Katz"
+date: "August 2025"
+# output: rmarkdown::github_document
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(sf)
+library(archive)
+library(leaflet)
+library(DT)
+library(janitor)
+library(scales)
+library(htmltools)
+
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+## 1. Background
+
+This explores two GIS layers from the **Klamath Reservoir Reach Restoration Prioritization (K3RP)**
+fish screening prioritization: diversions **downstream of Keno Dam** (`K3RP_FinalScreening_DSofKENO`)
+and diversions **upstream of Keno Dam** (`K3RP_FinalScreening_USofKENO`, in the Lake Ewauna / Keno
+reach).
+
+Per *Appendix C: Fish Screening Project Descriptions*, diversions were evaluated for fish-screening
+prioritization if they fell within 400 ft of expected anadromous fish distribution (a buffer meant to
+absorb small location inaccuracies in the underlying data). Each diversion was scored on:
+
+- **Size score** - size of the diversion relative to the stream it draws from
+- **Benefit score** - number of fish species (anadromous + resident native) affected
+- **Fish impact score** (downstream reach only) - best-professional-judgment impact rating from ODFW
+  fish biologists
+- **Total score** - combination of the above, used to assign a **Priority Tier** (Low / Medium / High)
+
+Each diversion also has a `Screen` status (`yes` / `no` / `unknown` / `no diversion`) describing whether
+it is already fish-screened. Water right data attached to each point is explicitly flagged in the report
+as **approximate and potentially inaccurate** - it should be verified before any project scoping or
+design work.
+
+The source files are ArcGIS Pro **layer packages** (`.lpkx`), which are 7-zip archives bundling a
+shapefile plus layer symbology. We extract the shapefile out of each package before reading it with `sf`.
+
+## 2. Load the data
+
+```{r}
+lpkx_dir <- here::here("data-raw", "data-exploration", "screening-keno")
+
+extract_lpkx_layer <- function(lpkx_name) {
+  lpkx_path <- file.path(lpkx_dir, lpkx_name)
+  out_dir <- file.path(tempdir(), tools::file_path_sans_ext(lpkx_name))
+  archive_extract(lpkx_path, dir = out_dir)
+
+  shp <- list.files(out_dir, pattern = "\\.shp$", recursive = TRUE, full.names = TRUE)
+  st_read(shp[1], quiet = TRUE)
+}
+
+screen_ds <- extract_lpkx_layer("K3RP_FinalScreening_DSofKENO.lpkx") |> clean_names()
+screen_us <- extract_lpkx_layer("K3RP_FinalScreening_USofKENO.lpkx") |> clean_names()
+```
+
+## 3. Structure
+
+Downstream-of-Keno layer:
+
+```{r}
+dim(screen_ds)
+glimpse(screen_ds)
+st_crs(screen_ds)$input
+st_bbox(screen_ds)
+```
+
+Upstream-of-Keno layer:
+
+```{r}
+dim(screen_us)
+glimpse(screen_us)
+st_crs(screen_us)$input
+st_bbox(screen_us)
+```
+
+The two layers were digitized separately and don't share a schema or a coordinate system:
+
+- `screen_ds` carries stream/project metadata (`stream_grp`, `proj_num`, `pri_div`, `source_nam`,
+  water-right holder fields) and is projected in **NAD83 / Oregon GIC Lambert (ft)**.
+- `screen_us` carries up to 14 stacked water-right columns (`wr_1`...`wr_14`) plus its own `lat`/`long`
+  fields, and is projected in **NAD83 / UTM zone 10N**.
+
+```{r}
+setdiff(names(screen_ds), names(screen_us))
+setdiff(names(screen_us), names(screen_ds))
+```
+
+## 4. Missingness
+
+```{r}
+map_dbl(st_drop_geometry(screen_ds), \(x) mean(is.na(x))) |>
+  enframe(name = "field", value = "pct_na") |>
+  arrange(desc(pct_na)) |>
+  datatable(caption = "DS of Keno - % missing by field") |>
+  formatPercentage("pct_na", 1)
+
+map_dbl(st_drop_geometry(screen_us), \(x) mean(is.na(x))) |>
+  enframe(name = "field", value = "pct_na") |>
+  arrange(desc(pct_na)) |>
+  datatable(caption = "US of Keno - % missing by field") |>
+  formatPercentage("pct_na", 1)
+```
+
+## 5. Screening status
+
+```{r}
+screen_ds |>
+  st_drop_geometry() |>
+  count(screen, sort = TRUE) |>
+  mutate(reach = "Downstream of Keno") |>
+  bind_rows(
+    screen_us |>
+      st_drop_geometry() |>
+      count(screen, sort = TRUE) |>
+      mutate(reach = "Upstream of Keno")
+  ) |>
+  ggplot(aes(x = fct_infreq(screen, w = n), y = n, fill = screen)) +
+  geom_col() +
+  facet_wrap(~reach, scales = "free_y") +
+  labs(title = "Screening status of diversions", x = "Screen status", y = "# diversions") +
+  theme(legend.position = "none")
+```
+
+## 6. Score distributions
+
+`size_score`, `ben_score`, and `tot_score` are common to both layers; `impact_sco` (fish impact) is
+only recorded downstream of Keno.
+
+```{r}
+bind_rows(
+  screen_ds |> st_drop_geometry() |> select(size_score, ben_score, tot_score) |> mutate(reach = "Downstream"),
+  screen_us |> st_drop_geometry() |> select(size_score, ben_score, tot_score) |> mutate(reach = "Upstream")
+) |>
+  pivot_longer(-reach, names_to = "metric", values_to = "score") |>
+  ggplot(aes(x = score, fill = reach)) +
+  geom_histogram(binwidth = 1, position = "dodge") +
+  facet_wrap(~metric, scales = "free") +
+  labs(title = "Score distributions by reach", x = "Score", y = "# diversions")
+```
+
+Downstream priority tier (`pri_div`) vs. total score - a sanity check that higher scores map to higher
+tiers:
+
+```{r}
+screen_ds |>
+  st_drop_geometry() |>
+  count(pri_div, sort = TRUE)
+
+screen_ds |>
+  st_drop_geometry() |>
+  ggplot(aes(x = pri_div, y = tot_score, fill = pri_div)) +
+  geom_boxplot() +
+  labs(title = "Total score by priority tier (downstream of Keno)", x = "Priority tier", y = "Total score") +
+  theme(legend.position = "none")
+```
+
+## 7. Diversions by stream (downstream of Keno)
+
+```{r}
+screen_ds |>
+  st_drop_geometry() |>
+  count(stream_grp, sort = TRUE) |>
+  datatable(caption = "Diversions per stream group - downstream of Keno")
+```
+
+## 8. Diversion size (approximate flow rate)
+
+```{r}
+screen_ds |>
+  st_drop_geometry() |>
+  summarise(min = min(rate_cfs, na.rm = TRUE), median = median(rate_cfs, na.rm = TRUE),
+            max = max(rate_cfs, na.rm = TRUE))
+
+screen_us |>
+  st_drop_geometry() |>
+  summarise(min = min(total_cfs, na.rm = TRUE), median = median(total_cfs, na.rm = TRUE),
+            max = max(total_cfs, na.rm = TRUE))
+```
+
+Flow rates span several orders of magnitude (small stockwater/domestic pumps up to large canals like
+the Lost River Diversion Ditch and Ady Canal), so a log scale is more useful for comparison:
+
+```{r}
+bind_rows(
+  screen_ds |> st_drop_geometry() |> transmute(reach = "Downstream", cfs = rate_cfs),
+  screen_us |> st_drop_geometry() |> transmute(reach = "Upstream", cfs = total_cfs)
+) |>
+  filter(cfs > 0) |>
+  ggplot(aes(x = cfs, fill = reach)) +
+  geom_histogram(bins = 20) +
+  scale_x_log10(labels = comma) +
+  facet_wrap(~reach, ncol = 1, scales = "free_y") +
+  labs(title = "Approximate diversion flow (log scale)", x = "cfs", y = "# diversions")
+```
+
+## 9. Map
+
+Reproject both layers to WGS84 so they can share a single leaflet map.
+
+```{r}
+ds_wgs84 <- st_transform(screen_ds, 4326)
+us_wgs84 <- st_transform(screen_us, 4326)
+
+pal_ds <- colorFactor(c("Low" = "#2ca25f", "Medium" = "#feb24c", "High" = "#de2d26"),
+                       domain = c("Low", "Medium", "High"))
+
+leaflet() |>
+  addTiles() |>
+  addCircleMarkers(
+    data = ds_wgs84, color = ~pal_ds(pri_div), radius = 6, stroke = FALSE, fillOpacity = 0.85,
+    label = ~htmlEscape(paste0(proj_num, " (", stream_grp, ") - ", pri_div, " priority, ", tot_score))
+  ) |>
+  addCircleMarkers(
+    data = us_wgs84, color = "#3182bd", radius = 5, stroke = FALSE, fillOpacity = 0.7,
+    label = ~htmlEscape(paste0(proj_num, " - score ", tot_score, ", screen: ", screen))
+  ) |>
+  addLegend("bottomright", pal = pal_ds, values = c("Low", "Medium", "High"),
+            title = "Downstream priority tier") |>
+  addLegend("bottomright", colors = "#3182bd", labels = "Upstream of Keno (Lake Ewauna reach)")
+```
+
+## 10. Full attribute tables
+
+```{r}
+screen_ds |> st_drop_geometry() |> datatable(caption = "Downstream of Keno - full table")
+screen_us |> st_drop_geometry() |> datatable(caption = "Upstream of Keno - full table")
+```
+
+## 11. Caveats
+
+- Water right details attached to each point are explicitly noted in Appendix C as **approximate and
+  potentially inaccurate**; several downstream diversions have overlapping/associated water rights
+  (e.g. notes referencing "associated with" another project number).
+- Several diversions - mostly on the Klamath River / Fall Creek downstream of Keno - are noted as
+  planned to be blocked by a fish passage barrier under the Amended Klamath Hydro Settlement Agreement,
+  meaning screening "will likely not be necessary" for those points even though they scored as
+  high-priority.
+- `screen == "no diversion"` indicates a water right on record where the reach was surveyed and no
+  actual diversion structure was found - these should probably be excluded from any screening project
+  count.
+- The two layers use different projections and were digitized independently, so joins between them
+  should go through coordinates/`proj_num`, not assume matching schemas.
+
+## 12. Clean combined table
+
+Both layers reduced to one shared set of fields - stream, total volume (cfs), screen status, size /
+benefit / total score, notes, and WGS84 coordinates. The upstream-of-Keno layer doesn't carry a stream
+name field of its own; per Appendix C, every point in that layer sits on the Klamath River
+(Lake Ewauna reach), so `stream` is set to `"Klamath River"` for all of them.
+
+```{r}
+ds_clean <- ds_wgs84 |>
+  st_drop_geometry() |>
+  bind_cols(st_coordinates(ds_wgs84) |> as_tibble() |> rename(longitude = X, latitude = Y)) |>
+  transmute(
+    stream = stream_grp,
+    total_volume = rate_cfs,
+    screen,
+    size_score,
+    benefit_score = ben_score,
+    total_score = tot_score,
+    notes,
+    latitude,
+    longitude
+  )
+
+us_clean <- us_wgs84 |>
+  st_drop_geometry() |>
+  bind_cols(st_coordinates(us_wgs84) |> as_tibble() |> rename(longitude = X, latitude = Y)) |>
+  transmute(
+    stream = "Klamath River",
+    total_volume = total_cfs,
+    screen,
+    size_score,
+    benefit_score = ben_score,
+    total_score = tot_score,
+    notes,
+    latitude,
+    longitude
+  )
+
+screening_clean <- bind_rows(ds_clean, us_clean)
+
+glimpse(screening_clean)
+screening_clean |> datatable(caption = "Cleaned fish screening diversions - DS and US of Keno combined")
+```
+
