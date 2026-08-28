@@ -71,7 +71,7 @@
 #' @title Flow gages in the Klamath Basin watershed (HUC8 18010204)
 #' @description A dataset containing metadata for flow gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
-#' @format A tibble with 49 rows and 8 columns
+#' @format A tibble with 117 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -87,8 +87,8 @@
 
 #' @name flow_data
 #' @title Publicly available flow data in the Klamath Basin watershed (HUC8 18010204)
-#' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX and USBR data portals.
-#' @format A tibble with 128,113 rows and 8 columns
+#' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX, USBR, and OWRD data portals.
+#' @format A tibble with 436,361 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -145,17 +145,21 @@
 "usgs_dam_removal_monitoring_layers"
 
 #' @name water_level_data
-#' @title Lake water surface elevation data from four different USGS gages, and one USBR monitoring site across the Klamath Basin
+#' @title Lake water surface elevation data from four different USGS gages, and six USBR monitoring sites across the Klamath Basin
 #' @description Lake water surface elevation (ft) data from the following gages:
 #' \itemize{
 #'   \item 11505900
 #'   \item 11504300
 #'   \item 11505800
 #'   \item 11507001
-#'   \item usbr tule lake sump 1a
+#'   \item usbr-tulc (Sump 1A; combines TID Daily Report data, 1986-2021, with USBR Hydromet data, 2024-present)
+#'   \item usbr-tulc2 (Tule Lake Sump 1B, USBR Hydromet)
+#'   \item usbr-ger (Gerber Reservoir, USBR Hydromet)
+#'   \item usbr-mal (Malone Reservoir, USBR Hydromet)
 #'   \item usbr-lrs
-#'   \item usbr-clk
-#' @format A tibble with 66,371 rows and 8 columns:
+#'   \item usbr-clk (Clear Lake West Lobe, USBR Hydromet)
+#'   }
+#' @format A tibble with 116,994 rows and 8 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -179,11 +183,14 @@
 #'   \item 11504300
 #'   \item 11505800
 #'   \item 11507001
-#'   \item usbr tule lake sump 1a
+#'   \item usbr-tulc
+#'   \item usbr-tulc2
+#'   \item usbr-ger
+#'   \item usbr-mal
 #'   \item usbr-lrs
 #'   \item usbr-clk
 #'   }
-#' @format A tibble with 7 rows and 7 columns:
+#' @format A tibble with 10 rows and 7 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
