@@ -233,7 +233,8 @@ do_data <- do_wqx |>
          statistic = tolower(statistic)) |>
   bind_rows(do_usgs |>
               mutate(gage_id = as.character(gage_id))) |>
-  mutate(location = tolower(stream)) |>
+  mutate(location = tolower(stream),
+         gage_name = tolower(gage_name)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
   glimpse()
@@ -242,7 +243,9 @@ do_data <- do_wqx |>
 do_gage <- gage_do_wqx |>
   bind_rows(gage_do_usgs |>
               mutate(gage_id = as.character(gage_id))) |>
-  mutate(location = tolower(stream)) |>
+  mutate(location = tolower(stream),
+         gage_name = tolower(gage_name),
+         agency = tolower(agency)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
   glimpse()
