@@ -463,7 +463,8 @@ temperature_gage <- temperature_gage_usgs |>
   mutate(gage_id = as.character(gage_id)) |>
   bind_rows(temperature_gage_wqx, temperature_gage_usfws, temperature_gage_owrd) |>
   mutate(location = tolower(stream),
-         gage_name = tolower(gage_name)) |>
+         gage_name = tolower(gage_name),
+         agency = tolower(agency)) |>
   relocate(location, .before = gage_name) |>
   filter(!is.na(location)) |>
   mutate(stream = location) |>
@@ -477,15 +478,15 @@ temperature_gage <- temperature_gage_usgs |>
 
 
 ### saves clean data to aws
-wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
-
-# temp data
-wq_processed_data |> pins::pin_write(temperature_data,
-                               type = "csv")
-
-# gage data
-wq_processed_data |> pins::pin_write(temperature_gage,
-                                     type = "csv")
+# wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
+#
+# # temp data
+# wq_processed_data |> pins::pin_write(temperature_data,
+#                                type = "csv")
+#
+# # gage data
+# wq_processed_data |> pins::pin_write(temperature_gage,
+#                                      type = "csv")
 
 # save rda files
 usethis::use_data(temperature_data, overwrite = TRUE)
