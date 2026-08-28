@@ -77,41 +77,21 @@ usgs_gage_flow_data <- readNWISsite(usgs_gages)
 
 
 
-### USBR data pull -----
-## Willow Creek: Willow Creek gage (USBR-WILC) ----
-url <- paste0(
-  "https://data.usbr.gov/rise/api/result/download",
-  "?type=csv&itemId=134084&order=ASC",
-  "&after=", format(start_date, "%Y-%m-%d"),
-  "&before=", format(end_date, "%Y-%m-%d")
-)
-
-raw <- readLines(url, warn = FALSE)
-
-# Header is the line containing "Datetime"
-hdr <- grep("Datetime", raw)[1]
-
-wilc <- read.csv(text = paste(raw[hdr:length(raw)], collapse = "\n"),
-                 stringsAsFactors = FALSE, check.names = FALSE)
-
-usbr_flow_data <- wilc |>
-  clean_names() |>
-  mutate(date = as.Date(datetime_utc),
-         gage_name = tolower(location),
-         location = "willow creek",
-         gage_id = "usbr-wilc",
-         variable_name = "flow",
-         value = result,
-         unit = units,
-         statistic = "mean"
-         ) |>
-  select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
-  glimpse()
-
 ## USBR Hydromet flow gages - missing from flow_data ----
 # On the "teacup diagram" (teacup-diagram-data-pull.R) but never pulled into
 # flow_data directly. Pulled via the same USBR Hydromet archive
 # (webarccsv.pl) mechanism teacup-diagram-data-pull.R uses.
+#
+# Willow Creek (WILC) is included here too. teacup-diagram-data-pull.R's own
+# notes say WILC has "NO daily archive record at all" - true for the "Q"/"FB"
+# pcodes the teacup diagram itself links to, but re-verified live against
+# webarccsv.pl: "WILC QD" *does* carry a full daily discharge record back to
+# 1996 (same real-time-pcode -> daily-archive-pcode mapping already
+# documented here for LRS/HRPO/LRD's "Q" -> "QD"). Its values match exactly
+# what was previously pulled from the RISE API's result/download endpoint
+# (itemId=134084) for this same physical gage, so this replaces that bespoke
+# pull with no change in the underlying data - just the standard mechanism
+# used by every other USBR Hydromet gage below.
 source("data-raw/data-pull/usbr-hydromet-pull-helpers.R")
 
 # Pulled live rather than hand-transcribed, so coordinates stay accurate and
@@ -120,6 +100,7 @@ rise_klamath_locations <- fetch_rise_klamath_locations()
 
 usbr_hydromet_flow_stations <- tribble(
   ~site,  ~parameter, ~label,
+  "WILC", "QD",       "Willow Creek - Flow (cfs)",
   "LVNO", "QJ",       "Langell Valley North Canal - Flow (cfs)",
   "MHPO", "QP",       "Miller Hill Pump Plant - Flow (cfs)",
   "LRD",  "QD",       "Lost River Diversion - Flow (cfs)",
@@ -138,6 +119,7 @@ usbr_hydromet_flow_raw <- fetch_usbr_batch(
 usbr_hydromet_flow_data <- usbr_hydromet_flow_raw |>
   mutate(
     location = case_when(
+      site == "WILC" ~ "willow creek",
       site == "LVNO" ~ "langell valley north canal",
       site == "MHPO" ~ "miller hill pump plant",
       site == "LRD"  ~ "lost river diversion",

@@ -43,11 +43,20 @@ end_date   <- as.Date("2025-12-31")
 # of these under their daily-value pcode instead (confirmed against
 # the archive: "LRS Q" -> "LRS QD", "HRPO Q" -> "HRPO QD",
 # "MAL GH" -> "MAL GD", "LVNO QC2" -> "LVNO QJ", "LRDO QC" -> "LRD QD").
-# Three teacup circles are real-time telemetry only with NO daily
-# archive record at all (verified against webarccsv.pl) and are
-# excluded here: Willow Creek (WILC Q/FB), Station 48 (S48O Q), and
-# West Canal at Malone (MAL QC). Pull those via pn-bin/instant.pl
-# directly if current/near-real-time values are needed.
+# Two teacup circles are real-time telemetry only with NO daily archive
+# record at all under any pcode (verified against webarccsv.pl) and are
+# excluded here: Station 48 (S48O Q) and West Canal at Malone (MAL QC).
+# Pull those via pn-bin/instant.pl directly if current/near-real-time
+# values are needed.
+#
+# Willow Creek (WILC) was also previously assumed to have no daily archive
+# record (its teacup circle links to the real-time-only "Q"/"FB" pcodes,
+# which do return NO RECORD) - re-verified against webarccsv.pl and it does
+# have one under "QD" instead, same real-time-pcode -> daily-archive-pcode
+# mapping as LRS/HRPO/LRD's "Q" -> "QD" above. Pulled via that "QD" archive
+# record directly in flow-data-pull.R for flow_data/flow_gage; not added to
+# usbr_stations below/this dataset, since teacup_diagram_data itself wasn't
+# part of this fix.
 # ------------------------------------------------------------
 
 # lat/long pulled live from the USBR RISE API (see fetch_rise_klamath_locations()

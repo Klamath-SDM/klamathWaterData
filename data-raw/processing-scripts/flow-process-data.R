@@ -168,19 +168,10 @@ gage_flow_usgs <- rivermile::find_nearest_river_miles(gage_flow_usgs_clean) |>
   glimpse()
 
 # ============================================================
-# USBR (Willow Creek, via RISE - see flow-data-pull.R)
-# ============================================================
-# No gage table built for this source - Willow Creek's metadata isn't
-# tracked in flow_gage (a pre-existing gap, not addressed here).
-
-usbr_flow_data <- usbr_flow_data |>
-  rename(stream = location) |>
-  glimpse()
-
-# ============================================================
-# USBR Hydromet (Gerber/Malone/Tule Lake/Clear Lake flow gages, plus
-# Langell Valley North Canal, Lost River, Cherry Creek - see flow-data-pull.R
-# for the flow pull itself; only the gage table is built here)
+# USBR Hydromet (Willow Creek, Gerber/Malone/Tule Lake/Clear Lake flow
+# gages, plus Langell Valley North Canal, Lost River, Cherry Creek - see
+# flow-data-pull.R for the flow pull itself; only the gage table is built
+# here)
 # ============================================================
 # lat/long come from rise_klamath_locations (pulled live - see
 # flow-data-pull.R) rather than hand-transcribed. Not run through
@@ -278,7 +269,7 @@ flow_gage <- flow_gage |>
 flow_data <- flow_wqx |>
   mutate(date = as.Date(date)) |>
   bind_rows(flow_usgs |>
-              mutate(gage_id = as.character(gage_id)), usbr_flow_data,
+              mutate(gage_id = as.character(gage_id)),
             usbr_hydromet_flow_data, owrd_flow_data) |>
   mutate(location = tolower(stream)) |>
   relocate(location, .before = gage_name) |>

@@ -236,7 +236,12 @@ water_level_data <- bind_rows(
   water_level_data_usgs,
   water_level_data_usbr_hydromet |> filter(gage_id != "usbr-tulc")
 ) |>
-  filter(value < 10000 & value > 3500) |> # outliers in TULC and TULC2
+  # Tule Lake Sump 1A/1B (usbr-tulc/usbr-tulc2) each have a handful of
+  # physically-impossible sentinel/data-entry errors (e.g. 998877 ft,
+  # 40235 ft, 3035 ft, against a true range of ~4030-4036 ft). Scoped to
+  # just these two gages so it doesn't also strip Malone's legitimate
+  # gage-height readings (a few feet, not an elevation in the thousands).
+  filter(!(gage_id %in% c("usbr-tulc", "usbr-tulc2") & !(value > 3500 & value < 10000))) |>
   filter(!is.na(value)) |>
   glimpse()
 

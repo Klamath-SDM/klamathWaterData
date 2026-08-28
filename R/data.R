@@ -71,7 +71,7 @@
 #' @title Flow gages in the Klamath Basin watershed (HUC8 18010204)
 #' @description A dataset containing metadata for flow gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
-#' @format A tibble with 117 rows and 8 columns
+#' @format A tibble with 118 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -159,7 +159,7 @@
 #'   \item usbr-lrs
 #'   \item usbr-clk (Clear Lake West Lobe, USBR Hydromet)
 #'   }
-#' @format A tibble with 116,994 rows and 8 columns:
+#' @format A tibble with 81,730 rows and 8 columns:
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
