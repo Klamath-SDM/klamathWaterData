@@ -1,10 +1,12 @@
 Package: klamathWaterData
-Title: What the Package Does (One Line, Title Case)
+Title: Klamath Basin Water Quality and Hydrology Data
 Version: 0.0.0.9000
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
+Description: A collection of curated, analysis-ready datasets describing water
+    quality, streamflow, lake and reservoir water levels, wetland surface
+    water extent, and hydrologic monitoring station locations across the
+    Klamath Basin. Data are sourced from USGS, the Water Quality Portal (WQX),
+    USBR Hydromet, Oregon Water Resources Department, and the Intermountain West Joint Venture Wetland Extent
+    Tool (WET) raster products.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

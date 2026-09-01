@@ -1,6 +1,5 @@
 library(tidyverse)
 library(httr)
-library(jsonlite)
 library(lubridate)
 library(dataRetrieval)
 
@@ -30,8 +29,9 @@ library(dataRetrieval)
 # diagram are excluded — they report weather, not elevation/flow.
 # ============================================================
 
-START_DATE <- as.Date("1990-10-01")
-END_DATE   <- Sys.Date() - 1
+# Standardized pull window - matches lake-levels-data-pull.R / flow-data-pull.R.
+start_date <- as.Date("1996-01-01")
+end_date   <- as.Date("2025-12-31")
 
 # ------------------------------------------------------------
 # 1. USBR Hydromet stations embedded in the teacup diagram
@@ -43,78 +43,34 @@ END_DATE   <- Sys.Date() - 1
 # of these under their daily-value pcode instead (confirmed against
 # the archive: "LRS Q" -> "LRS QD", "HRPO Q" -> "HRPO QD",
 # "MAL GH" -> "MAL GD", "LVNO QC2" -> "LVNO QJ", "LRDO QC" -> "LRD QD").
-# Three teacup circles are real-time telemetry only with NO daily
-# archive record at all (verified against webarccsv.pl) and are
-# excluded here: Willow Creek (WILC Q/FB), Station 48 (S48O Q), and
-# West Canal at Malone (MAL QC). Pull those via pn-bin/instant.pl
-# directly if current/near-real-time values are needed.
+# Two teacup circles are real-time telemetry only with NO daily archive
+# record at all under any pcode (verified against webarccsv.pl) and are
+# excluded here: Station 48 (S48O Q) and West Canal at Malone (MAL QC).
+# Pull those via pn-bin/instant.pl directly if current/near-real-time
+# values are needed.
+#
+# Willow Creek (WILC) was also previously assumed to have no daily archive
+# record (its teacup circle links to the real-time-only "Q"/"FB" pcodes,
+# which do return NO RECORD) - re-verified against webarccsv.pl and it does
+# have one under "QD" instead, same real-time-pcode -> daily-archive-pcode
+# mapping as LRS/HRPO/LRD's "Q" -> "QD" above. Pulled via that "QD" archive
+# record directly in flow-data-pull.R for flow_data/flow_gage; not added to
+# usbr_stations below/this dataset, since teacup_diagram_data itself wasn't
+# part of this fix.
 # ------------------------------------------------------------
 
-# lat/long are looked up live from the USBR RISE API
-# (data.usbr.gov/rise/api/location), which catalogs each Hydromet cbtt
-# under a named Reclamation location, e.g. "Gerber Reservoir and Dam (GER)".
-# Two steps: search Klamath-region locations to map cbtt -> RISE id, then
-# fetch each matched location individually for its point coordinates (the
-# search/list endpoint mixes point and polygon geometries across records,
-# which breaks a naive data-frame flatten of locationCoordinates).
-#
-# NOTE: LRD ("Lost River Reservoir and Diversion Dam", RISE id 7307) is used
-# as the archived-data proxy for the teacup's "LRDO" circle, but RISE shows
-# these are technically two distinct points ~0.6 mi apart along the same
-# channel: LRDO is "Lost River Diversion Channel at C-G Canal Crossing"
-# (RISE id 7324, 42.140669 / -121.682313) downstream of the LRD dam site
-# used here (42.142822 / -121.672895).
-RISE_BASE <- "https://data.usbr.gov/rise/api"
+# lat/long pulled live from the USBR RISE API (see fetch_rise_klamath_locations()
+# in usbr-hydromet-pull-helpers.R), which catalogs each Hydromet cbtt under a
+# named Reclamation location, rather than hand-transcribed here.
+# NOTE: LRD ("Lost River Reservoir and Diversion Dam") is used as the
+# archived-data proxy for the teacup's "LRDO" circle, but RISE shows these
+# are technically two distinct points ~0.6 mi apart along the same channel:
+# LRDO is "Lost River Diversion Channel at C-G Canal Crossing" (42.140669 /
+# -121.682313) downstream of the LRD dam site used here (42.142822 /
+# -121.672895).
+source("data-raw/data-pull/usbr-hydromet-pull-helpers.R")
 
-usbr_cbtt_codes <- c(
-  "GER", "CLK", "MAL", "TULC", "TULC2",
-  "LVNO", "MHPO", "LRD", "HRPO", "LRS", "CHRO"
-)
-
-fetch_rise_klamath_cbtt <- function() {
-  resp <- GET(
-    paste0(RISE_BASE, "/location"),
-    query = list(itemsPerPage = 200, locationRegionName = "Klamath"),
-    add_headers(Accept = "application/vnd.api+json")
-  )
-  stop_for_status(resp)
-
-  search_data <- content(resp, as = "text", encoding = "UTF-8") |>
-    fromJSON(simplifyDataFrame = FALSE) |>
-    pluck("data")
-
-  map_dfr(search_data, function(loc) {
-    attrs <- loc$attributes
-    tibble(rise_id = attrs[["_id"]], location_name = attrs$locationName)
-  }) |>
-    mutate(cbtt = str_match(str_trim(location_name), "\\(([A-Za-z0-9]+)\\)$")[, 2])
-}
-
-fetch_rise_coords <- function(rise_id) {
-  resp <- GET(
-    paste0(RISE_BASE, "/location/", rise_id),
-    add_headers(Accept = "application/vnd.api+json")
-  )
-  stop_for_status(resp)
-
-  attrs <- content(resp, as = "text", encoding = "UTF-8") |>
-    fromJSON(simplifyDataFrame = FALSE) |>
-    pluck("data", "attributes")
-
-  coords <- attrs$locationCoordinates$coordinates
-  tibble(long = coords[[1]], lat = coords[[2]])
-}
-
-usbr_coords <- fetch_rise_klamath_cbtt() |>
-  filter(cbtt %in% usbr_cbtt_codes) |>
-  mutate(coords = map(rise_id, fetch_rise_coords)) |>
-  unnest(coords) |>
-  select(site = cbtt, lat, long)
-
-missing_cbtt <- setdiff(usbr_cbtt_codes, usbr_coords$site)
-if (length(missing_cbtt) > 0) {
-  warning("RISE lookup missing coordinates for: ", paste(missing_cbtt, collapse = ", "))
-}
+rise_klamath_locations <- fetch_rise_klamath_locations()
 
 usbr_stations <- tribble(
   ~site,   ~parameter, ~label,                                            ~measure_type,
@@ -132,123 +88,18 @@ usbr_stations <- tribble(
   "LRS",   "QD",       "Clear Lake East Lobe / Lost River - Flow (cfs)",  "Flow",
   "CHRO",  "QD",       "Cherry Creek - Flow (cfs)",                       "Flow"
 ) |>
-  left_join(usbr_coords, by = "site")
-
-BASE_URL  <- "https://www.usbr.gov/pn-bin/webarccsv.pl"
-SLEEP_SEC <- 1
-UA <- "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+  left_join(rise_klamath_locations, by = "site")
 
 # ------------------------------------------------------------
-# Parse webarccsv.pl response
+# Pull/parse webarccsv.pl responses (shared with lake-levels and flow
+# pull scripts; see usbr-hydromet-pull-helpers.R)
 # ------------------------------------------------------------
-
-parse_webarccsv <- function(raw_text, station_params) {
-  lines <- strsplit(raw_text, "\n")[[1]]
-
-  begin_idx <- which(grepl("^BEGIN DATA", lines, ignore.case = TRUE))
-  if (length(begin_idx) == 0) {
-    message("  [parse] No 'BEGIN DATA' marker found")
-    return(NULL)
-  }
-
-  data_lines <- lines[(begin_idx + 1):length(lines)]
-  data_lines <- data_lines[nzchar(trimws(data_lines))]
-  if (length(data_lines) < 2) return(NULL)
-
-  header_line <- data_lines[1]
-  data_lines  <- data_lines[-1]
-
-  col_names <- trimws(strsplit(header_line, ",")[[1]])
-
-  df_raw <- tryCatch(
-    read.csv(
-      text             = paste(data_lines, collapse = "\n"),
-      header           = FALSE,
-      col.names        = col_names,
-      colClasses       = "character",
-      stringsAsFactors = FALSE,
-      fill             = TRUE,
-      strip.white      = TRUE
-    ),
-    error = function(e) {
-      message("  [parse] read.csv error: ", conditionMessage(e))
-      NULL
-    }
-  )
-  if (is.null(df_raw) || ncol(df_raw) < 2) return(NULL)
-
-  date_col     <- col_names[1]
-  dates_parsed <- mdy(trimws(df_raw[[date_col]]))
-  n_dates      <- length(dates_parsed)
-  df_col_names <- names(df_raw)
-
-  find_col <- function(site, param) {
-    key_space <- paste(site, param)
-    key_dot   <- paste(site, param, sep = ".")
-    m <- which(col_names == key_space)
-    if (length(m) > 0) return(df_col_names[m[1]])
-    m <- which(df_col_names == key_dot)
-    if (length(m) > 0) return(df_col_names[m[1]])
-    m <- which(toupper(df_col_names) == toupper(key_dot))
-    if (length(m) > 0) return(df_col_names[m[1]])
-    m <- which(grepl(site, df_col_names, ignore.case = TRUE) &
-                 grepl(param, df_col_names, ignore.case = TRUE))
-    if (length(m) > 0) return(df_col_names[m[1]])
-    NA_character_
-  }
-
-  long_list <- lapply(seq_len(nrow(station_params)), function(i) {
-    row       <- station_params[i, ]
-    col_match <- find_col(row$site, row$parameter)
-    if (is.na(col_match)) return(NULL)
-
-    vals <- suppressWarnings(as.numeric(trimws(df_raw[[col_match]])))
-    if (length(vals) != n_dates) vals <- rep(NA_real_, n_dates)
-
-    tibble(
-      site         = row$site,
-      parameter    = row$parameter,
-      label        = row$label,
-      measure_type = row$measure_type,
-      lat          = row$lat,
-      long         = row$long,
-      date         = dates_parsed,
-      value        = vals
-    )
-  })
-
-  long_list <- Filter(Negate(is.null), long_list)
-  if (length(long_list) == 0) return(NULL)
-
-  bind_rows(long_list) |> filter(!is.na(date))
-}
-
-fetch_usbr_batch <- function(batch_df, start_date, end_date) {
-  param_string <- paste(paste(batch_df$site, batch_df$parameter), collapse = ",")
-  message("Fetching USBR Hydromet batch: ", paste(unique(batch_df$site), collapse = ", "))
-
-  resp <- tryCatch(
-    GET(
-      BASE_URL,
-      query = list(
-        parameter = param_string,
-        syer      = year(start_date),  smnth = month(start_date), sdy = day(start_date),
-        eyer      = year(end_date),    emnth = month(end_date),   edy = day(end_date),
-        format    = "2"
-      ),
-      add_headers(`User-Agent` = UA, `Referer` = "https://www.usbr.gov/pn/hydromet/klamath/teacup.html"),
-      timeout(120)
-    ),
-    error = function(e) { warning("  HTTP error: ", conditionMessage(e)); NULL }
-  )
-  Sys.sleep(SLEEP_SEC)
-
-  if (is.null(resp) || status_code(resp) != 200) return(NULL)
-  parse_webarccsv(content(resp, as = "text", encoding = "UTF-8"), batch_df)
-}
 
 usbr_batches <- split(usbr_stations, ceiling(seq_len(nrow(usbr_stations)) / 14))
-usbr_data <- map_dfr(usbr_batches, fetch_usbr_batch, start_date = START_DATE, end_date = END_DATE)
+usbr_data <- map_dfr(usbr_batches, fetch_usbr_batch, start_date = start_date, end_date = end_date) |>
+  # fetch_usbr_batch()/parse_webarccsv() are shared with other pull scripts and
+  # don't carry measure_type themselves - join it back from usbr_stations.
+  left_join(usbr_stations |> select(site, parameter, measure_type), by = c("site", "parameter"))
 
 # ------------------------------------------------------------
 # 2. USGS NWIS gauges embedded in the teacup diagram
@@ -263,7 +114,7 @@ usbr_data <- map_dfr(usbr_batches, fetch_usbr_batch, start_date = START_DATE, en
 # images with no CSV/JSON API). Both are excluded here; Spencer Creek
 # (11510000, data through 1932) and Sycan River (11499100, data
 # through 1991) are legitimate but long-discontinued USGS gauges kept
-# below — they'll simply return no rows if START_DATE is after their
+# below — they'll simply return no rows if start_date is after their
 # end_date.
 # ------------------------------------------------------------
 
@@ -293,8 +144,8 @@ fetch_usgs_site <- function(site_no, parm_cd) {
     readNWISdv(
       siteNumbers = site_no,
       parameterCd = parm_cd,
-      startDate   = START_DATE,
-      endDate     = END_DATE
+      startDate   = start_date,
+      endDate     = end_date
     ),
     error = function(e) {
       warning("  USGS pull failed for ", site_no, "/", parm_cd, ": ", conditionMessage(e))
@@ -332,7 +183,7 @@ usgs_data <- usgs_raw |> filter(!is.na(date))
 # 3. add OWRD data:
 # ------------------------------------------------------------
 
-sf_sprague <- whychusModel::get_owrd_hydro(11495600, START_DATE, END_DATE , "MDF") |>
+sf_sprague <- whychusModel::get_owrd_hydro(11495600, start_date, end_date , "MDF") |>
   transmute(
     source       = "OWRD",
     site         = as.character(station_nbr),
@@ -345,7 +196,7 @@ sf_sprague <- whychusModel::get_owrd_hydro(11495600, START_DATE, END_DATE , "MDF
     value        = mean_daily_flow_cfs
   ) |>
   filter(!is.na(value))
-nf_sprague <- whychusModel::get_owrd_hydro(11495900, START_DATE, END_DATE , "MDF") |>
+nf_sprague <- whychusModel::get_owrd_hydro(11495900, start_date, end_date , "MDF") |>
   transmute(
     source       = "OWRD",
     site         = as.character(station_nbr),

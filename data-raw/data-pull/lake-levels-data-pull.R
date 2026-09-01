@@ -1,10 +1,16 @@
 library(tidyverse)
+library(dplyr)
 library(dataRetrieval)
+library(tidyr)
+library(purrr)
 library(pins)
 
+# the goal of this script is to pull Lake water surface elevation data from different sources. Pulling 1996-2025 data
+
 #  USGS data ----
-start_date <- "1996-01-01"
-end_date <- "2025-12-31"
+# Standardized pull window - every source below uses this same start/end date.
+start_date <- as.Date("1996-01-01")
+end_date   <- as.Date("2025-12-31")
 
 #### usgs lake water surface data ----
 ukl_levels_1 <- dataRetrieval::readNWISdv(11505900, parameterCd = "72275", start_date , end_date)
@@ -26,104 +32,41 @@ water_level_gage_data <- readNWISsite(usgs_gages)
 
 
 #  USBR data----
-## Clear Lake East Lobe (LRS) ----
-# https://www.usbr.gov/pn-bin/wyreport.pl?site=lrs&parameter=FD&head=yes
+## USBR Hydromet - gages missing from water_level_data ----
+# Gerber Reservoir, Malone Reservoir, Tule Lake Sump 1A/1B, Clear Lake West
+# Lobe (CLK), and Clear Lake East Lobe (LRS) are all on the "teacup diagram"
+# (teacup-diagram-data-pull.R). CLK and LRS were previously pulled via the
+# USBR RISE API's result/download CSV endpoint - replaced here with the same
+# USBR Hydromet archive (webarccsv.pl) mechanism teacup-diagram-data-pull.R
+# uses, for consistency with the other Hydromet-sourced gages. This also
+# drops the RISE download's UTC-to-Pacific date conversion entirely: that
+# conversion was wrong for LRS's fixed-UTC-hour daily value (it silently
+# shifted every winter/PST-season reading back one calendar day, and
+# duplicated/skipped a date each year at the DST transition). Hydromet's own
+# archive parses dates as plain calendar dates (see mdy() in
+# parse_webarccsv()), so this class of bug doesn't exist here.
+source("data-raw/data-pull/usbr-hydromet-pull-helpers.R")
 
-lrs_level_url <- paste0(
-  "https://data.usbr.gov/rise/api/result/download",
-  "?type=csv",
-  "&itemId=134049",
-  "&order=ASC",
-  "&after=1996-01-01",
-  "&before=2026-01-01")
+# Pulled live rather than hand-transcribed, so coordinates stay accurate and
+# reproducible if a station's location record is ever corrected upstream.
+rise_klamath_locations <- fetch_rise_klamath_locations()
 
-lrs_level_raw <- readLines(lrs_level_url, warn = FALSE)
+usbr_hydromet_elev_stations <- tribble(
+  ~site,   ~parameter, ~label,
+  "GER",   "FB",       "Gerber Reservoir - Forebay Elevation (ft)",
+  "MAL",   "GD",       "Malone Reservoir - Gage Height (ft)",
+  "TULC",  "FB",       "Tule Lake Sump 1A - Forebay Elevation (ft)",
+  "TULC2", "FB",       "Tule Lake Sump 1B - Forebay Elevation (ft)",
+  "CLK",   "FB",       "Clear Lake West Lobe - Forebay Elevation (ft)",
+  "LRS",   "FD",       "Clear Lake East Lobe - Forebay Elevation (ft)"
+) |>
+  left_join(rise_klamath_locations, by = "site")
 
-hdr <- grep("Datetime", lrs_level_raw)[1]
-
-lrs <- read.csv(
-  text = paste(lrs_level_raw[hdr:length(lrs_level_raw)], collapse = "\n"),
-  stringsAsFactors = FALSE,
-  check.names = FALSE
+usbr_hydromet_elev_raw <- fetch_usbr_batch(
+  usbr_hydromet_elev_stations,
+  start_date = start_date,
+  end_date   = end_date
 )
-
-# Confirm the downloaded series
-unique(lrs[c("Location", "Parameter", "Units")])
-
-clear_lake_dam_channel <- data.frame(
-  location  = lrs[["Location"]],
-  parameter = lrs[["Parameter"]],
-  units     = lrs[["Units"]],
-  date      = as.Date(
-    as.POSIXct(lrs[["Datetime (UTC)"]], tz = "UTC"),
-    tz = "America/Los_Angeles"
-  ),
-  value = as.numeric(lrs[["Result"]])
-)
-
-## Pull location metadata ----
-parse_rise_location_meta <- function(lrs_level_raw) {
-  loc_hdr  <- grep('^"Location","State","Coordinates', lrs_level_raw)
-  meta_row <- lrs_level_raw[loc_hdr + 1]
-  fields <- read.csv(text = paste(lrs_level_raw[loc_hdr], meta_row, sep = "\n"),
-                     stringsAsFactors = FALSE, check.names = FALSE)
-  coords <- str_match(fields$`Coordinates (long, lat)`, "\\(([-0-9.]+), ([-0-9.]+)\\)")
-  tibble(
-    location      = fields$Location,
-    state         = fields$State,
-    long          = as.numeric(coords[, 2]),
-    lat           = as.numeric(coords[, 3]),
-    timezone      = fields$Timezone,
-    location_type = fields$`Location Type`
-  )
-}
-
-lrs_coords  <- parse_rise_location_meta(lrs_level_raw)
-
-## Clear Lake West Lobe (CLK) ----
-clk_level_url <- paste0(
-  "https://data.usbr.gov/rise/api/result/download",
-  "?type=csv",
-  "&itemId=134025",
-  "&order=ASC",
-  "&after=1996-01-01",
-  "&before=2026-01-01"
-)
-
-clk_level_raw <- readLines(clk_level_url, warn = FALSE)
-
-hdr <- grep("Datetime", clk_level_raw)[1]
-
-clk <- read.csv(
-  text = paste(clk_level_raw[hdr:length(clk_level_raw)], collapse = "\n"),
-  stringsAsFactors = FALSE,
-  check.names = FALSE
-)
-
-# Confirm the downloaded series
-unique(clk[c("Location", "Parameter", "Units")])
-
-clear_lake_west <- data.frame(
-  location  = clk[["Location"]],
-  parameter = clk[["Parameter"]],
-  units     = clk[["Units"]],
-  date      = as.Date(
-    as.POSIXct(clk[["Datetime (UTC)"]], tz = "UTC"),
-    tz = "America/Los_Angeles"
-  ),
-  value = as.numeric(clk[["Result"]])
-)
-
-
-##  gage_data ----
-clk_coords  <- parse_rise_location_meta(clk_level_raw)
-
-
-
-#  bind both USBR gages
-usbr_lake_level <- bind_rows(clear_lake_dam_channel, clear_lake_west) |> glimpse()
-
-
 
 ##### save raw data into aws bucket water-quality/data-raw/
 

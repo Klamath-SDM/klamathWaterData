@@ -81,16 +81,17 @@ unmatched_gage_ids <- setdiff(unique(flow_data$gage_id), flow_gage$gage_id)
 `r format(max(flow_data$date), "%B %Y")`**, with `r format(nrow(flow_data), big.mark = ",")`
 records from `r n_distinct(flow_data$gage_id)` gages.
 
-Data sources include: 
+Data sources include:
 
 - USGS (via NWIS daily values)
 - Water Quality Exchange / Water Quality Portal (WQX)
-- U.S. Bureau of Reclamation
+- U.S. Bureau of Reclamation (via the USBR Hydromet archive)
+- Oregon Water Resources Department (OWRD "near real time" hydro stations)
 
 
 Data collection frequency:
 
-- USGS gages report daily mean flow,
+- USGS, USBR Hydromet, and OWRD gages report daily mean flow,
 - WQX-sourced tribal sites are periodic grab samples roughly twice a month:
 
 ```{r}
@@ -236,11 +237,19 @@ leaflet(gage_map_data) |>
     fill = FALSE,
     color = "black",
     weight = 2,
-    opacity = 0.7
+    opacity = 0.7,
+    group = "HUC8s"
+  ) |>
+  addPolylines(
+    data = rivermile::all_klamath_rivers_line,
+    color = "darkblue",
+    weight = 2,
+    popup = ~river,
+    group = "Rivers"
   ) |>
   addCircleMarkers(
     lng = ~longitude, lat = ~latitude,
-    color = "red",
+    color = "darkred",
     radius = 5, stroke = FALSE, fillOpacity = 0.8,
     label = ~paste0(gage_name, " (", gage_id, ")")
   ) |>
@@ -252,6 +261,10 @@ leaflet(gage_map_data) |>
       noHide = TRUE, textOnly = TRUE, direction = "center",
       style = list("font-weight" = "bold", "font-size" = "13px", "text-shadow" = "1px 1px 2px white, -1px -1px 2px white")
     )
+  ) |>
+  addLayersControl(
+    overlayGroups = c("Rivers", "HUC8s"),
+    options = layersControlOptions(collapsed = FALSE)
   )
 ```
 
@@ -306,11 +319,21 @@ for (group in names(stream_groups)) {
   )
 )
 
+  group_data <- flow_group_data(huc8)
+
   cat("\n\n#### Date coverage\n\n")
-  print(plot_date_coverage(flow_group_data(huc8)))
+  if (nrow(group_data) == 0) {
+    cat("No flow records available for this sub-basin's gage(s).\n\n")
+  } else {
+    print(plot_date_coverage(group_data))
+  }
 
   cat("\n\n#### Date range summary\n\n")
-  print(kable(summarize_date_range(flow_group_data(huc8))))
+  if (nrow(group_data) == 0) {
+    cat("No flow records available for this sub-basin's gage(s).\n\n")
+  } else {
+    print(kable(summarize_date_range(group_data)))
+  }
 
   cat("\n\n")
 }

@@ -5,7 +5,7 @@
 \alias{water_level_gage}
 \title{Metadata for water level gages in the Klamath Basin.}
 \format{
-A tibble with 5 rows and 7 columns:
+A tibble with 10 rows and 7 columns:
 \itemize{
 \item \code{location}: location associated where data was collected/where gage is located
 \item \code{gage_name}: name of the gaging station
@@ -28,7 +28,12 @@ Hydrologic Unit Code (HUC8) information for each station.
 \item 11504300
 \item 11505800
 \item 11507001
-\item usbr tule lake sump 1a
+\item usbr-tulc
+\item usbr-tulc2
+\item usbr-ger
+\item usbr-mal
+\item usbr-lrs
+\item usbr-clk
 }
 }
 \keyword{datasets}

@@ -1,9 +1,6 @@
 library(tidyverse)
-library(dplyr)
 library(dataRetrieval)
-library(tidyr)
 library(purrr)
-library(pins)
 library(rivermile)
 library(sf)
 
@@ -15,23 +12,18 @@ library(sf)
 # USGS dies not have mean pH data. For now we just have max and min
 # USGS - there are two sites at "Klamath Straits, leavinh waterbody_name as NA for now till we decide if we want to keep them
 
-# raw data will be pulled from S3 bucket. These data is originally retrieved on ph-data-pull.R
-
-# setting up aws bucket
-wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
-
+# These data are originally retrieved in ph-data-pull.R and sourced here directly (not read from AWS).
+source("data-raw/data-pull/ph-data-pull.R")
 
 ### WQX ----
 # pulling raw data
 # pH data
-wqx_data_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/wqx_ph_data") |>
+wqx_data_raw <- wqx_ph_data |>
   janitor::clean_names() |>
   glimpse()
 
 # GAGE data
-wqx_gage_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
+wqx_gage_raw <- wqx_gage_data |>
   janitor::clean_names() |>
   filter(monitoring_location_type_name %in% c("River/Stream", "Lake", "Stream",
                                               "Reservoir", "Lake, Reservoir, Impoundment",
@@ -50,10 +42,13 @@ all_wqx_ph_data <- all_wqx_ph_data |>
          waterbody_name = str_to_title(waterbody_name)) # testing function
 
 # check for naming assigned
-all_wqx_ph_data |>
-  select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |>
-  distinct() |>
-  view()
+# View()/view() require an interactive graphical session (X11/XQuartz) and
+# crash under plain Rscript - commented out rather than run, not used
+# downstream.
+# all_wqx_ph_data |>
+#   select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |>
+#   distinct() |>
+#   view()
 
 wqx_ph_data <- all_wqx_ph_data |>
   filter(!str_detect(monitoring_location_identifier, "^USGS"), # Keep NAs & remove "USGS"
@@ -95,10 +90,10 @@ all_wqx_ph_data_clean <- wqx_ph_data |>
 #TODO continue to clean locations that do not have explicit name
 # resoruce: https://www.waterqualitydata.us/provider/STORET/
 
-all_wqx_ph_data_clean |>  # check
-  select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |>
-  distinct() |>
-  view()
+# all_wqx_ph_data_clean |>  # check
+#   select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |>
+#   distinct() |>
+#   view()
 # All Resighini Rancheria (RREPA_WQX)gages are either at a pond or at named stream
 # TRINITY R A LEWISTON, "TRINITY R SF A SANDY BAR NR WILL, TRINITY R A HOOPA, TRINITY R A WEITCHPEC
 # CALWR_WQX-F3109500 and CALWR_WQX-F3410000 are located at a small unknown stream
@@ -111,10 +106,10 @@ all_wqx_ph_data_clean <- all_wqx_ph_data_clean |>
     TRUE ~ waterbody_name)) |>
   glimpse()
 
-all_wqx_ph_data_clean |>
-  select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |>
-  distinct() |>
-  view()
+# all_wqx_ph_data_clean |>
+#   select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |>
+#   distinct() |>
+#   view()
 
 #### water data table ----
 ph_wqx <- all_wqx_ph_data_clean |>
@@ -151,25 +146,10 @@ gage_ph_wqx <- rivermile::find_nearest_river_miles(gage_ph_wqx_clean) |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
   glimpse()
 
-# #### saves clean data to aws ----
-# wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
-#
-# # pH data
-# wq_processed_data |> pins::pin_write(ph_wqx,
-#                                      type = "csv",
-#                                      title = "ph_processed_data_usgs")
-#
-# # gage data
-# wq_processed_data |> pins::pin_write(gage_ph_wqx,
-#                                      type = "csv",
-#                                      title = "gage_ph_processed_data")
-
-
 ### USGS ----
 # pulling raw data
 # pH data
-usgs_data_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/usgs_ph_data") |>
+usgs_data_raw <- usgs_ph_data |>
   janitor::clean_names() |>
   glimpse()
 
@@ -197,8 +177,7 @@ usgs_data_raw_clean <- usgs_data_raw |>
 
 
 # GAGE data
-usgs_gage_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/usgs_gage_ph_data") |>
+usgs_gage_raw <- usgs_gage_ph_data |>
   janitor::clean_names() |>
   mutate(station_nm = tools::toTitleCase(tolower(station_nm))) |>
   glimpse()
@@ -213,8 +192,8 @@ all_usgs_ph_data_raw <- usgs_data_raw_clean |> left_join(usgs_gage_raw, by = "si
 all_usgs_ph_data_raw <- all_usgs_ph_data_raw |>
   mutate(waterbody_name = extract_waterbody(station_nm)) # testing function
 
-all_usgs_ph_data_raw |>
-  select(station_nm, waterbody_name) |> distinct() |> View()
+# all_usgs_ph_data_raw |>
+#   select(station_nm, waterbody_name) |> distinct() |> View()
 
 all_usgs_ph_data_raw <- all_usgs_ph_data_raw |>
   mutate(waterbody_name = case_when(station_nm %in% c("Upper Klamath Lake at Howard Bay, or", "Mid-Trench - Lower   -  Mdtl",
@@ -267,7 +246,8 @@ ph_data <- ph_wqx |>
               mutate(gage_id = as.character(gage_id))) |>
   #remove two NAs in value
   filter(!is.na(value)) |>
-  mutate(location = tolower(stream)) |>
+  mutate(location = tolower(stream),
+         gage_name = tolower(gage_name)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
   glimpse()
@@ -279,22 +259,13 @@ ph_gage <- gage_ph_usgs |>
   mutate(river_mile = case_when(gage_name == "Scott River at Gaging Station" ~ NA,
                                 gage_name == "Scott River South Fork" ~ NA,
                                 .default = as.numeric(river_mile))) |>
-  mutate(location = tolower(stream)) |>
+  mutate(location = tolower(stream),
+         gage_name = tolower(gage_name),
+         agency = tolower(agency)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
   glimpse()
 
-
-### saves clean data to aws
-wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
-
-# # pH data
-wq_processed_data |> pins::pin_write(ph_data,
-                                     type = "csv")
-
-# gage data
-wq_processed_data |> pins::pin_write(ph_gage,
-                                     type = "csv")
 
 # save rda files
 usethis::use_data(ph_data, overwrite = TRUE)

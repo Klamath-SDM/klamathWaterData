@@ -3,18 +3,15 @@ url: https://klamath-sdm.github.io/klamathWaterData
 template:
   bootswatch: flatly
 
-
 home:
   links:
-  - text:
-    href:
+  - text: Klamath-SDM on GitHub
+    href: https://github.com/Klamath-SDM
 
 reference:
-- title: Water Datasets
-  desc: Klamath Basin water quality data used and processed
-- subtitle: Monitoring Gages Dataset
-  desc: Water Quality data from monitoring gages sources form USGS and WQX
-- contents:
+- title: Water Quality Monitoring Gages
+  desc: Temperature, flow, pH, and dissolved oxygen data and gage metadata from USGS and WQX
+  contents:
   - temperature_data
   - temperature_gage
   - flow_data
@@ -23,31 +20,42 @@ reference:
   - ph_gage
   - do_data
   - do_gage
-- subtitle: USGS Dam Removal Monitoring Data
-  desc: description
-- contents:
-  - usgs_dam_removal_monitoring_layer
 
+- title: Lake & Reservoir Water Levels
+  desc: Water surface elevation data and gage metadata for Klamath Basin lakes and reservoirs
+  contents:
+  - water_level_data
+  - water_level_gage
 
-- title: Helper Functions
-  desc: Functions used to generate water quality data
-- contents:
-  -
+- title: Wetland Extent (WET)
+  desc: Monthly surface water extent and hydroperiod estimates for Klamath refuges and lakes, derived from the Intermountain West Joint Venture WET raster dataset
+  contents:
+  - wet_surface_water
+  - wet_hydroperiod
+
+- title: USBR Teacup Diagram & Elevation Crosswalk
+  desc: Elevation, storage, and flow data from the USBR Klamath "teacup" diagram, crosswalked to refuge/lake wetland extent
+  contents:
+  - teacup_diagram_data
+  - refuge_elevation_wetland
+
+- title: Dynamic Surface Water Extent (DSWE)
+  desc: Monthly aggregated Landsat-derived surface water extent for Klamath wildlife refuges
+  contents:
+  - dswe_monthly
+
+- title: Spatial Layers
+  desc: Spatial layers supporting Klamath dam removal monitoring
+  contents:
+  - usgs_dam_removal_monitoring_layers
 
 navbar:
   structure:
     left:  [home, reference, articles]
     right: [github]
   type: default
-  left:
-  - text: 'Reference'
-    href: reference/index.html
-  - text: 'Articles'
-    menu:
-      - text: 'Summary of Data for Modeling '
-        href: vignettes/usgs_data_vignette.html
 
 repo:
- url:
-  home: https://github.com/Klamath-SDM/klamathWaterData
-  issue: https://github.com/Klamath-SDM/klamathWaterData/issues/
+  url:
+    home: https://github.com/Klamath-SDM/klamathWaterData
+    issue: https://github.com/Klamath-SDM/klamathWaterData/issues/

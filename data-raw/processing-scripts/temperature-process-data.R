@@ -1,12 +1,12 @@
 library(tidyverse)
-library(dplyr)
 library(dataRetrieval)
-library(tidyr)
 library(purrr)
 library(pins)
 library(rivermile)
 library(sf)
 library(janitor)
+library(httr)
+library(xml2)
 
 # raw data will be pulled from S3 bucket. These data is originally retrieved on temperature-data-pull.R
 
@@ -51,8 +51,7 @@ table(missing_names_wqx$monitoring_location_name) # only 8 names that did not ca
 # check for naming assigned
 all_wqx_temp_data |>
   select(waterbody_name, monitoring_location_name, monitoring_location_identifier) |>
-  distinct() |>
-  view()
+  distinct()
 
 # fix "HOBO at Confluence of Klamath and Trinity Rivers" - this is on Klamath River
 # fixing stream names manually
@@ -88,8 +87,7 @@ all_wqx_temp_data_clean <- all_wqx_temp_data |>
 
 all_wqx_temp_data_clean |>
   select(waterbody_name, monitoring_location_name, monitoring_location_identifier, provider_name, organization_identifier) |>
-  distinct() |>
-  view()
+  distinct()
 
 
   #### water data table ----
@@ -202,8 +200,7 @@ all_usgs_temp_data_raw_clean <- all_usgs_temp_data_raw |>
 
 all_usgs_temp_data_raw_clean |>
   select(site_no , station_nm, waterbody_name) |> # there are two gages remaining that I am on sure on how no name
-  distinct() |>
-  view()
+  distinct()
 
 
 #### water data table ----
@@ -235,6 +232,93 @@ temperature_gage_usgs <- rivermile::find_nearest_river_miles(gage_temperature_us
          latitude = st_coordinates(gage_temperature_usgs_clean)[, 2]) |>
   st_drop_geometry() |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
+  glimpse()
+
+### OWRD ----
+# Some OWRD "near real time" gaging stations already used for flow (see the
+# owrd_station_list tribble in flow-data-pull.R) also report water
+# temperature (WTEMP_MEAN). Of those 22 stations, only the 14 below returned
+# real temperature data - the rest either have no temperature sensor or the
+# scraper can't parse their report page for this parameter (a different
+# subset than for flow - not every discharge station has a temperature
+# sensor). None of these 14 station numbers overlap usgs_gages above.
+# lat/long pulled live from OWRD's own KML station feed - see
+# owrd-pull-helpers.R (shared with flow-data-pull.R).
+source("data-raw/data-pull/owrd-pull-helpers.R")
+
+owrd_temp_start_date <- as.Date("1996-01-01")
+owrd_temp_end_date   <- as.Date("2025-12-31")
+
+owrd_temp_station_list <- tribble(
+  ~site,      ~location,          ~gage_name,
+  "11491400", "williamson river", "williamson r bl sheep cr nr lenz, or",
+  "11494000", "williamson river", "williamson r ab spring cr nr klamath agency, or",
+  "11494510", "williamson river", "williamson r ab sprague r nr chiloquin, or",
+  "11497500", "sprague river",    "sprague r nr beatty, or",
+  "11497550", "sprague river",    "sprague r bl brown cr nr beatty, or",
+  "11500400", "trout creek",      "trout cr nr lone pine",
+  "11500500", "sprague river",    "sprague r at lone pine, or",
+  "11502550", "williamson river", "williamson r at modoc pt rd, nr chiloquin, or",
+  "11502950", "sun creek",        "sun cr at ranger sta nr fort klamath, or",
+  "11503500", "annie creek",      "annie cr nr ft klamath",
+  "11504103", "wood river",       "wood r ab crooked cr, nr klamath agency, or",
+  "11504109", "crooked creek",    "crooked cr nr klamath agency, or",
+  "11504120", "sevenmile creek",  "sevenmile cr bl dry cr nr fort klamath",
+  "11510000", "spencer creek",    "spencer cr nr keno, or"
+)
+
+owrd_temp_coords <- map_dfr(owrd_temp_station_list$site, fetch_owrd_coord)
+owrd_temp_stations <- owrd_temp_station_list |> left_join(owrd_temp_coords, by = "site")
+
+#### water data table ----
+temperature_data_owrd <- map_dfr(seq_len(nrow(owrd_temp_stations)), function(i) {
+  station <- owrd_temp_stations[i, ]
+  message("Pulling OWRD temperature data for station: ", station$site)
+  result <- tryCatch(
+    whychusModel::get_owrd_hydro(station$site, owrd_temp_start_date, owrd_temp_end_date, "WTEMP_MEAN"),
+    error = function(e) { message("  failed: ", conditionMessage(e)); NULL }
+  )
+  # OWRD's server occasionally returns an HTML error page instead of data for
+  # a given station/parameter combination - skip rather than error out the
+  # whole pull (same defensive check as flow-data-pull.R's OWRD block).
+  if (is.null(result) || !"station_nbr" %in% names(result)) {
+    message("  no usable data returned for station ", station$site)
+    return(NULL)
+  }
+  result |>
+    transmute(
+      stream = station$location,
+      gage_name = station$gage_name,
+      gage_id = as.character(station_nbr),
+      variable_name = "temperature",
+      value = daily_mean_water_temp_c,
+      unit = "celsius",
+      statistic = "mean",
+      # WTEMP_MEAN's record_date includes a time component ("01-01-2023
+      # 00:00"), unlike flow's MDF format - plain mdy() can't parse it.
+      date = as.Date(mdy_hm(record_date)))
+}) |>
+  filter(!is.na(value)) |>
+  glimpse()
+
+#### monitoring site table ----
+# Not run through gage_data_format()/find_nearest_river_miles() (river_mile
+# left NA) - same treatment flow-process-data.R gives its OWRD/USBR Hydromet
+# gages. huc8 determined by spatial join against rivermile::klamath_hucs
+# (point-in-polygon on lat/long) rather than hand-transcribed.
+temperature_gage_owrd <- owrd_temp_stations |>
+  transmute(stream = location,
+            gage_name = gage_name,
+            gage_id = site,
+            agency = "Oregon Water Resources Department",
+            latitude = lat,
+            longitude = long,
+            river_mile = NA_real_) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326, remove = FALSE) |>
+  st_join(klamath_hucs |> st_transform(4326), join = st_intersects) |>
+  st_drop_geometry() |>
+  select(-name) |>
+  mutate(huc8 = as.numeric(huc8)) |>
   glimpse()
 
 ### USFWS ----
@@ -367,8 +451,9 @@ temperature_data <- temperature_data_wqx |>
          unit = "celsius",
          value = as.numeric(value)) |>
   bind_rows(temperature_data_usfws, temperature_data_usgs |>
-              mutate(gage_id = as.character(gage_id))) |>
-  mutate(location = tolower(stream)) |>
+              mutate(gage_id = as.character(gage_id)), temperature_data_owrd) |>
+  mutate(location = tolower(stream),
+         gage_name = tolower(gage_name)) |>
   relocate(location, .before = gage_name) |>
   select(-stream) |>
   filter(!is.na(location) & !is.na(gage_name)) |>
@@ -376,23 +461,32 @@ temperature_data <- temperature_data_wqx |>
 
 temperature_gage <- temperature_gage_usgs |>
   mutate(gage_id = as.character(gage_id)) |>
-  bind_rows(temperature_gage_wqx, temperature_gage_usfws) |>
-  mutate(location = tolower(stream)) |>
+  bind_rows(temperature_gage_wqx, temperature_gage_usfws, temperature_gage_owrd) |>
+  mutate(location = tolower(stream),
+         gage_name = tolower(gage_name),
+         agency = tolower(agency)) |>
   relocate(location, .before = gage_name) |>
-  select(-stream) |>
   filter(!is.na(location)) |>
+  mutate(stream = location) |>
+  gage_data_format(filter_streams = FALSE) |>
+  rivermile::find_nearest_river_miles() |>
+  mutate(longitude = st_coordinates(geometry)[, 1],
+         latitude = st_coordinates(geometry)[, 2]) |>
+  st_drop_geometry() |>
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, location = stream) |>
   glimpse()
 
+
 ### saves clean data to aws
-wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
-
-# temp data
-wq_processed_data |> pins::pin_write(temperature_data,
-                               type = "csv")
-
-# gage data
-wq_processed_data |> pins::pin_write(temperature_gage,
-                                     type = "csv")
+# wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
+#
+# # temp data
+# wq_processed_data |> pins::pin_write(temperature_data,
+#                                type = "csv")
+#
+# # gage data
+# wq_processed_data |> pins::pin_write(temperature_gage,
+#                                      type = "csv")
 
 # save rda files
 usethis::use_data(temperature_data, overwrite = TRUE)

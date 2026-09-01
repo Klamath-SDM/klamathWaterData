@@ -5,7 +5,7 @@
 \alias{temperature_data}
 \title{Publicly available temperature data in the Klamath Basin watershed (HUC8 18010204)}
 \format{
-A tibble with 348,642 rows and 8 columns
+A tibble with 414,312 rows and 8 columns
 \itemize{
 \item \code{location}: location associated where data was collected/where gage is located
 \item \code{gage_name}: name of the gaging station
@@ -21,6 +21,6 @@ A tibble with 348,642 rows and 8 columns
 temperature_data
 }
 \description{
-Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
+Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX and USFWS.
 }
 \keyword{datasets}

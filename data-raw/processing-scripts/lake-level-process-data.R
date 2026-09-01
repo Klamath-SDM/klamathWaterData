@@ -1,6 +1,4 @@
 library(tidyverse)
-library(dplyr)
-library(tidyr)
 library(purrr)
 library(janitor)
 library(rivermile)
@@ -74,16 +72,35 @@ water_level_gage_usgs <- all_usgs_water_level_raw |>
   relocate(location, .before = gage_name) |>
   glimpse()
 
-# USBR ----
-water_level_data_usbr <- usbr_lake_level |>
-  mutate(gage_name = tolower(location),
-         gage_id = case_when(str_detect(str_to_lower(gage_name), "(lrs)") ~ "usbr-lrs",
-                             str_detect(str_to_lower(gage_name), "(clk)")   ~ "usbr-clk",
-                             TRUE ~ NA),
-         location = "clear lake",
-         variable_name = "water level",
-         unit = "feet",
-         statistic = "mean") |>
+# USBR Hydromet - Gerber, Malone, Tule Lake Sump 1A/1B, Clear Lake West/East
+# Lobe (from teacup diagram; see lake-levels-data-pull.R) ----
+water_level_data_usbr_hydromet <- usbr_hydromet_elev_raw |>
+  mutate(
+    location = case_when(
+      site == "GER"   ~ "gerber reservoir",
+      site == "MAL"   ~ "malone reservoir",
+      site %in% c("TULC", "TULC2") ~ "tule lake",
+      site %in% c("CLK", "LRS") ~ "clear lake"
+    ),
+    gage_id = case_when(
+      site == "GER"   ~ "usbr-ger",
+      site == "MAL"   ~ "usbr-mal",
+      site == "TULC"  ~ "usbr-tulc",
+      site == "TULC2" ~ "usbr-tulc2",
+      site == "CLK"   ~ "usbr-clk",
+      site == "LRS"   ~ "usbr-lrs"
+    ),
+    gage_name = case_when(
+      site == "GER"   ~ "gerber reservoir forebay elevation",
+      site == "MAL"   ~ "malone reservoir gage height",
+      site == "TULC"  ~ "usbr tule lake sump 1a surface elevations",
+      site == "TULC2" ~ "tule lake sump 1b surface elevations",
+      site == "CLK"   ~ "clear lake west lobe forebay elevation",
+      site == "LRS"   ~ "clear lake east lobe forebay elevation"
+    ),
+    variable_name = "water level",
+    unit = "feet above sea level - usbr datum",
+    statistic = "mean") |>
   select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
   glimpse()
 
@@ -173,8 +190,8 @@ tule_elev_raw <- map_dfr(files, function(path) {
 tule_elev <- tule_elev_raw |>
   mutate(date = as.Date(date),
          location = "tule lake",
-         gage_name = "usbr tule lake sump 1a surface elevations",
-         gage_id = "usbr tule lake sump 1a",
+         gage_name = "tule lake sump 1a surface elevations",
+         gage_id = "usbr-tulc",
          variable_name = "water level",
          value = tule_lake_elev_ft,
          unit = "feet above sea level - USBR datum",
@@ -189,8 +206,8 @@ tule_elev_early <- readxl::read_excel("data-raw/raw-tule-lake-level-data/TID Ele
   slice(1:9179) |>
   mutate(date = as.Date(date),
          location = "tule lake",
-         gage_name = "usbr tule lake sump 1a surface elevations",
-         gage_id = "usbr tule lake sump 1a",
+         gage_name = "tule lake sump 1a surface elevations",
+         gage_id = "usbr-tulc",
          variable_name = "water level",
          value = tlelev,
          unit = "feet above sea level - USBR datum",
@@ -198,51 +215,110 @@ tule_elev_early <- readxl::read_excel("data-raw/raw-tule-lake-level-data/TID Ele
   select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |> glimpse()
 
 #combine Tule data
-tule_elevation <- bind_rows(tule_elev, tule_elev_early)
+# TULC (from usbr_hydromet_elev_raw, via the teacup diagram pull) is the same
+# physical gage as the TID-report-derived series above ("usbr tule lake sump
+# 1a") - union them into one continuous series. distinct() guards against
+# date overlap (there's none today: TID data ends 2021-07-05, TULC starts
+# 2024-04-15) should the two source windows ever grow to overlap.
+tule_elevation <- bind_rows(
+  tule_elev,
+  tule_elev_early,
+  water_level_data_usbr_hydromet |> filter(gage_id == "usbr-tulc")
+) |>
+  distinct(gage_id, date, .keep_all = TRUE)
 
 
 
 #### water data table ----
 # join usbr tule lake data with usgs
-water_level_data <- bind_rows(tule_elevation, water_level_data_usgs, water_level_data_usbr) |> glimpse()
+water_level_data <- bind_rows(
+  tule_elevation,
+  water_level_data_usgs,
+  water_level_data_usbr_hydromet |> filter(gage_id != "usbr-tulc")
+) |>
+  # Tule Lake Sump 1A/1B (usbr-tulc/usbr-tulc2) each have a handful of
+  # physically-impossible sentinel/data-entry errors (e.g. 998877 ft,
+  # 40235 ft, 3035 ft, against a true range of ~4030-4036 ft). Scoped to
+  # just these two gages so it doesn't also strip Malone's legitimate
+  # gage-height readings (a few feet, not an elevation in the thousands).
+  filter(!(gage_id %in% c("usbr-tulc", "usbr-tulc2") & !(value > 3500 & value < 10000))) |>
+  filter(!is.na(value)) |>
+  glimpse()
+
+ggplot(data = water_level_data, aes(x = date, y = value)) +
+  geom_line() +
+  facet_wrap(~gage_id, scales = "free") +
+  theme_minimal()
 
 #### water data gage table ----
-#  clk and lsr gage data
+# lat/long pulled live via rise_klamath_locations (see lake-levels-data-pull.R)
+# rather than hand-transcribed, so they stay accurate/reproducible.
+rise_coord <- function(site_code, field) {
+  rise_klamath_locations[[field]][rise_klamath_locations$site == site_code]
+}
 
-lrs_gage_data <- lrs_coords |>
-  mutate(gage_name = tolower(location),
-         location = "clear lake",
-         gage_id = "usbr-lsr",
-         agency = "usbr",
-         latitude = lat,
-         longitude = long,
-         river_mile = NA,
-         huc8 = "18010204") |>
-  select(location, gage_name, gage_id, agency, latitude, longitude, river_mile, huc8) |>
-  glimpse()
+# huc8 for the USBR Hydromet gages determined by spatial join against
+# rivermile::klamath_hucs (point-in-polygon on each gage's lat/long), rather
+# than hand-transcribed - this caught Tule Lake's huc8 having been wrong
+# (hardcoded "18010203"/Upper Klamath Lake; it's actually in "18010204"/Lost,
+# same basin as Clear Lake, Gerber, and Malone) and fills in Gerber/Malone,
+# which had no huc8 at all before.
+usbr_hydromet_huc8 <- usbr_hydromet_elev_stations |>
+  st_as_sf(coords = c("long", "lat"), crs = 4326, remove = FALSE) |>
+  st_join(klamath_hucs |> st_transform(4326), join = st_intersects) |>
+  st_drop_geometry() |>
+  select(site, huc8)
 
-clk_gage_data <- clk_coords |>
-  mutate(gage_name = tolower(location),
-         location = "clear lake",
-         gage_id = "usbr-clk",
-         agency = "usbr",
-         latitude = lat,
-         longitude = long,
-         river_mile = NA,
-         huc8 = "18010204") |>
-  select(location, gage_name, gage_id, agency, latitude, longitude, river_mile, huc8) |>
-  glimpse()
-
+huc_coord <- function(site_code) {
+  usbr_hydromet_huc8$huc8[usbr_hydromet_huc8$site == site_code]
+}
 
 water_level_gage <- water_level_gage_usgs |>
-  bind_rows(clk_gage_data, lrs_gage_data) |>
   add_row(location = "tule lake",
-          gage_name = "usbr tule lake sump 1a surface elevations",
-          gage_id = "usbr tule lake sump 1a",
+          gage_name = "tule lake sump 1a surface elevations",
+          gage_id = "usbr-tulc",
           agency = "u.s. bureau of reclamation",
-          latitude = 41.87862,
-          longitude = -121.5453,
-          huc8 = "18010203") |>
+          latitude = rise_coord("TULC", "lat"),
+          longitude = rise_coord("TULC", "long"),
+          huc8 = huc_coord("TULC")) |>
+  add_row(location = "tule lake",
+          gage_name = "tule lake sump 1b surface elevations",
+          gage_id = "usbr-tulc2",
+          agency = "u.s. bureau of reclamation",
+          latitude = rise_coord("TULC2", "lat"),
+          longitude = rise_coord("TULC2", "long"),
+          huc8 = huc_coord("TULC2")) |>
+  add_row(location = "gerber reservoir",
+          gage_name = "gerber reservoir forebay elevation",
+          gage_id = "usbr-ger",
+          agency = "u.s. bureau of reclamation",
+          latitude = rise_coord("GER", "lat"),
+          longitude = rise_coord("GER", "long"),
+          huc8 = huc_coord("GER")) |>
+  add_row(location = "malone reservoir",
+          gage_name = "malone reservoir gage height",
+          gage_id = "usbr-mal",
+          agency = "u.s. bureau of reclamation",
+          latitude = rise_coord("MAL", "lat"),
+          longitude = rise_coord("MAL", "long"),
+          huc8 = huc_coord("MAL")) |>
+  add_row(
+    location = "clear lake",
+    gage_name = "clear lake west lobe forebay elevation",
+    gage_id = "usbr-clk",
+    agency = "u.s. bureau of reclamation",
+    latitude = rise_coord("CLK", "lat"),
+    longitude = rise_coord("CLK", "long"),
+    huc8 = huc_coord("CLK")) |>
+  add_row(
+    location = "clear lake",
+    gage_name = "clear lake east lobe forebay elevation",
+    gage_id = "usbr-lrs",
+    agency = "u.s. bureau of reclamation",
+    latitude = rise_coord("LRS", "lat"),
+    longitude = rise_coord("LRS", "long"),
+    huc8 = huc_coord("LRS")) |>
+  mutate(huc8 = as.numeric(huc8)) |>
   glimpse()
 
 
