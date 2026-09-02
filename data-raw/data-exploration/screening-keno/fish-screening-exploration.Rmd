@@ -46,7 +46,7 @@ shapefile plus layer symbology. We extract the shapefile out of each package bef
 ## 2. Load the data
 
 ```{r}
-lpkx_dir <- here::here("data-raw", "data-exploration", "screening-keno")
+lpkx_dir <- here::here("data-raw", "screening-diversion-keno-data")
 
 extract_lpkx_layer <- function(lpkx_name) {
   lpkx_path <- file.path(lpkx_dir, lpkx_name)
