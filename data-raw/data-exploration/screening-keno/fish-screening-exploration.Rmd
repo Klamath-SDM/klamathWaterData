@@ -93,7 +93,7 @@ setdiff(names(screen_ds), names(screen_us))
 setdiff(names(screen_us), names(screen_ds))
 ```
 
-## 4. Missingness
+## 4. Missing data
 
 ```{r}
 map_dbl(st_drop_geometry(screen_ds), \(x) mean(is.na(x))) |>
