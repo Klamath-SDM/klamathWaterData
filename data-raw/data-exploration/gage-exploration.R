@@ -8,6 +8,7 @@ library(klamathWaterData)
 library(leaflet)
 library(stringr)
 library(htmltools)
+library(htmlwidgets)
 
 #  the purpose of this script is just to keep track gages that we are using and have questions about
 # it currently explores Scott and Shasta River temp and flow gages and ukl wq gages
@@ -245,7 +246,7 @@ ukl_gages <- bind_rows(
   temp_gage |> filter(str_detect(location, ukl_pattern)),
   flow_gage |> filter(str_detect(location, ukl_pattern)),
   do_gage   |> mutate(huc8 = as.numeric(huc8)) |> filter(str_detect(location, ukl_pattern)),
-  ph_gage   |> filter(str_detect(location, ukl_pattern))
+  ph_gage   |> mutate(huc8 = as.numeric(huc8)) |> filter(str_detect(location, ukl_pattern))
 ) |>
   mutate(
     latitude = as.numeric(latitude),

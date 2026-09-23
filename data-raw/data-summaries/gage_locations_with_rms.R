@@ -31,6 +31,12 @@ leaflet() |>
                     "River mile: ", river_mile),
     group = "River miles"
   ) |>
+  # addPolylines(
+  #   data = rivermile::all_klamath_rivers_line,
+  #   stroke = FALSE,
+  #   popup = ~paste0("River: ", river),
+  #   group = "River miles"
+  # ) |>
   addCircleMarkers(
     data = temp_pts |> filter(!is.na(river_mile)),
     radius = 8,
