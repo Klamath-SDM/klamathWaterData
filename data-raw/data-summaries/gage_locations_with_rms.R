@@ -120,13 +120,14 @@ leaflet() |>
 # temperature specific leaflet map and plot ----------------------------------------
 temp_pts_karuk <- make_river_pts(klamathWaterData::temperature_gage |> filter(agency == "karuk tribe"))
 temp_pts_hoopa <- make_river_pts(klamathWaterData::temperature_gage |> filter(agency == "hoopa valley tribe"))
+temp_pts_yurok <- make_river_pts(klamathWaterData::temperature_gage |> filter(agency == "yurok tribe"))
 temp_pts <- make_river_pts(klamathWaterData::temperature_gage |> filter(!(agency %in% c("hoopa valley tribe", "karuk tribe"))))
 
 temperature_gage_map <- leaflet() |>
   addTiles() |>
   addPolylines(
     data = rivermile::all_klamath_rivers_line,
-    color = "darkblue",
+    color = "blue",
     weight = 2,
     popup = ~paste0("River: ", river),
     group = "River"
@@ -158,6 +159,19 @@ temperature_gage_map <- leaflet() |>
     group = "Karuk Temperature gages"
   ) |>
   addCircleMarkers(
+    data = temp_pts_yurok |> filter(!is.na(river_mile)),
+    radius = 8,
+    fillOpacity = 0.8,
+    fillColor = "lightblue",
+    color = "darkblue",
+    popup = ~paste0("Type: Temperature<br>",
+                    "River: ", location, "<br>",
+                    "River mile: ", river_mile, "<br>",
+                    "Gage Name: ", gage_name, "<br>",
+                    "Agency: ", agency),
+    group = "Yurok Temperature gages"
+  ) |>
+  addCircleMarkers(
     data = temp_pts_hoopa |> filter(!is.na(river_mile)),
     radius = 8,
     fillOpacity = 0.8,
@@ -174,7 +188,8 @@ temperature_gage_map <- leaflet() |>
     overlayGroups = c("River",
                       "Temperature gages",
                       "Hoopa Temperature gages",
-                      "Karuk Temperature gages"),
+                      "Karuk Temperature gages",
+                      "Yurok Temperature gages"),
     options = layersControlOptions(collapsed = FALSE)
   )
 
@@ -187,7 +202,7 @@ save_selfcontained_widget(
 
 qc_data <- temperature_data |>
   left_join(temperature_gage |> select(gage_id, agency), by = "gage_id") |>
-  filter(agency %in% c("karuk tribe", "hoopa valley tribe"),
+  filter(agency %in% c("karuk tribe", "hoopa valley tribe", "yurok tribe"),
          location == "klamath river") |>
   mutate(facet_label = paste0(gage_name, " (", agency, ")"))
 
@@ -196,7 +211,7 @@ karuk_hoopa_temp_qc_plot <- ggplot(qc_data, aes(x = date, y = value, color = sta
   facet_wrap(~ facet_label, ncol = 2, scales = "free_x") +
   scale_color_manual(values = c(min = "#2166AC", mean = "#1B1B1B", max = "#B2182B")) +
   labs(
-    title = "Karuk & Hoopa Water Temperature",
+    title = "Karuk, Hoopa, and Yurok Water Temperature",
     subtitle = "Daily min / mean / max",
     x = NULL, y = "Water Temperature (\u00b0C)", color = "Statistic"
   ) +
@@ -210,7 +225,7 @@ karuk_hoopa_temp_qc_plot <- ggplot(qc_data, aes(x = date, y = value, color = sta
 karuk_hoopa_temp_qc_plot
 
 ggsave(
-  filename = "data-raw/data-summaries/karuk_hoopa_temperature_qc.png",
+  filename = "data-raw/data-summaries/karuk_hoopa_yurok_temperature_qc.png",
   plot = karuk_hoopa_temp_qc_plot,
   width = 12, height = 9, dpi = 300
 )

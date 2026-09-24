@@ -350,6 +350,42 @@ temperature_gage_owrd <- owrd_temp_stations |>
 # published or operational.
 source("data-raw/data-pull/karuk-wq-portal-pull-helpers.R")
 
+# Every value below was looked up by hand against the portal's own
+#  endpoints - not hand-guessed, and
+# reproducible/updatable the same way if the portal ever reorganizes its
+# stations or these need re-checking:
+#   - gage_id: the numeric ones are real USGS gage numbers Karuk/Yurok have
+#     co-located a sonde at, prefixed "karuk-" so they can't collide with
+#     the plain-numeric gage_id usgs_gages above already uses for that same
+#     station number (e.g. "11523000" from NWIS vs "karuk-11523000" here -
+#     see the note above on why 11523000 specifically needs this). "kas"/
+#     "kat" are the portal's own (already-unique) short codes for those two
+#     Yurok Tribe stations, used as-is.
+#   - location/gage_name: hand-transcribed from each station's entry in
+#     GET https://waterquality.karuk.us/Data/GetDropDownAll (a station
+#     picker list; response body is itself a JSON-encoded string containing
+#     the real JSON array - decode it twice). Every station below is
+#     confirmed Klamath mainstem by that listing's own display name (e.g.
+#     "11516530 - KLAMATH RIVER BELOW IRON GATE (Karuk)").
+#   - agency: the parenthesized suffix on that same DisplayText field
+#     ("(Karuk)" -> Karuk Tribe, "(YTEP)" -> Yurok Tribe).
+#   - dataset_id: the portal's internal id for each station's "Temperature
+#     water" parameter, from
+#     GET https://waterquality.karuk.us/Data/DataSets?locationid=<id>
+#     (<id> is that station's own IDNumber field from GetDropDownAll, not
+#     its site code) - look for the row where ParameterName is
+#     "Temperature water" and read its IDNumber. That same response's
+#     Id field is worth checking too: a value of "USGS"/"USGS OGC" there
+#     means the portal is just mirroring the official NWIS record (already
+#     pulled via usgs_gages above, so not worth re-pulling); "Final" means
+#     it's Karuk/Yurok's own independent sonde record, as all seven below
+#     are.
+#   - start_date: that same DataSets response's StartTime field for the
+#     "Temperature water" row.
+#   - lat/long: not given directly by DataSets - fetch
+#     GET https://waterquality.karuk.us/Data/Dataset_Side/?dataset=<dataset_id>&isDataset=true
+#     (an HTML fragment, not JSON) and read the coordinates out of its
+#     embedded onclick="...GoTo('map', <long>, <lat>)..." attribute.
 karuk_stations <- tribble(
   ~gage_id,         ~location,       ~gage_name,                          ~dataset_id, ~start_date,            ~lat,        ~long,         ~agency,
   "karuk-11516530", "klamath river", "klamath river below iron gate",     1883,        as.Date("2001-05-17"),  41.927762,   -122.443927,   "Karuk Tribe",
