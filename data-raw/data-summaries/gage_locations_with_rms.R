@@ -4,6 +4,19 @@ library(leaflet)
 library(ggplot2)
 library(htmlwidgets)
 
+# saveWidget()'s selfcontained=TRUE still stages dependency files in a
+# "<file>_files" directory next to the output before bundling them into the
+# single html - passing libdir elsewhere doesn't avoid this (it must live
+# under the same directory as `file`, or saveWidget errors). Staging in a
+# tempdir and copying out just the finished, self-contained html instead
+# keeps that folder out of the repo entirely.
+save_selfcontained_widget <- function(widget, file) {
+  tmp_html <- tempfile(fileext = ".html")
+  saveWidget(widget, file = tmp_html, selfcontained = TRUE)
+  file.copy(tmp_html, file, overwrite = TRUE)
+  invisible(file)
+}
+
 make_river_pts <- function(df) {
   df |>
     st_as_sf(coords = c("longitude", "latitude"),
@@ -167,10 +180,9 @@ temperature_gage_map <- leaflet() |>
 
 temperature_gage_map
 
-saveWidget(
+save_selfcontained_widget(
   temperature_gage_map,
-  file = "data-raw/data-summaries/temperature_gage_map.html",
-  selfcontained = TRUE
+  file = "data-raw/data-summaries/temperature_gage_map.html"
 )
 
 qc_data <- temperature_data |>
