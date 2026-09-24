@@ -418,6 +418,86 @@ temperature_gage_karuk <- karuk_stations |>
   mutate(huc8 = as.numeric(huc8)) |>
   glimpse()
 
+### Hoopa Valley Tribe Hydromet Portal ----
+# Continuous sonde water temperature for one more Klamath mainstem site
+# below Keno: "Klamath River Saints Rest" (wxvisual.com/HoopaValley, a
+# custom Hoopa Valley Tribe hydromet dashboard, unrelated to the Karuk
+# portal above). Coordinates (41.187972, -123.676941) match exactly the
+# existing WQX gage "cdr and nutrients at saints rest bar"
+# (HVTEPA_WQX-KR_STREST_CDR, in temperature_gage_wqx above) - same
+# physical station, but that's discrete grab samples while this is a
+# continuous sonde feed, so it's kept under its own "hoopa-" prefixed
+# gage_id rather than merged into the WQX one.
+#
+# This portal has no JSON API - Graph.php returns a full HTML page with
+# the chart's data embedded as a JS string (see
+# hoopa-wq-portal-pull-helpers.R). Unlike the Karuk portal, one request
+# returns the entire period of record at once (tested: ~53,000 rows /
+# ~7 years in ~3 seconds), no chunking needed.
+#
+# ~5% of raw readings are sensor error codes, not real measurements: a
+# literal 0.0 (sensor dropout, 2,615 of 51,687 in testing) and a fixed
+# sentinel value in the tens of thousands (51425, clearly not a
+# temperature) - both filtered out below, keeping only 0-35 C as a
+# generous but real bound for this river.
+#
+# Data is explicitly provisional per the portal's own disclaimer ("Data
+# is provisional and is subject to revision. Not to be used as official
+# record.") - get sign-off from the Hoopa Valley Tribe before this is
+# used in anything published or operational.
+source("data-raw/data-pull/hoopa-wq-portal-pull-helpers.R")
+
+hoopa_start_date <- as.Date("2015-01-01") # portal returns whatever it actually has, starting ~2019-08-27
+hoopa_end_date <- karuk_end_date
+
+#### water data table ----
+hoopa_saints_rest_raw <- fetch_hoopa_station(
+  "Klamath River Saints Rest", "Water Temp C", hoopa_start_date, hoopa_end_date
+)
+
+temperature_data_hoopa <- hoopa_saints_rest_raw |>
+  mutate(date = as.Date(timestamp)) |>
+  filter(!is.na(value), value > 0, value < 35) |>
+  group_by(date) |>
+  summarise(mean_temp = mean(value, na.rm = TRUE),
+            min_temp  = min(value, na.rm = TRUE),
+            max_temp  = max(value, na.rm = TRUE),
+            .groups = "drop") |>
+  pivot_longer(cols = c(mean_temp, min_temp, max_temp),
+               names_to = "statistic",
+               values_to = "value") |>
+  mutate(statistic = case_when(
+    statistic == "mean_temp" ~ "mean",
+    statistic == "min_temp"  ~ "min",
+    statistic == "max_temp"  ~ "max"),
+    stream = "klamath river",
+    gage_name = "klamath river saints rest",
+    gage_id = "hoopa-hvt-st2",
+    variable_name = "temperature",
+    unit = "celsius") |>
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
+  glimpse()
+
+#### monitoring site table ----
+# Coordinates and huc8 treated the same way as the Karuk/OWRD gages above
+# (not run through gage_data_format()/find_nearest_river_miles(), river_mile
+# left NA; huc8 via spatial join against rivermile::klamath_hucs).
+temperature_gage_hoopa <- tibble(
+  stream = "klamath river",
+  gage_name = "klamath river saints rest",
+  gage_id = "hoopa-hvt-st2",
+  agency = "Hoopa Valley Tribe",
+  latitude = 41.187972,
+  longitude = -123.676941,
+  river_mile = NA_real_
+) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326, remove = FALSE) |>
+  st_join(klamath_hucs |> st_transform(4326), join = st_intersects) |>
+  st_drop_geometry() |>
+  select(-name) |>
+  mutate(huc8 = as.numeric(huc8)) |>
+  glimpse()
+
 ### USFWS ----
 
 # pulling raw data -- This data was shared by Tylor Daley from USFWS
@@ -549,7 +629,7 @@ temperature_data <- temperature_data_wqx |>
          value = as.numeric(value)) |>
   bind_rows(temperature_data_usfws, temperature_data_usgs |>
               mutate(gage_id = as.character(gage_id)), temperature_data_owrd,
-            temperature_data_karuk) |>
+            temperature_data_karuk, temperature_data_hoopa) |>
   mutate(location = tolower(stream),
          gage_name = tolower(gage_name)) |>
   relocate(location, .before = gage_name) |>
@@ -560,7 +640,7 @@ temperature_data <- temperature_data_wqx |>
 temperature_gage <- temperature_gage_usgs |>
   mutate(gage_id = as.character(gage_id)) |>
   bind_rows(temperature_gage_wqx, temperature_gage_usfws, temperature_gage_owrd,
-            temperature_gage_karuk) |>
+            temperature_gage_karuk, temperature_gage_hoopa) |>
   mutate(location = tolower(stream),
          gage_name = tolower(gage_name),
          agency = tolower(agency)) |>
