@@ -320,15 +320,16 @@ temperature_gage_owrd <- owrd_temp_stations |>
   mutate(huc8 = as.numeric(huc8)) |>
   glimpse()
 
-### Karuk Tribe Water Quality Portal ----
-# Continuous sonde temperature for Klamath mainstem sites below Keno
+### Karuk Tribe Water Quality Portal (includes Yurok and Quartz Valley) ----
+# Continuous sonde temperature for Klamath mainstem sites below Keno, plus
+# one Scott River (a Klamath tributary) site
 # (waterquality.karuk.us, an Aquatic Informatics AQUARIUS WebPortal
-# aggregating Karuk Tribe, Yurok Tribe (YTEP), and co-located USGS
-# telemetry) - fills a gap raised for the salmon-model temperature
-# placeholder: USGS's own NWIS daily-values record for water temperature
-# only exists at a handful of gages below Keno (see usgs_gages above),
-# while this portal has continuous instream temperature at several more
-# mainstem sites.
+# aggregating Karuk Tribe, Yurok Tribe (YTEP), Quartz Valley Indian
+# Reservation (QVIR), and co-located USGS telemetry) - fills a gap raised
+# for the salmon-model temperature placeholder: USGS's own NWIS
+# daily-values record for water temperature only exists at a handful of
+# gages below Keno (see usgs_gages above), while this portal has
+# continuous instream temperature at several more sites.
 #
 # Checked every USGS-numbered site on this portal against usgs_gages above
 # to avoid duplicating what we already pull from NWIS: four
@@ -359,16 +360,19 @@ source("data-raw/data-pull/karuk-wq-portal-pull-helpers.R")
 #     the plain-numeric gage_id usgs_gages above already uses for that same
 #     station number (e.g. "11523000" from NWIS vs "karuk-11523000" here -
 #     see the note above on why 11523000 specifically needs this). "kas"/
-#     "kat" are the portal's own (already-unique) short codes for those two
-#     Yurok Tribe stations, used as-is.
+#     "kat"/"sc1" are the portal's own (already-unique) short codes for
+#     those stations, used as-is.
 #   - location/gage_name: hand-transcribed from each station's entry in
 #     GET https://waterquality.karuk.us/Data/GetDropDownAll (a station
 #     picker list; response body is itself a JSON-encoded string containing
 #     the real JSON array - decode it twice). Every station below is
-#     confirmed Klamath mainstem by that listing's own display name (e.g.
-#     "11516530 - KLAMATH RIVER BELOW IRON GATE (Karuk)").
+#     Klamath mainstem, confirmed by that listing's own display name (e.g.
+#     "11516530 - KLAMATH RIVER BELOW IRON GATE (Karuk)"), except "sc1"
+#     ("SC1 - SCOTT R NR FORT JONES (QVIR)"), which is on the Scott River,
+#     a Klamath tributary.
 #   - agency: the parenthesized suffix on that same DisplayText field
-#     ("(Karuk)" -> Karuk Tribe, "(YTEP)" -> Yurok Tribe).
+#     ("(Karuk)" -> Karuk Tribe, "(YTEP)" -> Yurok Tribe, "(QVIR)" ->
+#     Quartz Valley Indian Reservation).
 #   - dataset_id: the portal's internal id for each station's "Temperature
 #     water" parameter, from
 #     GET https://waterquality.karuk.us/Data/DataSets?locationid=<id>
@@ -377,9 +381,9 @@ source("data-raw/data-pull/karuk-wq-portal-pull-helpers.R")
 #     "Temperature water" and read its IDNumber. That same response's
 #     Id field is worth checking too: a value of "USGS"/"USGS OGC" there
 #     means the portal is just mirroring the official NWIS record (already
-#     pulled via usgs_gages above, so not worth re-pulling); "Final" means
-#     it's Karuk/Yurok's own independent sonde record, as all seven below
-#     are.
+#     pulled via usgs_gages above, so not worth re-pulling); "Final" or
+#     "Telemetered" means it's the tribe/agency's own independent sonde
+#     record, as all eight below are.
 #   - start_date: that same DataSets response's StartTime field for the
 #     "Temperature water" row.
 #   - lat/long: not given directly by DataSets - fetch
@@ -394,7 +398,8 @@ karuk_stations <- tribble(
   "karuk-11520500", "klamath river", "klamath river near seiad valley",   1864,        as.Date("2001-05-17"),  41.853798,   -123.232033,   "Karuk Tribe",
   "karuk-11523000", "klamath river", "klamath river near orleans",        1849,        as.Date("2001-05-18"),  41.303471,   -123.534421,   "Karuk Tribe",
   "kas",            "klamath river", "klamath river at salt creek",       1888,        as.Date("2022-11-02"),  41.546886,   -124.062264,   "Yurok Tribe",
-  "kat",            "klamath river", "klamath at turwar gage",            1666,        as.Date("2019-02-27"),  41.5159431,  -124.0003835,  "Yurok Tribe"
+  "kat",            "klamath river", "klamath at turwar gage",            1666,        as.Date("2019-02-27"),  41.5159431,  -124.0003835,  "Yurok Tribe",
+  "sc1",            "scott river",   "scott r nr fort jones",              2018,        as.Date("2017-07-18"),  41.64,       -123.0138,     "Quartz Valley Indian Reservation"
 )
 
 # matches the standardized end date used across this package's other pulls
