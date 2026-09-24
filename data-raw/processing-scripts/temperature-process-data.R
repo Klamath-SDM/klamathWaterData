@@ -643,7 +643,11 @@ temperature_gage <- temperature_gage_usgs |>
             temperature_gage_karuk, temperature_gage_hoopa) |>
   mutate(location = tolower(stream),
          gage_name = tolower(gage_name),
-         agency = tolower(agency)) |>
+         agency = tolower(agency),
+         # WQX's own agency name for HVTEPA's sites ("Hoopa Valley Tribe
+         # (Tribal)") otherwise doesn't match the plain "Hoopa Valley Tribe"
+         # used for the Hydromet portal gage above - same tribe, one name.
+         agency = ifelse(agency == "hoopa valley tribe (tribal)", "hoopa valley tribe", agency)) |>
   relocate(location, .before = gage_name) |>
   filter(!is.na(location)) |>
   mutate(stream = location) |>

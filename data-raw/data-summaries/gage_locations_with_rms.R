@@ -174,8 +174,9 @@ saveWidget(
 )
 
 qc_data <- temperature_data |>
-  filter(grepl("^karuk-|^hoopa-", gage_id)) |>
   left_join(temperature_gage |> select(gage_id, agency), by = "gage_id") |>
+  filter(agency %in% c("karuk tribe", "hoopa valley tribe"),
+         location == "klamath river") |>
   mutate(facet_label = paste0(gage_name, " (", agency, ")"))
 
 karuk_hoopa_temp_qc_plot <- ggplot(qc_data, aes(x = date, y = value, color = statistic)) +
