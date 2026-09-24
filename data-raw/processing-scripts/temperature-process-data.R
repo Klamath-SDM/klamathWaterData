@@ -416,7 +416,7 @@ temperature_data_karuk <- map_dfr(seq_len(nrow(karuk_stations)), function(i) {
   if (nrow(raw) == 0) return(NULL)
   raw |>
     mutate(date = as.Date(timestamp)) |>
-    filter(!is.na(value)) |>
+    filter(!is.na(value))  |>
     group_by(date) |>
     summarise(mean_temp = mean(value, na.rm = TRUE),
               min_temp  = min(value, na.rm = TRUE),

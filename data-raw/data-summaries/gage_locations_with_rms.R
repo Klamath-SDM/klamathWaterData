@@ -35,7 +35,13 @@ pal_rm <- colorNumeric(
 )
 
 leaflet() |>
-  addTiles() |>
+  # addTiles()'s default OSM tile server rejects requests with no/null
+  # Referer header - exactly what a browser sends when opening this file
+  # locally via file:// (no web server involved), so the base map renders
+  # as a blank gray grid once saved standalone. CartoDB's tiles don't
+  # enforce that restriction, so they still load when the html is just
+  # double-clicked/opened directly rather than served.
+  addProviderTiles(providers$CartoDB.Positron) |>
   # addCircleMarkers(
   #   data = rivermile::all_klamath_rivers_pts,
   #   radius = 3,
@@ -124,7 +130,7 @@ temp_pts_yurok <- make_river_pts(klamathWaterData::temperature_gage |> filter(ag
 temp_pts <- make_river_pts(klamathWaterData::temperature_gage |> filter(!(agency %in% c("hoopa valley tribe", "karuk tribe"))))
 
 temperature_gage_map <- leaflet() |>
-  addTiles() |>
+  addProviderTiles("Esri.WorldStreetMap", group = "Street") |>
   addPolylines(
     data = rivermile::all_klamath_rivers_line,
     color = "blue",
