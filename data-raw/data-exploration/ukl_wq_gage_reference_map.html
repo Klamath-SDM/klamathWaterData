@@ -4067,7 +4067,7 @@ function asArray(value) {
 
 },{}]},{},[13]);
 </script>
-<script>(function(root, factory) {
+<script>(function (root, factory) {
 	if (typeof define === 'function' && define.amd) {
 		// AMD. Register as an anonymous module.
 		define(['leaflet'], factory);
@@ -4078,11 +4078,11 @@ function asArray(value) {
 		// Assume Leaflet is loaded into global object L already
 		factory(L);
 	}
-}(this, function(L) {
+}(this, function (L) {
 	'use strict';
 
 	L.TileLayer.Provider = L.TileLayer.extend({
-		initialize: function(arg, options) {
+		initialize: function (arg, options) {
 			var providers = L.TileLayer.Provider.providers;
 
 			var parts = arg.split('.');
@@ -4121,13 +4121,12 @@ function asArray(value) {
 
 			// replace attribution placeholders with their values from toplevel provider attribution,
 			// recursively
-			var attributionReplacer = function(attr) {
+			var attributionReplacer = function (attr) {
 				if (attr.indexOf('{attribution.') === -1) {
 					return attr;
 				}
-				return attr.replace(
-					/\{attribution.(\w*)\}/g,
-					function(match, attributionName) {
+				return attr.replace(/\{attribution.(\w*)\}/g,
+					function (match, attributionName) {
 						return attributionReplacer(providers[attributionName].options.attribution);
 					}
 				);
@@ -4189,12 +4188,6 @@ function asArray(value) {
 					options: {
 						attribution: '{attribution.OpenStreetMap}, Tiles courtesy of <a href="http://www.openstreetmap.bzh/" target="_blank">Breton OpenStreetMap Team</a>',
 						bounds: [[46.2, -5.5], [50, 0.7]]
-					}
-				},
-				CAT: {
-					url: 'https://tile.openstreetmap.bzh/ca/{z}/{x}/{y}.png',
-					options: {
-						attribution: '{attribution.OpenStreetMap}, Tiles courtesy of <a href="https://www.openstreetmap.cat" target="_blank">Breton OpenStreetMap Team</a>',
 					}
 				}
 			}
@@ -4284,17 +4277,6 @@ function asArray(value) {
 			variants: {
 				AlidadeSmooth: 'alidade_smooth',
 				AlidadeSmoothDark: 'alidade_smooth_dark',
-				AlidadeSatellite: {
-					options: {
-						attribution:
-						  '&copy; CNES, Distribution Airbus DS, © Airbus DS, © PlanetObserver (Contains Copernicus Data) | ' +
-							'&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> ' +
-							'&copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> ' +
-							'{attribution.OpenStreetMap}',
-						variant: 'alidade_satellite',
-						ext: 'jpg',
-					}
-				},
 				OSMBright: 'osm_bright',
 				Outdoors: 'outdoors',
 				StamenToner: {
@@ -4412,7 +4394,7 @@ function asArray(value) {
 			}
 		},
 		Thunderforest: {
-			url: 'https://{s}.tile.thunderforest.com/{variant}/{z}/{x}/{y}{r}.png?apikey={apikey}',
+			url: 'https://{s}.tile.thunderforest.com/{variant}/{z}/{x}/{y}.png?apikey={apikey}',
 			options: {
 				attribution:
 					'&copy; <a href="http://www.thunderforest.com/">Thunderforest</a>, {attribution.OpenStreetMap}',
@@ -4444,17 +4426,6 @@ function asArray(value) {
 				Neighbourhood: 'neighbourhood'
 			}
 		},
-		BaseMapDE: {
-			url: 'https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/{variant}/default/GLOBAL_WEBMERCATOR/{z}/{y}/{x}.png',
-			options: {
-				attribution: 'Map data: &copy; <a href="http://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>',
-				variant: 'de_basemapde_web_raster_farbe',
-			},
-			variants: {
-				Color: 'de_basemapde_web_raster_farbe',
-				Grey: 'de_basemapde_web_raster_grau'
-			}
-		},
 		CyclOSM: {
 			url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
 			options: {
@@ -4463,14 +4434,15 @@ function asArray(value) {
 			}
 		},
 		Jawg: {
-			url: 'https://tile.jawg.io/{variant}/{z}/{x}/{y}{r}.png?access-token={accessToken}',
+			url: 'https://{s}.tile.jawg.io/{variant}/{z}/{x}/{y}{r}.png?access-token={accessToken}',
 			options: {
 				attribution:
-					'<a href="https://jawg.io" title="Tiles Courtesy of Jawg Maps" target="_blank">&copy; <b>Jawg</b>Maps</a> ' +
+					'<a href="http://jawg.io" title="Tiles Courtesy of Jawg Maps" target="_blank">&copy; <b>Jawg</b>Maps</a> ' +
 					'{attribution.OpenStreetMap}',
 				minZoom: 0,
 				maxZoom: 22,
-				variant: 'jawg-streets',
+				subdomains: 'abcd',
+				variant: 'jawg-terrain',
 				// Get your own Jawg access token here : https://www.jawg.io/lab/
 				// NB : this is a demonstration key that comes with no guarantee
 				accessToken: '<insert your access token here>',
@@ -4478,7 +4450,6 @@ function asArray(value) {
 			variants: {
 				Streets: 'jawg-streets',
 				Terrain: 'jawg-terrain',
-				Lagoon: 'jawg-lagoon',
 				Sunny: 'jawg-sunny',
 				Dark: 'jawg-dark',
 				Light: 'jawg-light',
@@ -4513,9 +4484,9 @@ function asArray(value) {
 				maxZoom: 21
 			},
 			variants: {
-				Streets: 'streets-v2',
-				Basic: 'basic-v2',
-				Bright: 'bright-v2',
+				Streets: 'streets',
+				Basic: 'basic',
+				Bright: 'bright',
 				Pastel: 'pastel',
 				Positron: 'positron',
 				Hybrid: {
@@ -4524,35 +4495,9 @@ function asArray(value) {
 						ext: 'jpg'
 					}
 				},
-				Toner: 'toner-v2',
-				Topo: 'topo-v2',
-				Voyager: 'voyager-v2',
-				Ocean: 'ocean',
-				Backdrop: 'backdrop',
-				Dataviz: 'dataviz',
-				DatavizLight: 'dataviz-light',
-				DatavizDark: 'dataviz-dark',
-				Aquarelle: {
-					options: {
-						variant: 'aquarelle',
-						ext: 'webp'
-					}
-				},
-				Landscape: 'landscape',
-				Openstreetmap: {
-					options: {
-						variant: 'openstreetmap',
-						ext: 'jpg'
-					}
-				},
-				Outdoor: 'outdoor-v2',
-				Satellite: {
-					options: {
-						variant: 'satellite',
-						ext: 'jpg'
-					}
-				},
-				Winter: 'winter-v2',
+				Toner: 'toner',
+				Topo: 'topo',
+				Voyager: 'voyager'
 			}
 		},
 		TomTom: {
@@ -4585,6 +4530,14 @@ function asArray(value) {
 						attribution:
 							'{attribution.Esri} &mdash; ' +
 							'Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+					}
+				},
+				DeLorme: {
+					options: {
+						variant: 'Specialty/DeLorme_World_Base_Map',
+						minZoom: 1,
+						maxZoom: 11,
+						attribution: '{attribution.Esri} &mdash; Copyright: &copy;2012 DeLorme'
 					}
 				},
 				WorldTopoMap: {
@@ -4671,29 +4624,25 @@ function asArray(value) {
 				Snow: 'snow'
 			}
 		},
-
 		HERE: {
-
 			/*
-			 * HERE maps API Version 3.
-			 * documentation at: https://www.here.com/docs/bundle/raster-tile-api-developer-guide/page/README.html
-			 * These basemaps are free, but you need an API key. Please sign up at
-			 * https://platform.here.com/portal/
-			 * Subscription remains for free, pricing details can be found here: https://www.here.com/get-started/pricing
-			 * Version 3 deprecates the app_id and app_code access in favor of apiKey
+			 * HERE maps, formerly Nokia maps.
+			 * These basemaps are free, but you need an api id and app key. Please sign up at
+			 * https://developer.here.com/plans
 			 */
 			url:
-				'https://maps.hereapi.com/v3/base/mc/' + // new base url for HERE maptile v3 api
-				'{z}/{x}/{y}/{format}?style={variant}&size={size}' + // slightly modified parameters
-				'&apiKey={app_id}&lg={language}', // replacing app-id with apikey
+				'https://{s}.{base}.maps.api.here.com/maptile/2.1/' +
+				'{type}/{mapID}/{variant}/{z}/{x}/{y}/{size}/{format}?' +
+				'app_id={app_id}&app_code={app_code}&lg={language}',
 			options: {
 				attribution:
-					'Map &copy; 1987-' + new Date().getFullYear() + ' <a href="http://platform.here.com">HERE</a>',
+					'Map &copy; 1987-' + new Date().getFullYear() + ' <a href="http://developer.here.com">HERE</a>',
 				subdomains: '1234',
 				mapID: 'newest',
-				apiKey: '<insert your apiKey here>', // switching from appid and appcode to apikey
+				'app_id': '<insert your app_id here>',
+				'app_code': '<insert your app_code here>',
 				base: 'base',
-				variant: 'explore.day',
+				variant: 'normal.day',
 				maxZoom: 20,
 				type: 'maptile',
 				language: 'eng',
@@ -4701,17 +4650,143 @@ function asArray(value) {
 				size: '256'
 			},
 			variants: {
-				exploreDay: 'explore.day',
-				liteDay: 'lite.day',
-				logisticsDay: 'logistics.day',
-				topoDay: 'topo.day',
-				logisticsNight: 'logistics.night',
-				exploreNight: 'explore.night',
-				topoNight: 'topo.night',
-				liteNight: 'lite.night',
-				exploreSatelliteDay: 'explore.satellite.day',
-				liteSatelliteDay: 'lite.satellite.day',
-				logisticsSatelliteDay: 'logistics.satellite.day',
+				normalDay: 'normal.day',
+				normalDayCustom: 'normal.day.custom',
+				normalDayGrey: 'normal.day.grey',
+				normalDayMobile: 'normal.day.mobile',
+				normalDayGreyMobile: 'normal.day.grey.mobile',
+				normalDayTransit: 'normal.day.transit',
+				normalDayTransitMobile: 'normal.day.transit.mobile',
+				normalDayTraffic: {
+					options: {
+						variant: 'normal.traffic.day',
+						base: 'traffic',
+						type: 'traffictile'
+					}
+				},
+				normalNight: 'normal.night',
+				normalNightMobile: 'normal.night.mobile',
+				normalNightGrey: 'normal.night.grey',
+				normalNightGreyMobile: 'normal.night.grey.mobile',
+				normalNightTransit: 'normal.night.transit',
+				normalNightTransitMobile: 'normal.night.transit.mobile',
+				reducedDay: 'reduced.day',
+				reducedNight: 'reduced.night',
+				basicMap: {
+					options: {
+						type: 'basetile'
+					}
+				},
+				mapLabels: {
+					options: {
+						type: 'labeltile',
+						format: 'png'
+					}
+				},
+				trafficFlow: {
+					options: {
+						base: 'traffic',
+						type: 'flowtile'
+					}
+				},
+				carnavDayGrey: 'carnav.day.grey',
+				hybridDay: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day'
+					}
+				},
+				hybridDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.mobile'
+					}
+				},
+				hybridDayTransit: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.transit'
+					}
+				},
+				hybridDayGrey: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.grey.day'
+					}
+				},
+				hybridDayTraffic: {
+					options: {
+						variant: 'hybrid.traffic.day',
+						base: 'traffic',
+						type: 'traffictile'
+					}
+				},
+				pedestrianDay: 'pedestrian.day',
+				pedestrianNight: 'pedestrian.night',
+				satelliteDay: {
+					options: {
+						base: 'aerial',
+						variant: 'satellite.day'
+					}
+				},
+				terrainDay: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day'
+					}
+				},
+				terrainDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day.mobile'
+					}
+				}
+			}
+		},
+		HEREv3: {
+			/*
+			 * HERE maps API Version 3.
+			 * These basemaps are free, but you need an API key. Please sign up at
+			 * https://developer.here.com/plans
+			 * Version 3 deprecates the app_id and app_code access in favor of apiKey
+			 *
+			 * Supported access methods as of 2019/12/21:
+			 * @see https://developer.here.com/faqs#access-control-1--how-do-you-control-access-to-here-location-services
+			 */
+			url:
+				'https://{s}.{base}.maps.ls.hereapi.com/maptile/2.1/' +
+				'{type}/{mapID}/{variant}/{z}/{x}/{y}/{size}/{format}?' +
+				'apiKey={apiKey}&lg={language}',
+			options: {
+				attribution:
+					'Map &copy; 1987-' + new Date().getFullYear() + ' <a href="http://developer.here.com">HERE</a>',
+				subdomains: '1234',
+				mapID: 'newest',
+				apiKey: '<insert your apiKey here>',
+				base: 'base',
+				variant: 'normal.day',
+				maxZoom: 20,
+				type: 'maptile',
+				language: 'eng',
+				format: 'png8',
+				size: '256'
+			},
+			variants: {
+				normalDay: 'normal.day',
+				normalDayCustom: 'normal.day.custom',
+				normalDayGrey: 'normal.day.grey',
+				normalDayMobile: 'normal.day.mobile',
+				normalDayGreyMobile: 'normal.day.grey.mobile',
+				normalDayTransit: 'normal.day.transit',
+				normalDayTransitMobile: 'normal.day.transit.mobile',
+				normalNight: 'normal.night',
+				normalNightMobile: 'normal.night.mobile',
+				normalNightGrey: 'normal.night.grey',
+				normalNightGreyMobile: 'normal.night.grey.mobile',
+				normalNightTransit: 'normal.night.transit',
+				normalNightTransitMobile: 'normal.night.transit.mobile',
+				reducedDay: 'reduced.day',
+				reducedNight: 'reduced.night',
 				basicMap: {
 					options: {
 						type: 'basetile'
@@ -4889,12 +4964,12 @@ function asArray(value) {
 				attribution: 'Kaartgegevens &copy; <a href="https://www.kadaster.nl">Kadaster</a>'
 			},
 			variants: {
-				standaard: 'standaard',
-				pastel: 'pastel',
-				grijs: 'grijs',
-				water: 'water',
-				luchtfoto: {
-					url: 'https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_ortho25/EPSG:3857/{z}/{x}/{y}.jpeg',
+				'standaard': 'standaard',
+				'pastel': 'pastel',
+				'grijs': 'grijs',
+				'water': 'water',
+				'luchtfoto': {
+					'url': 'https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_ortho25/EPSG:3857/{z}/{x}/{y}.jpeg',
 				}
 			}
 		},
@@ -4946,7 +5021,7 @@ function asArray(value) {
 				},
 				ModisTerraChlorophyll: {
 					options: {
-						variant: 'MODIS_Terra_L2_Chlorophyll_A',
+						variant: 'MODIS_Terra_Chlorophyll_A',
 						format: 'png',
 						maxZoom: 7,
 						opacity: 0.75
@@ -4956,29 +5031,20 @@ function asArray(value) {
 		},
 		NLS: {
 			// NLS maps are copyright National library of Scotland.
-			// http://maps.nls.uk/projects/subscription-api
+			// http://maps.nls.uk/projects/api/index.html
 			// Please contact NLS for anything other than non-commercial low volume usage
 			//
-			// Map sources: Ordnance Survey 1:1m to 1:63K, 1880s-1961
+			// Map sources: Ordnance Survey 1:1m to 1:63K, 1920s-1940s
 			//   z0-9  - 1:1m
 			//  z10-11 - quarter inch (1:253440)
 			//  z12-18 - one inch (1:63360)
-			url: 'https://api.maptiler.com/tiles/{variant}/{z}/{x}/{y}.jpg?key={apikey}',
+			url: 'https://nls-{s}.tileserver.com/nls/{z}/{x}/{y}.jpg',
 			options: {
-				attribution: '<a href="http://maps.nls.uk/projects/subscription-api">National Library of Scotland Historic Maps</a>',
+				attribution: '<a href="http://geo.nls.uk/maps/">National Library of Scotland Historic Maps</a>',
 				bounds: [[49.6, -12], [61.7, 3]],
 				minZoom: 1,
 				maxZoom: 18,
-				apikey: '<insert your api key here>'
-			},
-			variants: {
-				osgb63k1885: 'uk-osgb63k1885',
-				osgb1888: 'uk-osgb1888',
-				osgb10k1888: 'uk-osgb10k1888',
-				osgb1919: 'uk-osgb1919',
-				osgb25k1937: 'uk-osgb25k1937',
-				osgb63k1955: 'uk-osgb63k1955',
-				oslondon1k1893: 'uk-oslondon1k1893'
+				subdomains: '0123',
 			}
 		},
 		JusticeMap: {
@@ -5006,12 +5072,15 @@ function asArray(value) {
 			}
 		},
 		GeoportailFrance: {
-			url: 'https://data.geopf.fr/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&STYLE={style}&TILEMATRIXSET=PM&FORMAT={format}&LAYER={variant}&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+			url: 'https://wxs.ign.fr/{apikey}/geoportail/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&STYLE={style}&TILEMATRIXSET=PM&FORMAT={format}&LAYER={variant}&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
 			options: {
 				attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Geoportail France</a>',
 				bounds: [[-75, -180], [81, 180]],
 				minZoom: 2,
 				maxZoom: 18,
+				// Get your own geoportail apikey here : http://professionnels.ign.fr/ign/contrats/
+				// NB : 'choisirgeoportail' is a demonstration key that comes with no guarantee
+				apikey: 'choisirgeoportail',
 				format: 'image/png',
 				style: 'normal',
 				variant: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2'
@@ -5106,9 +5175,9 @@ function asArray(value) {
 			}
 		},
 		AzureMaps: {
-			url:
-				'https://atlas.microsoft.com/map/tile?api-version={apiVersion}' +
-				'&tilesetId={variant}&x={x}&y={y}&zoom={z}&language={language}' +
+			url: 
+				'https://atlas.microsoft.com/map/tile?api-version={apiVersion}'+
+				'&tilesetId={variant}&x={x}&y={y}&zoom={z}&language={language}'+
 				'&subscription-key={subscriptionKey}',
 			options: {
 				attribution: 'See https://docs.microsoft.com/en-us/rest/api/maps/render-v2/get-map-tile for details.',
@@ -5124,9 +5193,9 @@ function asArray(value) {
 				MicrosoftBaseHybridRoad: 'microsoft.base.hybrid.road',
 				MicrosoftTerraMain: 'microsoft.terra.main',
 				MicrosoftWeatherInfraredMain: {
-					url:
-					'https://atlas.microsoft.com/map/tile?api-version={apiVersion}' +
-					'&tilesetId={variant}&x={x}&y={y}&zoom={z}' +
+					url: 
+					'https://atlas.microsoft.com/map/tile?api-version={apiVersion}'+
+					'&tilesetId={variant}&x={x}&y={y}&zoom={z}'+
 					'&timeStamp={timeStamp}&language={language}' +
 					'&subscription-key={subscriptionKey}',
 					options: {
@@ -5136,9 +5205,9 @@ function asArray(value) {
 					},
 				},
 				MicrosoftWeatherRadarMain: {
-					url:
-					'https://atlas.microsoft.com/map/tile?api-version={apiVersion}' +
-					'&tilesetId={variant}&x={x}&y={y}&zoom={z}' +
+					url: 
+					'https://atlas.microsoft.com/map/tile?api-version={apiVersion}'+
+					'&tilesetId={variant}&x={x}&y={y}&zoom={z}'+
 					'&timeStamp={timeStamp}&language={language}' +
 					'&subscription-key={subscriptionKey}',
 					options: {
@@ -5167,22 +5236,10 @@ function asArray(value) {
 					}
 				}
 			}
-		},
-		TopPlusOpen: {
-			url: 'http://sgx.geodatenzentrum.de/wmts_topplus_open/tile/1.0.0/{variant}/default/WEBMERCATOR/{z}/{y}/{x}.png',
-			options: {
-				maxZoom: 18,
-				attribution: 'Map data: &copy; <a href="http://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>',
-				variant: 'web',
-			},
-			variants: {
-				Color: 'web',
-				Grey: 'web_grau'
-			}
 		}
 	};
 
-	L.tileLayer.provider = function(provider, options) {
+	L.tileLayer.provider = function (provider, options) {
 		return new L.TileLayer.Provider(provider, options);
 	};
 
@@ -5197,9 +5254,9 @@ function asArray(value) {
 </head>
 <body style="background-color: white;">
 <div id="htmlwidget_container">
-  <div class="leaflet html-widget html-fill-item" id="htmlwidget-70fe142824582d3557a9" style="width:100%;height:400px;"></div>
+  <div class="leaflet html-widget html-fill-item" id="htmlwidget-6a55282fadc7d75c80dc" style="width:100%;height:400px;"></div>
 </div>
-<script type="application/json" data-for="htmlwidget-70fe142824582d3557a9">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addProviderTiles","args":["Esri.WorldTopoMap",null,null,{"errorTileUrl":"","noWrap":false,"detectRetina":false}]},{"method":"addCircleMarkers","args":[[42.560556,42.523583,42.47225,42.43916489,42.43916489,42.3846892,42.3846892,42.34475205,42.435722,42.422083,42.23861,42.369083,42.441361,42.308389,42.241722,42.40725,42.32689,42.4749559,42.47976733,42.4565704,42.4574425,42.44584035,42.4346853,42.45210996,42.4713306,42.4775524,42.4530229,42.4572754,42.4348902,42.4167658,42.41658249,42.4497476,42.45383059,42.4319371,42.43566464,42.4086127,42.4170819,42.4206099,42.4360543,42.43013805,42.4589414,42.43891667,42.34427778,42.32638889,42.45524844],[-121.947444,-121.984278,-122.0559444,-122.0122388,-122.0122388,-121.9286044,-121.9286044,-121.8598427,-122.028194,-121.943278,-121.80588,-121.848694,-121.998833,-121.856222,-121.822306,-121.963083,-121.919922,-122.0002585,-122.0140798,-121.980638,-121.9911273,-121.9526814,-121.9252608,-121.919986,-122.0310593,-122.051685,-122.0115334,-122.0280173,-121.9915603,-121.9717287,-121.9728482,-122.0411842,-122.0624349,-122.0228861,-122.037795,-122.0169883,-122.0217108,-121.9961268,-121.9690429,-121.9408474,-122.074852,-122.01188889,-121.8601389,-121.9199722,-121.9549039],7,null,null,{"interactive":true,"className":"","stroke":true,"color":["#8DA0CB","#8DA0CB","#8DA0CB","#FC8D62","#FC8D62","#FC8D62","#FC8D62","#FC8D62","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#FC8D62","#E78AC3"],"weight":1,"opacity":0.5,"fill":true,"fillColor":["#8DA0CB","#8DA0CB","#8DA0CB","#FC8D62","#FC8D62","#FC8D62","#FC8D62","#FC8D62","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#8DA0CB","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#FC8D62","#E78AC3"],"fillOpacity":0.9},null,null,["<b>AGENCY LAKE NORTH<\/b><br><b>Location:<\/b> agency lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0011<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    209<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>AGENCY LAKE SOUTH<\/b><br><b>Location:<\/b> agency lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0010<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    175<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>Fish Banks West - Fbw<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422820122032100<br><b>Minimum date:<\/b> 2014-07-10<br><b>Maximum date:<\/b> 2017-09-20<br><b>Records:<\/b>    453<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>Mid-North - Lower  - Mdnl<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422622122004000<br><b>Minimum date:<\/b> 2003-06-27<br><b>Maximum date:<\/b> 2026-07-06<br><b>Records:<\/b> 18,577<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>Mid-North - Upper  - Mdnu<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422622122004003<br><b>Minimum date:<\/b> 2004-06-24<br><b>Maximum date:<\/b> 2026-07-06<br><b>Records:<\/b> 18,135<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>Mid-Trench - Lower   -  Mdtl<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422305121553800<br><b>Minimum date:<\/b> 2004-06-18<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b> 17,840<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>Mid-Trench - Upper   - Mdtu<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422305121553803<br><b>Minimum date:<\/b> 2004-09-02<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b> 17,863<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>Rattlesnake Point  -  Rpt<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422042121513100<br><b>Minimum date:<\/b> 2005-06-02<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b> 17,950<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>UPPER KLAMATH LAKE AT COON POINT<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0009<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    289<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>UPPER KLAMATH LAKE AT EAGLE RIDGE<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0006<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    500<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>UPPER KLAMATH LAKE AT FREMONT BRIDGE<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0001<br><b>Minimum date:<\/b> 2014-01-13<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    331<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>UPPER KLAMATH LAKE AT MID-LAKE<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0005<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    258<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>UPPER KLAMATH LAKE AT MID-LAKE NORTH<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0008<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    263<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>UPPER KLAMATH LAKE AT NORTH BUCK ISLAND<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0003<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    206<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>UPPER KLAMATH LAKE AT PELICAN MARINA<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0002<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    210<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>UPPER KLAMATH LAKE AT SHOAL WATER BAY<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0007<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    230<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>UPPER KLAMATH LAKE AT WOCUS BAY<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> klamathtribes_wqx-kl0004<br><b>Minimum date:<\/b> 2014-04-23<br><b>Maximum date:<\/b> 2018-10-23<br><b>Records:<\/b>    184<br><b>Parameter groups:<\/b> pH<br><b>Variables:<\/b> pH","<b>Ukl01<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422830121595700<br><b>Minimum date:<\/b> 2002-06-08<br><b>Maximum date:<\/b> 2002-08-31<br><b>Records:<\/b>    141<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl01-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422848122004700<br><b>Minimum date:<\/b> 2003-06-06<br><b>Maximum date:<\/b> 2004-08-03<br><b>Records:<\/b>    372<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl02<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422724121584600<br><b>Minimum date:<\/b> 2002-06-22<br><b>Maximum date:<\/b> 2002-09-07<br><b>Records:<\/b>    117<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl02-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422727121592400<br><b>Minimum date:<\/b> 2003-06-06<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    651<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422646121570600<br><b>Minimum date:<\/b> 2002-06-08<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    336<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl04<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422605121552700<br><b>Minimum date:<\/b> 2002-06-27<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    285<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl04-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422708121550800<br><b>Minimum date:<\/b> 2003-06-07<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    765<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl05<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422817122014800<br><b>Minimum date:<\/b> 2002-07-13<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    204<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl05-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422840122030200<br><b>Minimum date:<\/b> 2003-06-11<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    762<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl06<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422711122003700<br><b>Minimum date:<\/b> 2002-07-12<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    192<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl06-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422727122013700<br><b>Minimum date:<\/b> 2003-06-06<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    795<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl07<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422606121592600<br><b>Minimum date:<\/b> 2002-07-18<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    186<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl08<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422501121581400<br><b>Minimum date:<\/b> 2002-07-17<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    210<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl08-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422500121581800<br><b>Minimum date:<\/b> 2003-06-13<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    747<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl09<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422700122022400<br><b>Minimum date:<\/b> 2002-06-08<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    342<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl09-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422714122034100<br><b>Minimum date:<\/b> 2003-06-11<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    708<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl10<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422555122011800<br><b>Minimum date:<\/b> 2002-06-08<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    339<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl10-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422609122021200<br><b>Minimum date:<\/b> 2003-06-06<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    792<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl11<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422432122005700<br><b>Minimum date:<\/b> 2002-06-14<br><b>Maximum date:<\/b> 2002-09-26<br><b>Records:<\/b>    213<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl11-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422502122011400<br><b>Minimum date:<\/b> 2003-06-13<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    717<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl12-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422515121594200<br><b>Minimum date:<\/b> 2003-06-13<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    729<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl13-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422610121580500<br><b>Minimum date:<\/b> 2003-06-19<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    678<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl14-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422549121562300<br><b>Minimum date:<\/b> 2003-06-14<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    729<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Ukl17-04<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422733122042500<br><b>Minimum date:<\/b> 2004-07-10<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    228<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Upper Klamath Lake - Mid-North Fish Cage - Mdnfc<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422620122004300<br><b>Minimum date:<\/b> 2017-07-08<br><b>Maximum date:<\/b> 2017-09-20<br><b>Records:<\/b>     73<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Upper Klamath Lake - Rattlesnake Point Fish Cage<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422039121513700<br><b>Minimum date:<\/b> 2017-06-29<br><b>Maximum date:<\/b> 2017-09-20<br><b>Records:<\/b>     78<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>Upper Klamath Lake at Howard Bay, or<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 421935121551200<br><b>Minimum date:<\/b> 2022-04-21<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b>  4,757<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>Williamson River Outlet - Wmr<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422719121571400<br><b>Minimum date:<\/b> 2014-05-29<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b>  5,629<br><b>Parameter groups:<\/b> Temperature<br><b>Variables:<\/b> temperature"],null,["<b>AGENCY LAKE NORTH<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0011<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>AGENCY LAKE SOUTH<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0010<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>Fish Banks West - Fbw<\/b><br><b>Gage ID:<\/b> 422820122032100<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-07-10 – 2017-09-20","<b>Mid-North - Lower  - Mdnl<\/b><br><b>Gage ID:<\/b> 422622122004000<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2003-06-27 – 2026-07-06","<b>Mid-North - Upper  - Mdnu<\/b><br><b>Gage ID:<\/b> 422622122004003<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2004-06-24 – 2026-07-06","<b>Mid-Trench - Lower   -  Mdtl<\/b><br><b>Gage ID:<\/b> 422305121553800<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2004-06-18 – 2026-07-01","<b>Mid-Trench - Upper   - Mdtu<\/b><br><b>Gage ID:<\/b> 422305121553803<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2004-09-02 – 2026-07-01","<b>Rattlesnake Point  -  Rpt<\/b><br><b>Gage ID:<\/b> 422042121513100<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2005-06-02 – 2026-07-01","<b>UPPER KLAMATH LAKE AT COON POINT<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0009<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>UPPER KLAMATH LAKE AT EAGLE RIDGE<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0006<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>UPPER KLAMATH LAKE AT FREMONT BRIDGE<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0001<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-01-13 – 2018-10-23","<b>UPPER KLAMATH LAKE AT MID-LAKE<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0005<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>UPPER KLAMATH LAKE AT MID-LAKE NORTH<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0008<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>UPPER KLAMATH LAKE AT NORTH BUCK ISLAND<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0003<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>UPPER KLAMATH LAKE AT PELICAN MARINA<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0002<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>UPPER KLAMATH LAKE AT SHOAL WATER BAY<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0007<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>UPPER KLAMATH LAKE AT WOCUS BAY<\/b><br><b>Gage ID:<\/b> klamathtribes_wqx-kl0004<br><b>Parameters:<\/b> pH<br><b>Period:<\/b> 2014-04-23 – 2018-10-23","<b>Ukl01<\/b><br><b>Gage ID:<\/b> 422830121595700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-08 – 2002-08-31","<b>Ukl01-03<\/b><br><b>Gage ID:<\/b> 422848122004700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-06 – 2004-08-03","<b>Ukl02<\/b><br><b>Gage ID:<\/b> 422724121584600<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-22 – 2002-09-07","<b>Ukl02-03<\/b><br><b>Gage ID:<\/b> 422727121592400<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-06 – 2004-09-30","<b>Ukl03<\/b><br><b>Gage ID:<\/b> 422646121570600<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-08 – 2002-09-30","<b>Ukl04<\/b><br><b>Gage ID:<\/b> 422605121552700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-27 – 2002-09-30","<b>Ukl04-03<\/b><br><b>Gage ID:<\/b> 422708121550800<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-07 – 2004-09-30","<b>Ukl05<\/b><br><b>Gage ID:<\/b> 422817122014800<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-07-13 – 2002-09-30","<b>Ukl05-03<\/b><br><b>Gage ID:<\/b> 422840122030200<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-11 – 2004-09-30","<b>Ukl06<\/b><br><b>Gage ID:<\/b> 422711122003700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-07-12 – 2002-09-30","<b>Ukl06-03<\/b><br><b>Gage ID:<\/b> 422727122013700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-06 – 2004-09-30","<b>Ukl07<\/b><br><b>Gage ID:<\/b> 422606121592600<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-07-18 – 2002-09-30","<b>Ukl08<\/b><br><b>Gage ID:<\/b> 422501121581400<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-07-17 – 2002-09-30","<b>Ukl08-03<\/b><br><b>Gage ID:<\/b> 422500121581800<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-13 – 2004-09-30","<b>Ukl09<\/b><br><b>Gage ID:<\/b> 422700122022400<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-08 – 2002-09-30","<b>Ukl09-03<\/b><br><b>Gage ID:<\/b> 422714122034100<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-11 – 2004-09-30","<b>Ukl10<\/b><br><b>Gage ID:<\/b> 422555122011800<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-08 – 2002-09-30","<b>Ukl10-03<\/b><br><b>Gage ID:<\/b> 422609122021200<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-06 – 2004-09-30","<b>Ukl11<\/b><br><b>Gage ID:<\/b> 422432122005700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-14 – 2002-09-26","<b>Ukl11-03<\/b><br><b>Gage ID:<\/b> 422502122011400<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-13 – 2004-09-30","<b>Ukl12-03<\/b><br><b>Gage ID:<\/b> 422515121594200<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-13 – 2004-09-30","<b>Ukl13-03<\/b><br><b>Gage ID:<\/b> 422610121580500<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-19 – 2004-09-30","<b>Ukl14-03<\/b><br><b>Gage ID:<\/b> 422549121562300<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-14 – 2004-09-30","<b>Ukl17-04<\/b><br><b>Gage ID:<\/b> 422733122042500<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2004-07-10 – 2004-09-30","<b>Upper Klamath Lake - Mid-North Fish Cage - Mdnfc<\/b><br><b>Gage ID:<\/b> 422620122004300<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2017-07-08 – 2017-09-20","<b>Upper Klamath Lake - Rattlesnake Point Fish Cage<\/b><br><b>Gage ID:<\/b> 422039121513700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2017-06-29 – 2017-09-20","<b>Upper Klamath Lake at Howard Bay, or<\/b><br><b>Gage ID:<\/b> 421935121551200<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2022-04-21 – 2026-07-01","<b>Williamson River Outlet - Wmr<\/b><br><b>Gage ID:<\/b> 422719121571400<br><b>Parameters:<\/b> Temperature<br><b>Period:<\/b> 2014-05-29 – 2026-07-01"],{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"13px","textOnly":false,"className":"","sticky":true},null]},{"method":"addLegend","args":[{"colors":["#66C2A5","#FC8D62","#8DA0CB","#E78AC3"],"labels":["Dissolved oxygen","Dissolved oxygen, pH, Temperature","pH","Temperature"],"na_color":null,"na_label":"NA","opacity":1,"position":"bottomright","type":"factor","title":"Parameters available","extra":null,"layerId":null,"className":"info legend","group":null}]}],"limits":{"lat":[42.23861,42.560556],"lng":[-122.074852,-121.80588]},"fitBounds":[42.23861,-122.074852,42.560556,-121.80588,[]]},"evals":[],"jsHooks":[]}</script>
-<script type="application/htmlwidget-sizing" data-for="htmlwidget-70fe142824582d3557a9">{"viewer":{"width":"100%","height":400,"padding":0,"fill":true},"browser":{"width":"100%","height":400,"padding":0,"fill":true}}</script>
+<script type="application/json" data-for="htmlwidget-6a55282fadc7d75c80dc">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addProviderTiles","args":["Esri.WorldTopoMap",null,null,{"errorTileUrl":"","noWrap":false,"detectRetina":false}]},{"method":"addCircleMarkers","args":[[42.43916489,42.43916489,42.3846892,42.3846892,42.34475205,42.4749559,42.47976733,42.4565704,42.4574425,42.44584035,42.4713306,42.4775524,42.4530229,42.4572754,42.4348902,42.4167658,42.41658249,42.4497476,42.45383059,42.4319371,42.43566464,42.4086127,42.4170819,42.4206099,42.4360543,42.4589414,42.43891667,42.32638889,42.45524844],[-122.0122388,-122.0122388,-121.9286044,-121.9286044,-121.8598427,-122.0002585,-122.0140798,-121.980638,-121.9911273,-121.9526814,-122.0310593,-122.051685,-122.0115334,-122.0280173,-121.9915603,-121.9717287,-121.9728482,-122.0411842,-122.0624349,-122.0228861,-122.037795,-122.0169883,-122.0217108,-121.9961268,-121.9690429,-122.074852,-122.01188889,-121.9199722,-121.9549039],7,null,null,{"interactive":true,"className":"","stroke":true,"color":["#FC8D62","#FC8D62","#FC8D62","#FC8D62","#8DA0CB","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#8DA0CB","#E78AC3"],"weight":1,"opacity":0.5,"fill":true,"fillColor":["#FC8D62","#FC8D62","#FC8D62","#FC8D62","#8DA0CB","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#66C2A5","#8DA0CB","#E78AC3"],"fillOpacity":0.9},null,null,["<b>mid-north - lower  - mdnl<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422622122004000<br><b>Minimum date:<\/b> 2003-06-27<br><b>Maximum date:<\/b> 2026-07-06<br><b>Records:<\/b> 22,540<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>mid-north - upper  - mdnu<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422622122004003<br><b>Minimum date:<\/b> 2004-06-24<br><b>Maximum date:<\/b> 2026-07-06<br><b>Records:<\/b> 21,853<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>mid-trench - lower   -  mdtl<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422305121553800<br><b>Minimum date:<\/b> 2004-06-18<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b> 21,412<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>mid-trench - upper   - mdtu<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422305121553803<br><b>Minimum date:<\/b> 2004-09-02<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b> 21,500<br><b>Parameter groups:<\/b> Dissolved oxygen, pH, Temperature<br><b>Variables:<\/b> dissolved oxygen, pH, temperature","<b>rattlesnake point  -  rpt<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422042121513100<br><b>Minimum date:<\/b> 2005-06-02<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b> 12,033<br><b>Parameter groups:<\/b> pH, Temperature<br><b>Variables:<\/b> pH, temperature","<b>ukl01<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422830121595700<br><b>Minimum date:<\/b> 2002-06-08<br><b>Maximum date:<\/b> 2002-08-31<br><b>Records:<\/b>    141<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl01-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422848122004700<br><b>Minimum date:<\/b> 2003-06-06<br><b>Maximum date:<\/b> 2004-08-03<br><b>Records:<\/b>    372<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl02<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422724121584600<br><b>Minimum date:<\/b> 2002-06-22<br><b>Maximum date:<\/b> 2002-09-07<br><b>Records:<\/b>    117<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl02-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422727121592400<br><b>Minimum date:<\/b> 2003-06-06<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    651<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422646121570600<br><b>Minimum date:<\/b> 2002-06-08<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    336<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl05<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422817122014800<br><b>Minimum date:<\/b> 2002-07-13<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    204<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl05-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422840122030200<br><b>Minimum date:<\/b> 2003-06-11<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    762<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl06<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422711122003700<br><b>Minimum date:<\/b> 2002-07-12<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    192<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl06-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422727122013700<br><b>Minimum date:<\/b> 2003-06-06<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    795<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl07<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422606121592600<br><b>Minimum date:<\/b> 2002-07-18<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    186<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl08<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422501121581400<br><b>Minimum date:<\/b> 2002-07-17<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    210<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl08-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422500121581800<br><b>Minimum date:<\/b> 2003-06-13<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    747<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl09<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422700122022400<br><b>Minimum date:<\/b> 2002-06-08<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    342<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl09-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422714122034100<br><b>Minimum date:<\/b> 2003-06-11<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    708<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl10<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422555122011800<br><b>Minimum date:<\/b> 2002-06-08<br><b>Maximum date:<\/b> 2002-09-30<br><b>Records:<\/b>    339<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl10-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422609122021200<br><b>Minimum date:<\/b> 2003-06-06<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    792<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl11<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422432122005700<br><b>Minimum date:<\/b> 2002-06-14<br><b>Maximum date:<\/b> 2002-09-26<br><b>Records:<\/b>    213<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl11-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422502122011400<br><b>Minimum date:<\/b> 2003-06-13<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    717<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl12-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422515121594200<br><b>Minimum date:<\/b> 2003-06-13<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    729<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl13-03<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422610121580500<br><b>Minimum date:<\/b> 2003-06-19<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    678<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>ukl17-04<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422733122042500<br><b>Minimum date:<\/b> 2004-07-10<br><b>Maximum date:<\/b> 2004-09-30<br><b>Records:<\/b>    228<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>upper klamath lake - mid-north fish cage - mdnfc<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422620122004300<br><b>Minimum date:<\/b> 2017-07-08<br><b>Maximum date:<\/b> 2017-09-20<br><b>Records:<\/b>     73<br><b>Parameter groups:<\/b> Dissolved oxygen<br><b>Variables:<\/b> dissolved oxygen","<b>upper klamath lake at howard bay, or<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 421935121551200<br><b>Minimum date:<\/b> 2022-04-21<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b>  3,627<br><b>Parameter groups:<\/b> pH, Temperature<br><b>Variables:<\/b> pH, temperature","<b>williamson river outlet - wmr<\/b><br><b>Location:<\/b> upper klamath lake<br><b>Gage ID:<\/b> 422719121571400<br><b>Minimum date:<\/b> 2014-05-29<br><b>Maximum date:<\/b> 2026-07-01<br><b>Records:<\/b>  5,629<br><b>Parameter groups:<\/b> Temperature<br><b>Variables:<\/b> temperature"],null,["<b>mid-north - lower  - mdnl<\/b><br><b>Gage ID:<\/b> 422622122004000<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2003-06-27 – 2026-07-06","<b>mid-north - upper  - mdnu<\/b><br><b>Gage ID:<\/b> 422622122004003<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2004-06-24 – 2026-07-06","<b>mid-trench - lower   -  mdtl<\/b><br><b>Gage ID:<\/b> 422305121553800<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2004-06-18 – 2026-07-01","<b>mid-trench - upper   - mdtu<\/b><br><b>Gage ID:<\/b> 422305121553803<br><b>Parameters:<\/b> Dissolved oxygen, pH, Temperature<br><b>Period:<\/b> 2004-09-02 – 2026-07-01","<b>rattlesnake point  -  rpt<\/b><br><b>Gage ID:<\/b> 422042121513100<br><b>Parameters:<\/b> pH, Temperature<br><b>Period:<\/b> 2005-06-02 – 2026-07-01","<b>ukl01<\/b><br><b>Gage ID:<\/b> 422830121595700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-08 – 2002-08-31","<b>ukl01-03<\/b><br><b>Gage ID:<\/b> 422848122004700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-06 – 2004-08-03","<b>ukl02<\/b><br><b>Gage ID:<\/b> 422724121584600<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-22 – 2002-09-07","<b>ukl02-03<\/b><br><b>Gage ID:<\/b> 422727121592400<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-06 – 2004-09-30","<b>ukl03<\/b><br><b>Gage ID:<\/b> 422646121570600<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-08 – 2002-09-30","<b>ukl05<\/b><br><b>Gage ID:<\/b> 422817122014800<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-07-13 – 2002-09-30","<b>ukl05-03<\/b><br><b>Gage ID:<\/b> 422840122030200<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-11 – 2004-09-30","<b>ukl06<\/b><br><b>Gage ID:<\/b> 422711122003700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-07-12 – 2002-09-30","<b>ukl06-03<\/b><br><b>Gage ID:<\/b> 422727122013700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-06 – 2004-09-30","<b>ukl07<\/b><br><b>Gage ID:<\/b> 422606121592600<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-07-18 – 2002-09-30","<b>ukl08<\/b><br><b>Gage ID:<\/b> 422501121581400<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-07-17 – 2002-09-30","<b>ukl08-03<\/b><br><b>Gage ID:<\/b> 422500121581800<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-13 – 2004-09-30","<b>ukl09<\/b><br><b>Gage ID:<\/b> 422700122022400<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-08 – 2002-09-30","<b>ukl09-03<\/b><br><b>Gage ID:<\/b> 422714122034100<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-11 – 2004-09-30","<b>ukl10<\/b><br><b>Gage ID:<\/b> 422555122011800<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-08 – 2002-09-30","<b>ukl10-03<\/b><br><b>Gage ID:<\/b> 422609122021200<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-06 – 2004-09-30","<b>ukl11<\/b><br><b>Gage ID:<\/b> 422432122005700<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2002-06-14 – 2002-09-26","<b>ukl11-03<\/b><br><b>Gage ID:<\/b> 422502122011400<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-13 – 2004-09-30","<b>ukl12-03<\/b><br><b>Gage ID:<\/b> 422515121594200<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-13 – 2004-09-30","<b>ukl13-03<\/b><br><b>Gage ID:<\/b> 422610121580500<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2003-06-19 – 2004-09-30","<b>ukl17-04<\/b><br><b>Gage ID:<\/b> 422733122042500<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2004-07-10 – 2004-09-30","<b>upper klamath lake - mid-north fish cage - mdnfc<\/b><br><b>Gage ID:<\/b> 422620122004300<br><b>Parameters:<\/b> Dissolved oxygen<br><b>Period:<\/b> 2017-07-08 – 2017-09-20","<b>upper klamath lake at howard bay, or<\/b><br><b>Gage ID:<\/b> 421935121551200<br><b>Parameters:<\/b> pH, Temperature<br><b>Period:<\/b> 2022-04-21 – 2026-07-01","<b>williamson river outlet - wmr<\/b><br><b>Gage ID:<\/b> 422719121571400<br><b>Parameters:<\/b> Temperature<br><b>Period:<\/b> 2014-05-29 – 2026-07-01"],{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"13px","textOnly":false,"className":"","sticky":true},null]},{"method":"addLegend","args":[{"colors":["#66C2A5","#FC8D62","#8DA0CB","#E78AC3"],"labels":["Dissolved oxygen","Dissolved oxygen, pH, Temperature","pH, Temperature","Temperature"],"na_color":null,"na_label":"NA","opacity":1,"position":"bottomright","type":"factor","title":"Parameters available","extra":null,"layerId":null,"className":"info legend","group":null}]}],"limits":{"lat":[42.32638889,42.47976733],"lng":[-122.074852,-121.8598427]},"fitBounds":[42.32638889,-122.074852,42.47976733,-121.8598427,[]]},"evals":[],"jsHooks":[]}</script>
+<script type="application/htmlwidget-sizing" data-for="htmlwidget-6a55282fadc7d75c80dc">{"viewer":{"width":"100%","height":400,"padding":0,"fill":true},"browser":{"width":"100%","height":400,"padding":0,"fill":true}}</script>
 </body>
 </html>

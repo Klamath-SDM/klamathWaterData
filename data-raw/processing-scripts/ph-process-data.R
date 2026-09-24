@@ -10,7 +10,7 @@ library(sf)
 # USBR_WQX are on a Prairie Canal
 
 # USGS dies not have mean pH data. For now we just have max and min
-# USGS - there are two sites at "Klamath Straits, leavinh waterbody_name as NA for now till we decide if we want to keep them
+# USGS - there are two sites at "Klamath Straits, leaving waterbody_name as NA for now till we decide if we want to keep them
 
 # These data are originally retrieved in ph-data-pull.R and sourced here directly (not read from AWS).
 source("data-raw/data-pull/ph-data-pull.R")

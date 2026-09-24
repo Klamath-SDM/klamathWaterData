@@ -173,7 +173,7 @@ all_usgs_temp_data_raw <- all_usgs_temp_data_raw |>
   mutate(waterbody_name = extract_waterbody(station_nm)) # testing function
 
 all_usgs_temp_data_raw |>
-  select(station_nm, waterbody_name) |> distinct() |> View()
+  select(station_nm, waterbody_name) |> distinct()
 
 unique(all_usgs_temp_data_raw$waterbody_name)
 
@@ -182,8 +182,7 @@ all_usgs_temp_data_raw |>
   filter(is.na(waterbody_name)) |>
   select(site_no , station_nm, waterbody_name) |>
   distinct() |>
-  mutate(site_no = as.character(site_no)) |>
-  view()
+  mutate(site_no = as.character(site_no))
 
 # fixing names
 all_usgs_temp_data_raw_clean <- all_usgs_temp_data_raw |>
@@ -321,6 +320,225 @@ temperature_gage_owrd <- owrd_temp_stations |>
   mutate(huc8 = as.numeric(huc8)) |>
   glimpse()
 
+### Karuk Tribe Water Quality Portal (includes Yurok and Quartz Valley) ----
+# Continuous sonde temperature for Klamath mainstem sites below Keno, plus
+# one Scott River (a Klamath tributary) site
+# (waterquality.karuk.us, an Aquatic Informatics AQUARIUS WebPortal
+# aggregating Karuk Tribe, Yurok Tribe (YTEP), Quartz Valley Indian
+# Reservation (QVIR), and co-located USGS telemetry) - fills a gap raised
+# for the salmon-model temperature placeholder: USGS's own NWIS
+# daily-values record for water temperature only exists at a handful of
+# gages below Keno (see usgs_gages above), while this portal has
+# continuous instream temperature at several more sites.
+#
+# Checked every USGS-numbered site on this portal against usgs_gages above
+# to avoid duplicating what we already pull from NWIS: four
+# (11509500/Keno, 11510700/below Boyle, 11511990/above Fall Creek,
+# 11530500/near the mouth) are either a pure mirror of the official USGS
+# record (dataset source tagged "USGS"/"USGS OGC" in the portal's own API)
+# or have no temperature dataset there at all (11530500) - not pulled
+# again here. One site, 11523000 (near Orleans), is genuinely Karuk's own
+# independent sonde record under the same USGS site number (source tagged
+# "Final"): it starts in 2001 and is still live, while usgs_gages' NWIS
+# record for that same number only covers 2014-2024. Kept under a
+# "karuk-" prefixed gage_id rather than merged into "11523000" so the two
+# different-source records don't collide into ambiguous duplicate
+# gage_id/date rows.
+#
+# Data is explicitly provisional per the portal's own disclaimer ("All
+# Data Provisional. Do Not Cite without Karuk Tribe consent.") - get
+# sign-off from Karuk Tribe / KBMP before this is used in anything
+# published or operational.
+source("data-raw/data-pull/karuk-wq-portal-pull-helpers.R")
+
+# Every value below was looked up by hand against the portal's own
+#  endpoints - not hand-guessed, and
+# reproducible/updatable the same way if the portal ever reorganizes its
+# stations or these need re-checking:
+#   - gage_id: the numeric ones are real USGS gage numbers Karuk/Yurok have
+#     co-located a sonde at, prefixed "karuk-" so they can't collide with
+#     the plain-numeric gage_id usgs_gages above already uses for that same
+#     station number (e.g. "11523000" from NWIS vs "karuk-11523000" here -
+#     see the note above on why 11523000 specifically needs this). "kas"/
+#     "kat"/"sc1" are the portal's own (already-unique) short codes for
+#     those stations, used as-is.
+#   - location/gage_name: hand-transcribed from each station's entry in
+#     GET https://waterquality.karuk.us/Data/GetDropDownAll (a station
+#     picker list; response body is itself a JSON-encoded string containing
+#     the real JSON array - decode it twice). Every station below is
+#     Klamath mainstem, confirmed by that listing's own display name (e.g.
+#     "11516530 - KLAMATH RIVER BELOW IRON GATE (Karuk)"), except "sc1"
+#     ("SC1 - SCOTT R NR FORT JONES (QVIR)"), which is on the Scott River,
+#     a Klamath tributary.
+#   - agency: the parenthesized suffix on that same DisplayText field
+#     ("(Karuk)" -> Karuk Tribe, "(YTEP)" -> Yurok Tribe, "(QVIR)" ->
+#     Quartz Valley Indian Reservation).
+#   - dataset_id: the portal's internal id for each station's "Temperature
+#     water" parameter, from
+#     GET https://waterquality.karuk.us/Data/DataSets?locationid=<id>
+#     (<id> is that station's own IDNumber field from GetDropDownAll, not
+#     its site code) - look for the row where ParameterName is
+#     "Temperature water" and read its IDNumber. That same response's
+#     Id field is worth checking too: a value of "USGS"/"USGS OGC" there
+#     means the portal is just mirroring the official NWIS record (already
+#     pulled via usgs_gages above, so not worth re-pulling); "Final" or
+#     "Telemetered" means it's the tribe/agency's own independent sonde
+#     record, as all eight below are.
+#   - start_date: that same DataSets response's StartTime field for the
+#     "Temperature water" row.
+#   - lat/long: not given directly by DataSets - fetch
+#     GET https://waterquality.karuk.us/Data/Dataset_Side/?dataset=<dataset_id>&isDataset=true
+#     (an HTML fragment, not JSON) and read the coordinates out of its
+#     embedded onclick="...GoTo('map', <long>, <lat>)..." attribute.
+karuk_stations <- tribble(
+  ~gage_id,         ~location,       ~gage_name,                          ~dataset_id, ~start_date,            ~lat,        ~long,         ~agency,
+  "karuk-11516530", "klamath river", "klamath river below iron gate",     1883,        as.Date("2001-05-17"),  41.927762,   -122.443927,   "Karuk Tribe",
+  "karuk-11516000", "klamath river", "klamath river above shasta river",  1972,        as.Date("2023-12-20"),  41.831236,   -122.593248,   "Karuk Tribe",
+  "karuk-11517818", "klamath river", "klamath river at walker bridge",    1905,        as.Date("2022-09-27"),  41.837087,   -122.864828,   "Karuk Tribe",
+  "karuk-11520500", "klamath river", "klamath river near seiad valley",   1864,        as.Date("2001-05-17"),  41.853798,   -123.232033,   "Karuk Tribe",
+  "karuk-11523000", "klamath river", "klamath river near orleans",        1849,        as.Date("2001-05-18"),  41.303471,   -123.534421,   "Karuk Tribe",
+  "kas",            "klamath river", "klamath river at salt creek",       1888,        as.Date("2022-11-02"),  41.546886,   -124.062264,   "Yurok Tribe",
+  "kat",            "klamath river", "klamath at turwar gage",            1666,        as.Date("2019-02-27"),  41.5159431,  -124.0003835,  "Yurok Tribe",
+  "sc1",            "scott river",   "scott r nr fort jones",              2018,        as.Date("2017-07-18"),  41.64,       -123.0138,     "Quartz Valley Indian Reservation"
+)
+
+# matches the standardized end date used across this package's other pulls
+karuk_end_date <- owrd_temp_end_date
+
+#### water data table ----
+# Portal returns 15-minute instantaneous readings, not pre-aggregated daily
+# stats - aggregated to daily min/mean/max here, same treatment the USFWS
+# section below gives its own raw hourly readings.
+temperature_data_karuk <- map_dfr(seq_len(nrow(karuk_stations)), function(i) {
+  station <- karuk_stations[i, ]
+  message("Pulling Karuk WQ portal data for station: ", station$gage_id)
+  raw <- fetch_karuk_dataset(station$dataset_id, station$start_date, karuk_end_date)
+  if (nrow(raw) == 0) return(NULL)
+  raw |>
+    mutate(date = as.Date(timestamp)) |>
+    filter(!is.na(value))  |>
+    group_by(date) |>
+    summarise(mean_temp = mean(value, na.rm = TRUE),
+              min_temp  = min(value, na.rm = TRUE),
+              max_temp  = max(value, na.rm = TRUE),
+              .groups = "drop") |>
+    pivot_longer(cols = c(mean_temp, min_temp, max_temp),
+                 names_to = "statistic",
+                 values_to = "value") |>
+    mutate(statistic = case_when(
+      statistic == "mean_temp" ~ "mean",
+      statistic == "min_temp"  ~ "min",
+      statistic == "max_temp"  ~ "max"),
+      stream = station$location,
+      gage_name = station$gage_name,
+      gage_id = station$gage_id,
+      variable_name = "temperature",
+      unit = "celsius") |>
+    select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date)
+}) |>
+  glimpse()
+
+#### monitoring site table ----
+# Not run through gage_data_format()/find_nearest_river_miles() (river_mile
+# left NA) - same treatment as the OWRD/USBR Hydromet gages elsewhere in
+# this package. huc8 determined by spatial join against
+# rivermile::klamath_hucs (point-in-polygon on lat/long) rather than
+# hand-transcribed.
+temperature_gage_karuk <- karuk_stations |>
+  transmute(stream = location,
+            gage_name = gage_name,
+            gage_id = gage_id,
+            agency = agency,
+            latitude = lat,
+            longitude = long,
+            river_mile = NA_real_) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326, remove = FALSE) |>
+  st_join(klamath_hucs |> st_transform(4326), join = st_intersects) |>
+  st_drop_geometry() |>
+  select(-name) |>
+  mutate(huc8 = as.numeric(huc8)) |>
+  glimpse()
+
+### Hoopa Valley Tribe Hydromet Portal ----
+# Continuous sonde water temperature for one more Klamath mainstem site
+# below Keno: "Klamath River Saints Rest" (wxvisual.com/HoopaValley, a
+# custom Hoopa Valley Tribe hydromet dashboard, unrelated to the Karuk
+# portal above). Coordinates (41.187972, -123.676941) match exactly the
+# existing WQX gage "cdr and nutrients at saints rest bar"
+# (HVTEPA_WQX-KR_STREST_CDR, in temperature_gage_wqx above) - same
+# physical station, but that's discrete grab samples while this is a
+# continuous sonde feed, so it's kept under its own "hoopa-" prefixed
+# gage_id rather than merged into the WQX one.
+#
+# This portal has no JSON API - Graph.php returns a full HTML page with
+# the chart's data embedded as a JS string (see
+# hoopa-wq-portal-pull-helpers.R). Unlike the Karuk portal, one request
+# returns the entire period of record at once (tested: ~53,000 rows /
+# ~7 years in ~3 seconds), no chunking needed.
+#
+# ~5% of raw readings are sensor error codes, not real measurements: a
+# literal 0.0 (sensor dropout, 2,615 of 51,687 in testing) and a fixed
+# sentinel value in the tens of thousands (51425, clearly not a
+# temperature) - both filtered out below, keeping only 0-35 C as a
+# generous but real bound for this river.
+#
+# Data is explicitly provisional per the portal's own disclaimer ("Data
+# is provisional and is subject to revision. Not to be used as official
+# record.") - get sign-off from the Hoopa Valley Tribe before this is
+# used in anything published or operational.
+source("data-raw/data-pull/hoopa-wq-portal-pull-helpers.R")
+
+hoopa_start_date <- as.Date("2015-01-01") # portal returns whatever it actually has, starting ~2019-08-27
+hoopa_end_date <- karuk_end_date
+
+#### water data table ----
+hoopa_saints_rest_raw <- fetch_hoopa_station(
+  "Klamath River Saints Rest", "Water Temp C", hoopa_start_date, hoopa_end_date
+)
+
+temperature_data_hoopa <- hoopa_saints_rest_raw |>
+  mutate(date = as.Date(timestamp)) |>
+  filter(!is.na(value), value > 0, value < 35) |>
+  group_by(date) |>
+  summarise(mean_temp = mean(value, na.rm = TRUE),
+            min_temp  = min(value, na.rm = TRUE),
+            max_temp  = max(value, na.rm = TRUE),
+            .groups = "drop") |>
+  pivot_longer(cols = c(mean_temp, min_temp, max_temp),
+               names_to = "statistic",
+               values_to = "value") |>
+  mutate(statistic = case_when(
+    statistic == "mean_temp" ~ "mean",
+    statistic == "min_temp"  ~ "min",
+    statistic == "max_temp"  ~ "max"),
+    stream = "klamath river",
+    gage_name = "klamath river saints rest",
+    gage_id = "hoopa-hvt-st2",
+    variable_name = "temperature",
+    unit = "celsius") |>
+  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
+  glimpse()
+
+#### monitoring site table ----
+# Coordinates and huc8 treated the same way as the Karuk/OWRD gages above
+# (not run through gage_data_format()/find_nearest_river_miles(), river_mile
+# left NA; huc8 via spatial join against rivermile::klamath_hucs).
+temperature_gage_hoopa <- tibble(
+  stream = "klamath river",
+  gage_name = "klamath river saints rest",
+  gage_id = "hoopa-hvt-st2",
+  agency = "Hoopa Valley Tribe",
+  latitude = 41.187972,
+  longitude = -123.676941,
+  river_mile = NA_real_
+) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326, remove = FALSE) |>
+  st_join(klamath_hucs |> st_transform(4326), join = st_intersects) |>
+  st_drop_geometry() |>
+  select(-name) |>
+  mutate(huc8 = as.numeric(huc8)) |>
+  glimpse()
+
 ### USFWS ----
 
 # pulling raw data -- This data was shared by Tylor Daley from USFWS
@@ -451,7 +669,8 @@ temperature_data <- temperature_data_wqx |>
          unit = "celsius",
          value = as.numeric(value)) |>
   bind_rows(temperature_data_usfws, temperature_data_usgs |>
-              mutate(gage_id = as.character(gage_id)), temperature_data_owrd) |>
+              mutate(gage_id = as.character(gage_id)), temperature_data_owrd,
+            temperature_data_karuk, temperature_data_hoopa) |>
   mutate(location = tolower(stream),
          gage_name = tolower(gage_name)) |>
   relocate(location, .before = gage_name) |>
@@ -461,10 +680,15 @@ temperature_data <- temperature_data_wqx |>
 
 temperature_gage <- temperature_gage_usgs |>
   mutate(gage_id = as.character(gage_id)) |>
-  bind_rows(temperature_gage_wqx, temperature_gage_usfws, temperature_gage_owrd) |>
+  bind_rows(temperature_gage_wqx, temperature_gage_usfws, temperature_gage_owrd,
+            temperature_gage_karuk, temperature_gage_hoopa) |>
   mutate(location = tolower(stream),
          gage_name = tolower(gage_name),
-         agency = tolower(agency)) |>
+         agency = tolower(agency),
+         # WQX's own agency name for HVTEPA's sites ("Hoopa Valley Tribe
+         # (Tribal)") otherwise doesn't match the plain "Hoopa Valley Tribe"
+         # used for the Hydromet portal gage above - same tribe, one name.
+         agency = ifelse(agency == "hoopa valley tribe (tribal)", "hoopa valley tribe", agency)) |>
   relocate(location, .before = gage_name) |>
   filter(!is.na(location)) |>
   mutate(stream = location) |>

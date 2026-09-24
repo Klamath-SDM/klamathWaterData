@@ -8,6 +8,20 @@ library(klamathWaterData)
 library(leaflet)
 library(stringr)
 library(htmltools)
+library(htmlwidgets)
+
+# saveWidget()'s selfcontained=TRUE still stages dependency files in a
+# "<file>_files" directory next to the output before bundling them into the
+# single html - passing libdir elsewhere doesn't avoid this (it must live
+# under the same directory as `file`, or saveWidget errors). Staging in a
+# tempdir and copying out just the finished, self-contained html instead
+# keeps that folder out of the repo entirely.
+save_selfcontained_widget <- function(widget, file) {
+  tmp_html <- tempfile(fileext = ".html")
+  saveWidget(widget, file = tmp_html, selfcontained = TRUE)
+  file.copy(tmp_html, file, overwrite = TRUE)
+  invisible(file)
+}
 
 #  the purpose of this script is just to keep track gages that we are using and have questions about
 # it currently explores Scott and Shasta River temp and flow gages and ukl wq gages
@@ -245,7 +259,7 @@ ukl_gages <- bind_rows(
   temp_gage |> filter(str_detect(location, ukl_pattern)),
   flow_gage |> filter(str_detect(location, ukl_pattern)),
   do_gage   |> mutate(huc8 = as.numeric(huc8)) |> filter(str_detect(location, ukl_pattern)),
-  ph_gage   |> filter(str_detect(location, ukl_pattern))
+  ph_gage   |> mutate(huc8 = as.numeric(huc8)) |> filter(str_detect(location, ukl_pattern))
 ) |>
   mutate(
     latitude = as.numeric(latitude),
@@ -362,8 +376,7 @@ ukl_wq_data_summary <- ukl_data_summary |>
 write_csv(ukl_wq_data_summary,"data-raw/data-exploration/ukl_wq_data_summary.csv")
 
 
-saveWidget(
+save_selfcontained_widget(
   ukl_reference_map,
-  file = "data-raw/data-exploration/ukl_wq_gage_reference_map.html",
-  selfcontained = TRUE)
+  file = "data-raw/data-exploration/ukl_wq_gage_reference_map.html")
 

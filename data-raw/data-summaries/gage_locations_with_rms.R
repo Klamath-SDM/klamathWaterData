@@ -1,6 +1,21 @@
 library(sf)
 library(dplyr)
 library(leaflet)
+library(ggplot2)
+library(htmlwidgets)
+
+# saveWidget()'s selfcontained=TRUE still stages dependency files in a
+# "<file>_files" directory next to the output before bundling them into the
+# single html - passing libdir elsewhere doesn't avoid this (it must live
+# under the same directory as `file`, or saveWidget errors). Staging in a
+# tempdir and copying out just the finished, self-contained html instead
+# keeps that folder out of the repo entirely.
+save_selfcontained_widget <- function(widget, file) {
+  tmp_html <- tempfile(fileext = ".html")
+  saveWidget(widget, file = tmp_html, selfcontained = TRUE)
+  file.copy(tmp_html, file, overwrite = TRUE)
+  invisible(file)
+}
 
 make_river_pts <- function(df) {
   df |>
@@ -20,15 +35,28 @@ pal_rm <- colorNumeric(
 )
 
 leaflet() |>
-  addTiles() |>
-  addCircleMarkers(
-    data = rivermile::all_klamath_rivers_pts,
-    radius = 3,
-    stroke = FALSE,
-    fillOpacity = 0.9,
-    fillColor = ~pal_rm(river_mile),
-    popup = ~paste0("River: ", river, "<br>",
-                    "River mile: ", river_mile),
+  # addTiles()'s default OSM tile server rejects requests with no/null
+  # Referer header - exactly what a browser sends when opening this file
+  # locally via file:// (no web server involved), so the base map renders
+  # as a blank gray grid once saved standalone. CartoDB's tiles don't
+  # enforce that restriction, so they still load when the html is just
+  # double-clicked/opened directly rather than served.
+  addProviderTiles(providers$CartoDB.Positron) |>
+  # addCircleMarkers(
+  #   data = rivermile::all_klamath_rivers_pts,
+  #   radius = 3,
+  #   stroke = FALSE,
+  #   fillOpacity = 0.9,
+  #   fillColor = ~pal_rm(river_mile),
+  #   popup = ~paste0("River: ", river, "<br>",
+  #                   "River mile: ", river_mile),
+  #   group = "River miles"
+  # ) |>
+  addPolylines(
+    data = rivermile::all_klamath_rivers_line,
+    color = "darkblue",
+    weight = 2,
+    popup = ~paste0("River: ", river),
     group = "River miles"
   ) |>
   addCircleMarkers(
@@ -93,3 +121,117 @@ leaflet() |>
     title = "River mile",
     opacity = 1
   )
+
+
+# temperature specific leaflet map and plot ----------------------------------------
+temp_pts_karuk <- make_river_pts(klamathWaterData::temperature_gage |> filter(agency == "karuk tribe"))
+temp_pts_hoopa <- make_river_pts(klamathWaterData::temperature_gage |> filter(agency == "hoopa valley tribe"))
+temp_pts_yurok <- make_river_pts(klamathWaterData::temperature_gage |> filter(agency == "yurok tribe"))
+temp_pts <- make_river_pts(klamathWaterData::temperature_gage |> filter(!(agency %in% c("hoopa valley tribe", "karuk tribe"))))
+
+temperature_gage_map <- leaflet() |>
+  addProviderTiles("Esri.WorldStreetMap", group = "Street") |>
+  addPolylines(
+    data = rivermile::all_klamath_rivers_line,
+    color = "blue",
+    weight = 2,
+    popup = ~paste0("River: ", river),
+    group = "River"
+  ) |>
+  addCircleMarkers(
+    data = temp_pts |> filter(!is.na(river_mile)),
+    radius = 8,
+    fillOpacity = 0.8,
+    fillColor = "green",
+    color = "darkgreen",
+    popup = ~paste0("Type: Temperature<br>",
+                    "River: ", location, "<br>",
+                    "River mile: ", river_mile, "<br>",
+                    "Gage Name: ", gage_name, "<br>",
+                    "Agency: ", agency),
+    group = "Temperature gages"
+  ) |>
+  addCircleMarkers(
+    data = temp_pts_karuk |> filter(!is.na(river_mile)),
+    radius = 8,
+    fillOpacity = 0.8,
+    fillColor = "pink",
+    color = "red",
+    popup = ~paste0("Type: Temperature<br>",
+                    "River: ", location, "<br>",
+                    "River mile: ", river_mile, "<br>",
+                    "Gage Name: ", gage_name, "<br>",
+                    "Agency: ", agency),
+    group = "Karuk Temperature gages"
+  ) |>
+  addCircleMarkers(
+    data = temp_pts_yurok |> filter(!is.na(river_mile)),
+    radius = 8,
+    fillOpacity = 0.8,
+    fillColor = "lightblue",
+    color = "darkblue",
+    popup = ~paste0("Type: Temperature<br>",
+                    "River: ", location, "<br>",
+                    "River mile: ", river_mile, "<br>",
+                    "Gage Name: ", gage_name, "<br>",
+                    "Agency: ", agency),
+    group = "Yurok Temperature gages"
+  ) |>
+  addCircleMarkers(
+    data = temp_pts_hoopa |> filter(!is.na(river_mile)),
+    radius = 8,
+    fillOpacity = 0.8,
+    fillColor = "purple",
+    color = "darkgrey",
+    popup = ~paste0("Type: Temperature<br>",
+                    "River: ", location, "<br>",
+                    "River mile: ", river_mile, "<br>",
+                    "Gage Name: ", gage_name, "<br>",
+                    "Agency: ", agency),
+    group = "Hoopa Temperature gages"
+  ) |>
+  addLayersControl(
+    overlayGroups = c("River",
+                      "Temperature gages",
+                      "Hoopa Temperature gages",
+                      "Karuk Temperature gages",
+                      "Yurok Temperature gages"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+temperature_gage_map
+
+save_selfcontained_widget(
+  temperature_gage_map,
+  file = "data-raw/data-summaries/temperature_gage_map.html"
+)
+
+qc_data <- temperature_data |>
+  left_join(temperature_gage |> select(gage_id, agency), by = "gage_id") |>
+  filter(agency %in% c("karuk tribe", "hoopa valley tribe", "yurok tribe"),
+         location == "klamath river") |>
+  mutate(facet_label = paste0(gage_name, " (", agency, ")"))
+
+karuk_hoopa_temp_qc_plot <- ggplot(qc_data, aes(x = date, y = value, color = statistic)) +
+  geom_line(linewidth = 0.4) +
+  facet_wrap(~ facet_label, ncol = 2, scales = "free_x") +
+  scale_color_manual(values = c(min = "#2166AC", mean = "#1B1B1B", max = "#B2182B")) +
+  labs(
+    title = "Karuk, Hoopa, and Yurok Water Temperature",
+    subtitle = "Daily min / mean / max",
+    x = NULL, y = "Water Temperature (\u00b0C)", color = "Statistic"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+karuk_hoopa_temp_qc_plot
+
+ggsave(
+  filename = "data-raw/data-summaries/karuk_hoopa_yurok_temperature_qc.png",
+  plot = karuk_hoopa_temp_qc_plot,
+  width = 12, height = 9, dpi = 300
+)
