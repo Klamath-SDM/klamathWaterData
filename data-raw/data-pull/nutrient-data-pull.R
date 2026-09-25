@@ -1,3 +1,9 @@
+#  the purpose of this script is to pull and explore nutrient data al UKL and Tule lake
+# this data has not yet been integrated to the data package. However, some documentation placeholder and exploration has been done
+# all work related is onb this script, and will serve as a reference to:
+# what it is publicly available, time coverage, and columns to be used for data object
+# this item is marked as "blocked" since we are planning on doing some follow-up with the modeler and understand if this is useful/helpul
+
 #' library(dataRetrieval)
 #' library(dplyr)
 #' library(janitor)
@@ -42,8 +48,6 @@ library(readr)
 library(sf)
 library(ggplot2)
 
-#  the purpose of this markdown is to pull and explore nutrient data al UKL and Tule lake
-#  this script will serve as a reference to what it is publicly available and their time coverage
 
 # Upper Klamath Lake -----
 
