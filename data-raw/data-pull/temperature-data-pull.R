@@ -6,14 +6,9 @@ library(purrr)
 library(pins)
 library(paws)
 
-# the goal of this script is to pull temperature data from different sources and save into aws bucket.
-
-# Define aws bucket (klamath-sdm)
+# the goal of this script is to pull temperature data from different sources
 
 ### WQX data pull -----
-# raw temperature data in aws bucket
-wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/data-raw/")
-
 huc_code <- "180102" # huc code for Klamath basin
 
 # Standardized pull window - matches lake-levels/flow/teacup-diagram pulls.
@@ -78,23 +73,3 @@ usgs_temp_data <- bind_rows(all_data)
 #### gage data ----
 usgs_temp_gage_data <- readNWISsite(usgs_gages)
 
-##### save raw data into aws bucket water-quality/data-raw/
-
-### WQX
-# temp data
-# wq_data_raw |> pins::pin_write(wqx_temp_data,
-#                                type = "csv",
-#                                title = "wqx_temperature")
-# # gage data
-# wq_data_raw |> pins::pin_write(wqx_gage_data,
-#                                type = "csv",
-#                                title = "wqx_temperature")
-# ### USGS
-# # temp data
-# wq_data_raw |> pins::pin_write(usgs_temp_data,
-#                                type = "csv",
-#                                title = "usgs_temperature")
-# # gage data
-# wq_data_raw |> pins::pin_write(usgs_temp_gage_data,
-#                                type = "csv",
-#                                title = "usgs_temperature_gage")

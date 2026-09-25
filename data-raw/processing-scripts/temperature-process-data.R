@@ -8,30 +8,26 @@ library(janitor)
 library(httr)
 library(xml2)
 
-# raw data will be pulled from S3 bucket. These data is originally retrieved on temperature-data-pull.R
+# These data is originally retrieved on temperature-data-pull.R and script is being sourced here
+source("data-raw/data-pull/temperature-data-pull.R")
 
-# setting up aws bucket
-wq_data_board <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1")
-
-### WQX ----
-# pulling raw data
-# TEMPERATURE data
-wqx_data_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/wqx_temp_data") |>
+# ### WQX ----
+# # pulling raw data
+# # TEMPERATURE data
+wqx_data_raw <- wqx_temp_data |>
   janitor::clean_names() |>
   filter(statistical_base_code %in% c("Mean", "Maximum", "Minimum")) |>  # filtering to stats of interest
   glimpse()
 
-
-# GAGE data
-wqx_gage_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/wqx_gage_data") |>
+# # GAGE data
+wqx_gage_raw <- wqx_gage_data |>
   janitor::clean_names() |>
-  # TODO: could include this as a function call
   filter(monitoring_location_type_name %in% c("River/Stream", "Lake", "Stream",
-                                              "Reservoir", "Lake, Reservoir, Impoundment",
-                                              "Spring", "Estuary")) |>
+                                                "Reservoir", "Lake, Reservoir, Impoundment",
+                                                "Spring", "Estuary")) |>
   glimpse()
+
+
 
 # JOIN - station data with temp data
 all_wqx_temp_data <- wqx_data_raw |> left_join(wqx_gage_raw) |>
@@ -122,7 +118,8 @@ gage_temperature_wqx_clean <- all_wqx_temp_data_clean |>
 
 temperature_gage_wqx <- rivermile::find_nearest_river_miles(gage_temperature_wqx_clean) |>
   mutate(longitude = st_coordinates(gage_temperature_wqx_clean)[, 1],
-         latitude = st_coordinates(gage_temperature_wqx_clean)[, 2]) |>
+         latitude = st_coordinates(gage_temperature_wqx_clean)[, 2],
+         huc8 = as.numeric(huc8)) |>
   st_drop_geometry() |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, stream) |>
   glimpse()
@@ -131,8 +128,7 @@ temperature_gage_wqx <- rivermile::find_nearest_river_miles(gage_temperature_wqx
 
 # pulling raw data
 # TEMPERATURE data
-usgs_data_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/usgs_temp_data") |>
+usgs_data_raw <- usgs_temp_data |>
   janitor::clean_names() |>
   glimpse()
 
@@ -156,8 +152,7 @@ usgs_data_raw_clean <- usgs_data_raw |>
   glimpse()
 
 # GAGE data
-usgs_gage_raw <- wq_data_board |>
-  pins::pin_read("water_quality/data-raw/usgs_temp_gage_data") |>
+usgs_gage_raw <- usgs_temp_gage_data |>
   janitor::clean_names() |>
   mutate(station_nm = tools::toTitleCase(tolower(station_nm))) |>
   glimpse()
@@ -679,7 +674,8 @@ temperature_data <- temperature_data_wqx |>
   glimpse()
 
 temperature_gage <- temperature_gage_usgs |>
-  mutate(gage_id = as.character(gage_id)) |>
+  mutate(gage_id = as.character(gage_id),
+         huc8 = as.numeric(huc8)) |>
   bind_rows(temperature_gage_wqx, temperature_gage_usfws, temperature_gage_owrd,
             temperature_gage_karuk, temperature_gage_hoopa) |>
   mutate(location = tolower(stream),
@@ -699,18 +695,6 @@ temperature_gage <- temperature_gage_usgs |>
   st_drop_geometry() |>
   select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, location = stream) |>
   glimpse()
-
-
-### saves clean data to aws
-# wq_processed_data <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/processed-data/")
-#
-# # temp data
-# wq_processed_data |> pins::pin_write(temperature_data,
-#                                type = "csv")
-#
-# # gage data
-# wq_processed_data |> pins::pin_write(temperature_gage,
-#                                      type = "csv")
 
 # save rda files
 usethis::use_data(temperature_data, overwrite = TRUE)
