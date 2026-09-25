@@ -1,14 +1,14 @@
 #' @name temperature_gage
-#' @title Temperature gages in the Klamath Basin watershed (HUC8 18010204)
+#' @title Temperature gages in the Klamath Basin watershed (HUC6 180102)
 #' @description A dataset containing metadata for temperature gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
-#' @format A tibble with 96 rows and 8 columns
+#' @format A tibble with 167 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
 #'   \item \code{gage_id}: unique identifier for the gage
 #'   \item \code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,
-#'   Hoopa Valley Tribe (Tribal), USDA FS PIBO Monitoring Program)
+#'   Hoopa Valley Tribe (Tribal), USDA FS PIBO Monitoring Program, Quartz Valley Indian Tribe, Karuk Tribe, Yurok Tribes)
 #'   \item \code{latitude}: latitude coordinate of the gage location
 #'   \item \code{longitude}: longitude coordinate of the gage location
 #'   \item \code{river_mile}: closest river mile location relative to river mouth or a reference point
@@ -17,9 +17,9 @@
 "temperature_gage"
 
 #' @name temperature_data
-#' @title Publicly available temperature data in the Klamath Basin watershed (HUC8 18010204)
-#' @description Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX and USFWS.
-#' @format A tibble with 414,312 rows and 8 columns
+#' @title Publicly available temperature data in the Klamath Basin watershed (HUC6 180102)
+#' @description Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX, USFWS, Karuk, Hoopa and Quartz Valley Tribes.
+#' @format A tibble with 725,457 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -33,7 +33,7 @@
 "temperature_data"
 
 #' @name ph_gage
-#' @title pH gages in the Klamath Basin watershed (HUC8 18010204)
+#' @title pH gages in the Klamath Basin watershed (HUC6 180102)
 #' @description A dataset containing metadata for pH gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 124 rows and 8 columns
@@ -52,7 +52,7 @@
 "ph_gage"
 
 #' @name ph_data
-#' @title Publicly available pH data in the Klamath Basin watershed (HUC8 18010204)
+#' @title Publicly available pH data in the Klamath Basin watershed (HUC6 180102)
 #' @description Mean, min and max pH data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
 #' @format A tibble with 111,594 rows and 8 columns
 #' \itemize{
@@ -68,7 +68,7 @@
 "ph_data"
 
 #' @name flow_gage
-#' @title Flow gages in the Klamath Basin watershed (HUC8 18010204)
+#' @title Flow gages in the Klamath Basin watershed (HUC6 180102)
 #' @description A dataset containing metadata for flow gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 118 rows and 8 columns
@@ -86,7 +86,7 @@
 "flow_gage"
 
 #' @name flow_data
-#' @title Publicly available flow data in the Klamath Basin watershed (HUC8 18010204)
+#' @title Publicly available flow data in the Klamath Basin watershed (HUC6 180102)
 #' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX, USBR, and OWRD data portals.
 #' @format A tibble with 436,361 rows and 8 columns
 #' \itemize{
@@ -102,7 +102,7 @@
 "flow_data"
 
 #' @name do_gage
-#' @title Dissolved oxygen gages in the Klamath Basin watershed (HUC8 18010204)
+#' @title Dissolved oxygen gages in the Klamath Basin watershed (HUC6 180102)
 #' @description A dataset containing metadata for dissolved oxygen gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
 #' @format A tibble with 131 rows and 8 columns
@@ -119,7 +119,7 @@
 "do_gage"
 
 #' @name do_data
-#' @title Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC8 18010204)
+#' @title Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC6 180102)
 #' @description Mean, min and max dissolved oxygen data from gages across the Klamath Basin. Raw data was obtained from USGS and WQX data portals.
 #' @format A tibble with 365,162 rows and 8 columns
 #' \itemize{
