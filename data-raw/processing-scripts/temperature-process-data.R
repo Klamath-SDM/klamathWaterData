@@ -236,62 +236,80 @@ temperature_gage_usgs <- rivermile::find_nearest_river_miles(gage_temperature_us
 # scraper can't parse their report page for this parameter (a different
 # subset than for flow - not every discharge station has a temperature
 # sensor). None of these 14 station numbers overlap usgs_gages above.
-# lat/long pulled live from OWRD's own KML station feed - see
-# owrd-pull-helpers.R (shared with flow-data-pull.R).
-source("data-raw/data-pull/owrd-pull-helpers.R")
+# lat/long pulled live from OWRD's own KML station feed
+# source("data-raw/data-pull/temperature-pull-helper-functions.R")
 
-owrd_temp_start_date <- as.Date("1996-01-01")
-owrd_temp_end_date   <- as.Date("2025-12-31")
+# owrd_temp_start_date <- as.Date("1996-01-01")
+# owrd_temp_end_date   <- as.Date("2025-12-31")
+#
+# owrd_temp_station_list <- tribble(
+#   ~site,      ~location,          ~gage_name,
+#   "11491400", "williamson river", "williamson r bl sheep cr nr lenz, or",
+#   "11494000", "williamson river", "williamson r ab spring cr nr klamath agency, or",
+#   "11494510", "williamson river", "williamson r ab sprague r nr chiloquin, or",
+#   "11497500", "sprague river",    "sprague r nr beatty, or",
+#   "11497550", "sprague river",    "sprague r bl brown cr nr beatty, or",
+#   "11500400", "trout creek",      "trout cr nr lone pine",
+#   "11500500", "sprague river",    "sprague r at lone pine, or",
+#   "11502550", "williamson river", "williamson r at modoc pt rd, nr chiloquin, or",
+#   "11502950", "sun creek",        "sun cr at ranger sta nr fort klamath, or",
+#   "11503500", "annie creek",      "annie cr nr ft klamath",
+#   "11504103", "wood river",       "wood r ab crooked cr, nr klamath agency, or",
+#   "11504109", "crooked creek",    "crooked cr nr klamath agency, or",
+#   "11504120", "sevenmile creek",  "sevenmile cr bl dry cr nr fort klamath",
+#   "11510000", "spencer creek",    "spencer cr nr keno, or"
+# )
+#
+# owrd_temp_coords <- map_dfr(owrd_temp_station_list$site, fetch_owrd_coord)
+# owrd_temp_stations <- owrd_temp_station_list |> left_join(owrd_temp_coords, by = "site")
+#
+# #### water data table ----
+# temperature_data_owrd <- map_dfr(seq_len(nrow(owrd_temp_stations)), function(i) {
+#   station <- owrd_temp_stations[i, ]
+#   message("Pulling OWRD temperature data for station: ", station$site)
+#   result <- tryCatch(
+#     whychusModel::get_owrd_hydro(station$site, owrd_temp_start_date, owrd_temp_end_date, "WTEMP_MEAN"),
+#     error = function(e) { message("  failed: ", conditionMessage(e)); NULL }
+#   )
+#   # OWRD's server occasionally returns an HTML error page instead of data for
+#   # a given station/parameter combination - skip rather than error out the
+#   # whole pull (same defensive check as flow-data-pull.R's OWRD block).
+#   if (is.null(result) || !"station_nbr" %in% names(result)) {
+#     message("  no usable data returned for station ", station$site)
+#     return(NULL)
+#   }
+#   result |>
+#     transmute(
+#       stream = station$location,
+#       gage_name = station$gage_name,
+#       gage_id = as.character(station_nbr),
+#       variable_name = "temperature",
+#       value = daily_mean_water_temp_c,
+#       unit = "celsius",
+#       statistic = "mean",
+#       # WTEMP_MEAN's record_date includes a time component ("01-01-2023
+#       # 00:00"), unlike flow's MDF format - plain mdy() can't parse it.
+#       date = as.Date(mdy_hm(record_date)))
+# }) |>
+#   filter(!is.na(value)) |>
+#   glimpse()
 
-owrd_temp_station_list <- tribble(
-  ~site,      ~location,          ~gage_name,
-  "11491400", "williamson river", "williamson r bl sheep cr nr lenz, or",
-  "11494000", "williamson river", "williamson r ab spring cr nr klamath agency, or",
-  "11494510", "williamson river", "williamson r ab sprague r nr chiloquin, or",
-  "11497500", "sprague river",    "sprague r nr beatty, or",
-  "11497550", "sprague river",    "sprague r bl brown cr nr beatty, or",
-  "11500400", "trout creek",      "trout cr nr lone pine",
-  "11500500", "sprague river",    "sprague r at lone pine, or",
-  "11502550", "williamson river", "williamson r at modoc pt rd, nr chiloquin, or",
-  "11502950", "sun creek",        "sun cr at ranger sta nr fort klamath, or",
-  "11503500", "annie creek",      "annie cr nr ft klamath",
-  "11504103", "wood river",       "wood r ab crooked cr, nr klamath agency, or",
-  "11504109", "crooked creek",    "crooked cr nr klamath agency, or",
-  "11504120", "sevenmile creek",  "sevenmile cr bl dry cr nr fort klamath",
-  "11510000", "spencer creek",    "spencer cr nr keno, or"
-)
 
-owrd_temp_coords <- map_dfr(owrd_temp_station_list$site, fetch_owrd_coord)
-owrd_temp_stations <- owrd_temp_station_list |> left_join(owrd_temp_coords, by = "site")
-
-#### water data table ----
-temperature_data_owrd <- map_dfr(seq_len(nrow(owrd_temp_stations)), function(i) {
-  station <- owrd_temp_stations[i, ]
-  message("Pulling OWRD temperature data for station: ", station$site)
-  result <- tryCatch(
-    whychusModel::get_owrd_hydro(station$site, owrd_temp_start_date, owrd_temp_end_date, "WTEMP_MEAN"),
-    error = function(e) { message("  failed: ", conditionMessage(e)); NULL }
-  )
-  # OWRD's server occasionally returns an HTML error page instead of data for
-  # a given station/parameter combination - skip rather than error out the
-  # whole pull (same defensive check as flow-data-pull.R's OWRD block).
-  if (is.null(result) || !"station_nbr" %in% names(result)) {
-    message("  no usable data returned for station ", station$site)
-    return(NULL)
-  }
-  result |>
-    transmute(
-      stream = station$location,
-      gage_name = station$gage_name,
-      gage_id = as.character(station_nbr),
-      variable_name = "temperature",
-      value = daily_mean_water_temp_c,
-      unit = "celsius",
-      statistic = "mean",
-      # WTEMP_MEAN's record_date includes a time component ("01-01-2023
-      # 00:00"), unlike flow's MDF format - plain mdy() can't parse it.
-      date = as.Date(mdy_hm(record_date)))
-}) |>
+#### clean OWRD water temperature data ----
+# sources from temperature-data-pull.R
+temperature_data_owrd <- temperature_data_owrd_raw |>
+  transmute(
+    stream,
+    gage_name,
+    gage_id = as.character(station_nbr),
+    variable_name = "temperature",
+    value = daily_mean_water_temp_c,
+    unit = "celsius",
+    statistic = "mean",
+    # WTEMP_MEAN's record_date includes a time component
+    # ("01-01-2023 00:00"), so use mdy_hm().
+    date = as.Date(mdy_hm(record_date))
+  ) |>
   filter(!is.na(value)) |>
   glimpse()
 
@@ -300,6 +318,7 @@ temperature_data_owrd <- map_dfr(seq_len(nrow(owrd_temp_stations)), function(i) 
 # left NA) - same treatment flow-process-data.R gives its OWRD/USBR Hydromet
 # gages. huc8 determined by spatial join against rivermile::klamath_hucs
 # (point-in-polygon on lat/long) rather than hand-transcribed.
+# sources from temperature-data-pull.R
 temperature_gage_owrd <- owrd_temp_stations |>
   transmute(stream = location,
             gage_name = gage_name,
@@ -344,7 +363,7 @@ temperature_gage_owrd <- owrd_temp_stations |>
 # Data Provisional. Do Not Cite without Karuk Tribe consent.") - get
 # sign-off from Karuk Tribe / KBMP before this is used in anything
 # published or operational.
-source("data-raw/data-pull/karuk-wq-portal-pull-helpers.R")
+# source("data-raw/data-pull/karuk-wq-portal-pull-helpers.R")
 
 # Every value below was looked up by hand against the portal's own
 #  endpoints - not hand-guessed, and
@@ -385,52 +404,95 @@ source("data-raw/data-pull/karuk-wq-portal-pull-helpers.R")
 #     GET https://waterquality.karuk.us/Data/Dataset_Side/?dataset=<dataset_id>&isDataset=true
 #     (an HTML fragment, not JSON) and read the coordinates out of its
 #     embedded onclick="...GoTo('map', <long>, <lat>)..." attribute.
-karuk_stations <- tribble(
-  ~gage_id,         ~location,       ~gage_name,                          ~dataset_id, ~start_date,            ~lat,        ~long,         ~agency,
-  "karuk-11516530", "klamath river", "klamath river below iron gate",     1883,        as.Date("2001-05-17"),  41.927762,   -122.443927,   "Karuk Tribe",
-  "karuk-11516000", "klamath river", "klamath river above shasta river",  1972,        as.Date("2023-12-20"),  41.831236,   -122.593248,   "Karuk Tribe",
-  "karuk-11517818", "klamath river", "klamath river at walker bridge",    1905,        as.Date("2022-09-27"),  41.837087,   -122.864828,   "Karuk Tribe",
-  "karuk-11520500", "klamath river", "klamath river near seiad valley",   1864,        as.Date("2001-05-17"),  41.853798,   -123.232033,   "Karuk Tribe",
-  "karuk-11523000", "klamath river", "klamath river near orleans",        1849,        as.Date("2001-05-18"),  41.303471,   -123.534421,   "Karuk Tribe",
-  "kas",            "klamath river", "klamath river at salt creek",       1888,        as.Date("2022-11-02"),  41.546886,   -124.062264,   "Yurok Tribe",
-  "kat",            "klamath river", "klamath at turwar gage",            1666,        as.Date("2019-02-27"),  41.5159431,  -124.0003835,  "Yurok Tribe",
-  "sc1",            "scott river",   "scott r nr fort jones",              2018,        as.Date("2017-07-18"),  41.64,       -123.0138,     "Quartz Valley Indian Reservation"
-)
-
-# matches the standardized end date used across this package's other pulls
-karuk_end_date <- owrd_temp_end_date
+# karuk_stations <- tribble(
+#   ~gage_id,         ~location,       ~gage_name,                          ~dataset_id, ~start_date,            ~lat,        ~long,         ~agency,
+#   "karuk-11516530", "klamath river", "klamath river below iron gate",     1883,        as.Date("2001-05-17"),  41.927762,   -122.443927,   "Karuk Tribe",
+#   "karuk-11516000", "klamath river", "klamath river above shasta river",  1972,        as.Date("2023-12-20"),  41.831236,   -122.593248,   "Karuk Tribe",
+#   "karuk-11517818", "klamath river", "klamath river at walker bridge",    1905,        as.Date("2022-09-27"),  41.837087,   -122.864828,   "Karuk Tribe",
+#   "karuk-11520500", "klamath river", "klamath river near seiad valley",   1864,        as.Date("2001-05-17"),  41.853798,   -123.232033,   "Karuk Tribe",
+#   "karuk-11523000", "klamath river", "klamath river near orleans",        1849,        as.Date("2001-05-18"),  41.303471,   -123.534421,   "Karuk Tribe",
+#   "kas",            "klamath river", "klamath river at salt creek",       1888,        as.Date("2022-11-02"),  41.546886,   -124.062264,   "Yurok Tribe",
+#   "kat",            "klamath river", "klamath at turwar gage",            1666,        as.Date("2019-02-27"),  41.5159431,  -124.0003835,  "Yurok Tribe",
+#   "sc1",            "scott river",   "scott r nr fort jones",              2018,        as.Date("2017-07-18"),  41.64,       -123.0138,     "Quartz Valley Indian Reservation"
+# )
+#
+# # matches the standardized end date used across this package's other pulls
+# karuk_end_date <- owrd_temp_end_date
 
 #### water data table ----
 # Portal returns 15-minute instantaneous readings, not pre-aggregated daily
 # stats - aggregated to daily min/mean/max here, same treatment the USFWS
 # section below gives its own raw hourly readings.
-temperature_data_karuk <- map_dfr(seq_len(nrow(karuk_stations)), function(i) {
-  station <- karuk_stations[i, ]
-  message("Pulling Karuk WQ portal data for station: ", station$gage_id)
-  raw <- fetch_karuk_dataset(station$dataset_id, station$start_date, karuk_end_date)
-  if (nrow(raw) == 0) return(NULL)
-  raw |>
-    mutate(date = as.Date(timestamp)) |>
-    filter(!is.na(value))  |>
-    group_by(date) |>
-    summarise(mean_temp = mean(value, na.rm = TRUE),
-              min_temp  = min(value, na.rm = TRUE),
-              max_temp  = max(value, na.rm = TRUE),
-              .groups = "drop") |>
-    pivot_longer(cols = c(mean_temp, min_temp, max_temp),
-                 names_to = "statistic",
-                 values_to = "value") |>
-    mutate(statistic = case_when(
+# temperature_data_karuk <- map_dfr(seq_len(nrow(karuk_stations)), function(i) {
+#   station <- karuk_stations[i, ]
+#   message("Pulling Karuk WQ portal data for station: ", station$gage_id)
+#   raw <- fetch_karuk_dataset(station$dataset_id, station$start_date, karuk_end_date)
+#   if (nrow(raw) == 0) return(NULL)
+#   raw |>
+#     mutate(date = as.Date(timestamp)) |>
+#     filter(!is.na(value))  |>
+#     group_by(date) |>
+#     summarise(mean_temp = mean(value, na.rm = TRUE),
+#               min_temp  = min(value, na.rm = TRUE),
+#               max_temp  = max(value, na.rm = TRUE),
+#               .groups = "drop") |>
+#     pivot_longer(cols = c(mean_temp, min_temp, max_temp),
+#                  names_to = "statistic",
+#                  values_to = "value") |>
+#     mutate(statistic = case_when(
+#       statistic == "mean_temp" ~ "mean",
+#       statistic == "min_temp"  ~ "min",
+#       statistic == "max_temp"  ~ "max"),
+#       stream = station$location,
+#       gage_name = station$gage_name,
+#       gage_id = station$gage_id,
+#       variable_name = "temperature",
+#       unit = "celsius") |>
+#     select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date)
+# }) |>
+#   glimpse()
+
+
+
+#### clean Karuk water temperature data ----
+# sourcing temperature_data_karuk_raw from temperature-data-pull.R script
+source("data-raw/data-pull/temperature-pull-helper-functions.R")
+temperature_data_karuk <- temperature_data_karuk_raw |>
+  mutate(
+    date = as.Date(timestamp)
+  ) |>
+  filter(!is.na(value)) |>
+  group_by(stream, gage_name, gage_id, date) |>
+  summarise(
+    mean_temp = mean(value, na.rm = TRUE),
+    min_temp  = min(value, na.rm = TRUE),
+    max_temp  = max(value, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  pivot_longer(
+    cols = c(mean_temp, min_temp, max_temp),
+    names_to = "statistic",
+    values_to = "value"
+  ) |>
+  mutate(
+    statistic = case_when(
       statistic == "mean_temp" ~ "mean",
       statistic == "min_temp"  ~ "min",
-      statistic == "max_temp"  ~ "max"),
-      stream = station$location,
-      gage_name = station$gage_name,
-      gage_id = station$gage_id,
-      variable_name = "temperature",
-      unit = "celsius") |>
-    select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date)
-}) |>
+      statistic == "max_temp"  ~ "max"
+    ),
+    variable_name = "temperature",
+    unit = "celsius"
+  ) |>
+  select(
+    stream,
+    gage_name,
+    gage_id,
+    variable_name,
+    value,
+    unit,
+    statistic,
+    date
+  ) |>
   glimpse()
 
 #### monitoring site table ----
@@ -481,15 +543,15 @@ temperature_gage_karuk <- karuk_stations |>
 # is provisional and is subject to revision. Not to be used as official
 # record.") - get sign-off from the Hoopa Valley Tribe before this is
 # used in anything published or operational.
-source("data-raw/data-pull/hoopa-wq-portal-pull-helpers.R")
+# source("data-raw/data-pull/hoopa-wq-portal-pull-helpers.R")
 
-hoopa_start_date <- as.Date("2015-01-01") # portal returns whatever it actually has, starting ~2019-08-27
-hoopa_end_date <- karuk_end_date
-
-#### water data table ----
-hoopa_saints_rest_raw <- fetch_hoopa_station(
-  "Klamath River Saints Rest", "Water Temp C", hoopa_start_date, hoopa_end_date
-)
+# hoopa_start_date <- as.Date("2015-01-01") # portal returns whatever it actually has, starting ~2019-08-27
+# hoopa_end_date <- karuk_end_date
+#
+# #### water data table ----
+# hoopa_saints_rest_raw <- fetch_hoopa_station(
+#   "Klamath River Saints Rest", "Water Temp C", hoopa_start_date, hoopa_end_date
+# )
 
 temperature_data_hoopa <- hoopa_saints_rest_raw |>
   mutate(date = as.Date(timestamp)) |>
