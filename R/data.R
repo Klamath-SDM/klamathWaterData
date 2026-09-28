@@ -19,7 +19,7 @@
 #' @name temperature_data
 #' @title Publicly available temperature data in the Klamath Basin watershed (HUC6 180102)
 #' @description Mean, min and max temperature data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX, USFWS, Karuk, Hoopa and Quartz Valley Tribes.
-#' @format A tibble with 725,457 rows and 8 columns
+#' @format A tibble with 720,587 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station

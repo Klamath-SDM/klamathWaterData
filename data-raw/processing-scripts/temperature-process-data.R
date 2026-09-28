@@ -513,7 +513,7 @@ temperature_gage_usfws <- bind_rows(temperature_gage_shkr, temperature_gage_sckr
 
 
 # combine gage and data files ---------------------------------------------
-temperature_data_updated <- temperature_data_wqx |>
+temperature_data <- temperature_data_wqx |>
   mutate(date = as.Date(date),
          variable_name = "temperature",
          statistic = tolower(statistic),
