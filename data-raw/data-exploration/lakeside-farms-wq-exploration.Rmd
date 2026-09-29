@@ -1,0 +1,199 @@
+---
+title: "Lakeside Farms Water Quality Monitoring Data Exploration"
+author: "Badhia Yunes Katz"
+date: "September 2026"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, fig.width = 9, fig.height = 4.5)
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(lubridate)
+library(leaflet)
+library(knitr)
+```
+
+This report explores the Lakeside Farms water quality monitoring workbook
+(`data-raw/skinner-wq-data/Lakeside Farms WQ monitoring.xlsx`) to understand its temporal coverage,
+data gaps and collection points, and how it could be formatted like the other water quality objects in
+klamathWaterData.
+
+```{r read}
+f <- "data-raw/skinner-wq-data/Lakeside Farms WQ monitoring.xlsx"
+
+sites_raw <- read_excel(f, sheet = "Sample sites", .name_repair = "minimal") |> clean_names()
+
+num_cols <- c("staff_plate", "temp", "sp_cond", "depth_m", "p_h", "do_sat", "do_conc",
+              "tdp", "tp", "po4", "nh3", "n_ox", "tn", "pp", "per_pp", "n_p")
+
+# all columns read as text: "NA" is stored as literal text in many cells
+wq <- read_excel(f, sheet = "Lakeside_data", col_types = "text", .name_repair = "minimal") |>
+  clean_names() |>
+  mutate(across(everything(), ~ na_if(.x, "NA")),
+         date = as.Date(as.numeric(date), origin = "1899-12-30"),
+         across(all_of(num_cols), as.numeric))
+```
+
+The sheet has **`r nrow(wq)` rows** from **`r min(wq$date)`** to **`r max(wq$date)`**
+(`r n_distinct(wq$date)` sampling dates). One row is one site on one date.
+
+# 1. Collection points
+
+```{r coords}
+site_tbl <- sites_raw |>
+  mutate(coordinates = str_squish(coordinates)) |>
+  separate(coordinates, c("latitude", "longitude"), sep = ",", convert = TRUE) |>
+  left_join(count(wq, site, name = "n_samples"), by = c("site_code" = "site")) |>
+  select(site_code, site_name, site_type, latitude, longitude, n_samples)
+
+kable(site_tbl)
+```
+
+- **Permanent sites** (SPR-N, SUK-N, WET-NE, WET-M) were sampled almost every visit and are the only ones with coordinates.
+- **Condition-dependent and one-off sites** have 1-10 samples each and no coordinates.
+- **Staff-plate sites** (SPR-M, SUK-M, WET-S) only record water level, not chemistry.
+- **`Wocus`** appears in the data (one sample) but is not in the site list.
+- **QA/QC rows** (blanks `b`, duplicates `d`) are stored as extra sites, e.g. `WET-NEd`.
+
+```{r map}
+site_tbl |>
+  drop_na(latitude, longitude) |>
+  leaflet() |>
+  addProviderTiles("Esri.WorldImagery") |>
+  addCircleMarkers(~longitude, ~latitude, radius = 8, color = "white", weight = 1,
+                   fillColor = "steelblue", fillOpacity = 0.9,
+                   label = ~paste0(site_code, " - ", site_name),
+                   popup = ~paste0("<b>", site_code, "</b><br>", site_name, "<br>", n_samples, " samples"),
+                   labelOptions = labelOptions(noHide = TRUE, direction = "right"))
+```
+
+# 2. Temporal coverage
+
+```{r timeline}
+wq |>
+  filter(site_type != "QA_QC") |>
+  mutate(site = fct_reorder(site, date, .fun = length)) |>
+  ggplot(aes(date, site, colour = site_type)) +
+  geom_point(alpha = 0.7) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
+  labs(x = NULL, y = NULL, colour = "Site type", title = "Sampling dates by site") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r gaps}
+visits <- wq |> distinct(date) |> arrange(date) |>
+  mutate(days_since_prev = as.numeric(date - lag(date)))
+
+visits |>
+  filter(days_since_prev > 35) |>
+  transmute(gap_start = date - days_since_prev, gap_end = date, days = days_since_prev) |>
+  kable(caption = "Gaps between visits longer than 35 days")
+```
+
+Visits are roughly monthly (median `r median(visits$days_since_prev, na.rm = TRUE)` days apart). The main gap is
+**16 Sep 2025 to 14 Jan 2026 (120 days)**, leaving Oct-Dec 2025 unsampled. Other gaps are 36-49 days.
+
+# 3. Parameters
+
+```{r param-year}
+prim <- wq |> filter(site_type == "Primary")
+params <- setdiff(num_cols, c("staff_plate", "pp", "per_pp", "n_p"))
+
+prim |>
+  select(date, all_of(params)) |>
+  mutate(year = year(date), .keep = "unused") |>
+  pivot_longer(-year, names_to = "parameter", values_to = "value") |>
+  group_by(year, parameter) |>
+  summarise(pct = 100 * mean(!is.na(value)), .groups = "drop") |>
+  ggplot(aes(factor(year), parameter, fill = pct)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(label = round(pct)), size = 3) +
+  scale_fill_viridis_c(limits = c(0, 100), name = "% present") +
+  labs(x = NULL, y = NULL, title = "% of primary samples with a value, by year") +
+  theme_minimal()
+```
+
+- Nutrients (TDP, TP, PO4, NH3, NOx, TN) are essentially complete.
+- YSI field parameters have small gaps: depth (~84% present) is the least complete, then specific conductance (~95%) and pH (~96%, with "pH sensor issue" in the notes).
+- Nutrient values of `0` mean **below the detection limit**, not a true zero (about a third of NOx and 18% of NH3 values). The detection limits are not in the workbook.
+
+# 4. Formatting for klamathWaterData
+
+Existing objects (`temperature_data`, `do_data`, `ph_data`) are long tables with
+`location, gage_name, gage_id, variable_name, value, unit, statistic, date`, plus a `*_gage` table with
+`gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, location`. Draft conversion (primary samples
+only; below-detection zeros set to missing):
+
+```{r package-format}
+param_map <- tribble(
+  ~col,      ~variable_name,                 ~unit,
+  "temp",    "temperature",                  "celsius",
+  "sp_cond", "specific conductance",         "uS/cm",
+  "p_h",     "pH",                           "std unit",
+  "do_sat",  "dissolved oxygen saturation",  "%",
+  "do_conc", "dissolved oxygen",             "mg/L",
+  "tdp",     "total dissolved phosphorus",   "ug/L",
+  "tp",      "total phosphorus",             "ug/L",
+  "po4",     "orthophosphate",               "ug/L",
+  "nh3",     "ammonia",                      "ug/L",
+  "n_ox",    "nitrate/nitrite",              "ug/L",
+  "tn",      "total nitrogen",               "ug/L"
+)
+nutrient_cols <- c("tdp", "tp", "po4", "nh3", "n_ox", "tn")
+
+lakeside_wq_data <- prim |>
+  select(site, date, all_of(param_map$col)) |>
+  pivot_longer(all_of(param_map$col), names_to = "col", values_to = "value") |>
+  mutate(value = if_else(col %in% nutrient_cols & value == 0, NA_real_, value)) |>
+  drop_na(value) |>
+  left_join(param_map, by = "col") |>
+  mutate(location  = "lakeside farms",
+         gage_name = paste("lakeside farms", str_to_lower(site)),
+         gage_id   = paste0("LAKESIDE-", site),
+         statistic = "") |>
+  select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
+  as.data.frame()
+
+lakeside_wq_gage <- site_tbl |>
+  drop_na(latitude, longitude) |>
+  transmute(gage_name = paste("lakeside farms", str_to_lower(site_code)),
+            gage_id = paste0("LAKESIDE-", site_code),
+            agency = NA_character_, latitude, longitude,
+            river_mile = NA_real_, huc8 = NA_character_, location = "lakeside farms")
+
+count(lakeside_wq_data, variable_name, unit, name = "n_records") |>
+  mutate(existing_object = case_when(variable_name == "temperature" ~ "temperature_data",
+                                     variable_name == "dissolved oxygen" ~ "do_data",
+                                     variable_name == "pH" ~ "ph_data",
+                                     TRUE ~ "none (new object)")) |>
+  kable()
+```
+
+# 5. Summary and open questions
+
+**Coverage**
+
+- Approx. monthly visits from **`r min(wq$date)`** to **`r max(wq$date)`**, with a 120-day gap (16 Sep 2025 to 14 Jan 2026) that leaves Oct-Dec 2025 unsampled
+  (see section 2). Other gaps are 36-49 days.
+- 4 permanent sites give a consistent record; 5 other sites have at most 10 samples each and cannot
+  support a time series.
+- Nutrients (TDP, TP, PO4, NH3, NOx, TN) are essentially complete; YSI field parameters have small gaps (depth the largest, then specific conductance and pH).
+
+**Decisions needed before adding to the package**
+
+1. **Which sites to include** - permanent sites only, or all primary sites (sparse condition-dependent ones)?
+2. **Nutrients** - the package has no nutrient objects yet. Add new objects (e.g. `nutrient_data`) or only
+   temperature / DO / pH from this source?
+3. **Below-detection zeros** - drop (as drafted above), or keep with a flag column? Detection limits are not provided.
+4. **QA/QC rows** - excluded here; confirm blanks/duplicates should not be published.
+5. **`location` / `agency` / `huc8`** - "lakeside farms" is a placeholder; confirm data owner and naming convention.
+6. **Missing coordinates** - 5 of 9 listed sites (plus `Wocus`) have none; request from the provider.
+7. **Staff plate readings** - stage data at SPR-M, SUK-M, WET-S; could feed `water_level_data` if wanted.
+8. **Derived columns** (PP, Per_PP, N_P) - omitted; can be recomputed.
