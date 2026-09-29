@@ -3,9 +3,9 @@ library(dataRetrieval)
 library(purrr)
 library(pins)
 
-# the goal of this script is to pull dissolved oxygen data from different sources and save into aws bucket. Pulling last 10 years of data
+# the goal of this script is to pull dissolved oxygen data from different sources. Pulling last 10 years of data
 
-# Define aws bucket (klamath-sdm)
+# Define aws bucket (klamath-sdm) - previous approach was to pull raw data and save into aws bucket. uncomment lines
 # wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/data-raw/")
 
 # Standardized pull window - matches lake-levels/flow/teacup-diagram pulls.
