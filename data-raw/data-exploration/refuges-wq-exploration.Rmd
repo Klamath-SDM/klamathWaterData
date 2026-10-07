@@ -172,8 +172,7 @@ deployments |>
 # 4. Time series
 
 Each tab shows one continuous sonde site. For readability the hourly readings are summarised to a **daily mean (line) with the daily minimum-maximum range (shaded)**.
-Breaks in the line are periods with no data. The plots are interactive: hover for the date and values, drag to zoom (all panels in a tab zoom together) and double-click to reset.
-Each panel has its own y-axis.
+Breaks in the line are periods with no data. Each panel has its own y-axis.
 
 ```{r plotly-deps, echo = FALSE}
 # widgets printed inside the results = "asis" loop below do not register their JS dependencies on their own;
@@ -257,12 +256,6 @@ for (s in cont_sites) {
 }
 ```
 
-## What the plots show {.unlisted .unnumbered}
-
-- **Seasonal pattern:** temperature rises through summer at every site, with the sondes only deployed from spring to autumn.
-- **Large daily swings:** the shaded min-max bands show that DO and pH move strongly within a day.
-- **Low oxygen:** at `LKNWR_AI` and `TLNWR1a_LRI` DO is often near or below zero in summer and autumn, which is partly a sensor issue (see section 7).
-
 # 5. Nutrient and cyanotoxin samples
 
 - `r nrow(nc)` samples from `r fmt(min(nc$date))` to `r fmt(max(nc$date))`: routine sampling at 6 sites in 2021-2022 (plus a few early one-off sites), then a few sites during blooms.
@@ -270,8 +263,7 @@ for (s in cont_sites) {
 - Nutrients were only measured at `TLNWR1a_DH` (`r n_nut` samples): total P ranged from `r format(min(nc$tp, na.rm = TRUE), big.mark = ",")` to `r format(max(nc$tp, na.rm = TRUE), big.mark = ",")` ug/L and total N from `r format(min(nc$tn, na.rm = TRUE), big.mark = ",")` to `r format(max(nc$tn, na.rm = TRUE), big.mark = ",")` ug/L.
 - Observed cyanobacteria genera and bloom notes are in the free-text `taxa` and `notes` columns.
 
-Each tab below is a time series of the individual samples (one point per sample, no averaging). Hover for the site, date and value, drag to zoom
-(all panels in a tab zoom together). **Open markers at zero are non-detects** (below the detection limit), not true zeros. The cyanotoxin tab includes all sites; click a site in the legend to hide or show it.
+Each tab below is a time series of the individual samples (one point per sample, no averaging).**Open markers at zero are non-detects** (below the detection limit), not true zeros. The cyanotoxin tab includes all sites; click a site in the legend to hide or show it.
 
 ## Samples over time {.tabset .tabset-pills}
 
@@ -368,7 +360,6 @@ ctx |>
 These are context series for interpreting the sonde and cyano data (not water quality). Per the workbook, Ady flow comes from a USGS gage
 (site 11509250), Anderson Rose flow from TID daily reports, and Unit 2 elevation from refuge staff. Flow units are not stated.
 Unit 2 elevation is sparse before 2024 (`r sum(ctx$series == "Unit 2 water surface elevation (ft)" & year(ctx$date) < 2023)` reading before 2023, `r sum(ctx$series == "Unit 2 water surface elevation (ft)" & year(ctx$date) == 2023)` in 2023); the flow series only start in 2023 (Ady) and 2024 (Anderson Rose).
-Hover for values, drag to zoom (all panels zoom together).
 
 ```{r ctx-plot}
 ctx_panels <- imap(split(ctx, factor(ctx$series, levels = unique(ctx$series))), function(d, label) {
