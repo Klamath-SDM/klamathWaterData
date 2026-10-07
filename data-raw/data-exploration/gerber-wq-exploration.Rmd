@@ -1,0 +1,272 @@
+---
+title: "Gerber Reservoir Water Quality Data Exploration"
+author: "Badhia Yunes Katz"
+date: "October 2026"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, fig.width = 9, fig.height = 4.5)
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(lubridate)
+library(leaflet)
+library(plotly)
+library(htmltools)
+library(knitr)
+```
+
+```{r read}
+f <- "data-raw/skinner-wq-data/Gerber WQ.xlsx"
+excel_date <- function(x) as.Date(as.numeric(x), origin = "1899-12-30")
+
+# "NA" is stored as literal text in many cells, so everything is read as text first
+read_txt <- function(sheet) {
+  read_excel(f, sheet = sheet, col_types = "text", .name_repair = "minimal") |>
+    clean_names() |>
+    mutate(across(everything(), ~ na_if(.x, "NA")))
+}
+
+sites <- read_txt("Gerber net pen locations") |>
+  separate(coordinates, c("latitude", "longitude"), sep = ",", convert = TRUE)
+
+sonde_cols <- c("temp", "p_h", "do_conc", "do_sat", "sp_cond", "sal", "tds", "depth", "bat", "cab")
+
+sonde <- read_txt("Gerber_sondes") |>
+  filter(!is.na(site)) |>   # drops one stray row that only has a date (2026-10-01)
+  mutate(date = excel_date(date),
+         datetime = as.POSIXct(date, tz = "UTC") + round(as.numeric(time) * 86400),
+         across(all_of(sonde_cols), as.numeric))
+
+chla <- read_txt("Gerber chla (SFEI)") |>
+  mutate(date = excel_date(date), across(c(pixelcount, chla_mean, chla_med, chla_90per), as.numeric))
+
+cyano <- read_txt("Gerber cyano") |>
+  mutate(date = excel_date(date), across(c(atx, cyl, mc, stx), as.numeric))
+
+# one row per site / sensor / year (a "deployment")
+deployments <- sonde |>
+  group_by(site, sonde, year) |>
+  summarise(first = min(date), last = max(date), days = n_distinct(date), readings = n(), .groups = "drop") |>
+  arrange(first)
+
+fmt <- function(d) format(d, "%d %b %Y")
+```
+
+This report describes the Gerber Reservoir water quality workbook (`data-raw/skinner-wq-data/Gerber WQ.xlsx`): where the data were
+collected, what was measured, over what period, and what to watch out for when using it.
+
+# At a glance
+
+| | |
+|---|---|
+| **Where** | Two floating net pens in Gerber Reservoir: `Gerber_NP` (south) and `Gerber_NPN` (north) |
+| **Sonde data** | Hourly readings of temperature, pH, dissolved oxygen and conductivity, from `r fmt(min(sonde$date))` to `r fmt(max(sonde$date))`, in six seasonal deployments |
+| **Satellite chlorophyll-a** | Daily summary of SFEI satellite imagery (area covered not documented), `r fmt(min(chla$date))` to `r fmt(max(chla$date))` |
+| **Cyanobacteria samples** | `r nrow(cyano)` discrete samples (cyanotoxins and observed taxa), `r format(min(cyano$date), "%b %Y")` to `r format(max(cyano$date), "%b %Y")` |
+| **Main gaps** | No sonde data in winter (never monitored Nov-Mar), none at all in 2022, and none for July 2024 |
+
+# 1. Where the data were collected
+
+```{r sites}
+site_tbl <- sonde |>
+  group_by(site) |>
+  summarise(readings = n(), first = min(date), last = max(date)) |>
+  left_join(sites, by = "site") |>
+  select(Site = site, Description = site_description, latitude, longitude, Readings = readings, First = first, Last = last)
+
+kable(site_tbl)
+```
+
+```{r map}
+site_tbl |>
+  leaflet() |>
+  addProviderTiles("Esri.WorldImagery") |>
+  addCircleMarkers(~longitude, ~latitude, radius = 8, color = "white", weight = 1,
+                   fillColor = "steelblue", fillOpacity = 0.9,
+                   label = ~paste0(Site, " - ", Description),
+                   popup = ~paste0("<b>", Site, "</b><br>", Description, "<br>", format(Readings, big.mark = ","), " readings"),
+                   labelOptions = labelOptions(noHide = TRUE, direction = "right"))
+```
+
+- The two net pens were **not monitored at the same time**: `Gerber_NP` has the 2021 and 2023-2025 record, `Gerber_NPN` only starts in 2026.
+- The satellite chlorophyll-a values are a **daily summary of satellite pixels**, not tied to a net pen. The workbook does not say what area the pixels cover.
+- The cyanobacteria samples were taken at the net pens.
+
+# 2. What was measured
+
+```{r param-table}
+tibble(
+  Data = c("Sonde (hourly)", "Sonde (hourly)", "Sonde (hourly)", "Sonde (hourly)", "Sonde (hourly)",
+           "Satellite (daily)", "Cyano samples", "Cyano samples"),
+  Parameter = c("Water temperature", "pH", "Dissolved oxygen concentration", "Dissolved oxygen saturation",
+                "Specific conductance", "Chlorophyll-a (mean, median, 90th percentile)",
+                "Cyanotoxins: anatoxin-a, cylindrospermopsin, microcystin, saxitoxin", "Cyanobacteria taxa and bloom notes"),
+  Unit = c("°C", "std units", "mg/L", "%", "uS/cm", "not stated", "ug/L (assumed)", "free text"),
+  `Range in data` = c(
+    sprintf("%.1f to %.1f", min(sonde$temp, na.rm = TRUE), max(sonde$temp, na.rm = TRUE)),
+    sprintf("%.1f to %.1f", min(sonde$p_h, na.rm = TRUE), max(sonde$p_h, na.rm = TRUE)),
+    sprintf("%.1f to %.1f", min(sonde$do_conc, na.rm = TRUE), max(sonde$do_conc, na.rm = TRUE)),
+    sprintf("%.0f to %.0f", min(sonde$do_sat, na.rm = TRUE), max(sonde$do_sat, na.rm = TRUE)),
+    sprintf("%.0f to %.0f", min(sonde$sp_cond, na.rm = TRUE), max(sonde$sp_cond, na.rm = TRUE)),
+    sprintf("%.1f to %.1f (daily mean)", min(chla$chla_mean, na.rm = TRUE), max(chla$chla_mean, na.rm = TRUE)),
+    sprintf("0 to %.2f (max microcystin)", max(cyano$mc, na.rm = TRUE)), "")
+) |> kable()
+```
+
+The sonde tab also has salinity, total dissolved solids, depth and two columns (`Bat`, `Cab`) that look like sonde battery readings.
+These are only partly filled and are not plotted. Two sensor types appear: **YSI sondes** (all parameters) and one short **HOBO** logger record
+(temperature and dissolved oxygen only).
+
+# 3. Time period and gaps
+
+```{r deployment-bullets, results = "asis"}
+# one line per net pen listing its seasonal records
+deployments |>
+  mutate(period = paste0(format(first, "%d %b"), " - ", format(last, "%d %b %Y"), if_else(sonde == "HOBO", " (HOBO)", ""))) |>
+  group_by(site) |>
+  summarise(txt = paste0("- **", first(site), ":** ", paste(period, collapse = "; "))) |>
+  pull(txt) |>
+  writeLines()
+```
+
+**Gaps**
+
+- **No winter data:** all sonde records fall between late April and mid October.
+- **No 2022 data** in the sonde or cyano tabs (the satellite record does cover 2022).
+- **July 2024 is missing** at `Gerber_NP` (no data from 26 Jun to 13 Aug).
+- **Satellite chlorophyll-a** is daily, but about 40% of days are blank (no valid pixels).
+- **Cyano samples** are sparse: 1 in 2024, 3 in 2025 and 3 in 2026.
+
+# 4. Time series
+
+Each tab shows one record. Sonde tabs show **all hourly readings** (orange = YSI, dark = HOBO); the chlorophyll-a tab shows the daily satellite
+summary. The plots are interactive: hover for the exact date and value, drag to zoom (all panels in a tab zoom together) and double-click to reset.
+Each panel has its own y-axis.
+
+```{r plotly-deps, echo = FALSE}
+# widgets printed inside the results = "asis" loop below do not register their JS dependencies on their own;
+# an empty widget here makes knitr include plotly.js in the page
+dummy <- plot_ly(x = 1, y = 1, type = "scatter", mode = "markers", marker = list(opacity = 0)) |>
+  layout(margin = list(t = 0, b = 0, l = 0, r = 0), xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
+dummy$height <- 1
+htmltools::tagList(dummy)
+```
+
+```{=html}
+<script>
+// plotly widgets drawn inside hidden tabs have no width; resize them when their tab is opened
+document.addEventListener("click", function (e) {
+  if (!e.target.closest(".tabset")) return;
+  setTimeout(function () {
+    document.querySelectorAll(".plotly.html-widget").forEach(function (w) {
+      if (w.offsetParent !== null && window.Plotly) Plotly.Plots.resize(w);
+    });
+  }, 200);
+});
+</script>
+```
+
+## Time series by record {.tabset .tabset-pills}
+
+```{r tabs, results = "asis"}
+sonde_labels <- c(temp = "Temperature (°C)", p_h = "pH", do_conc = "DO (mg/L)",
+                  do_sat = "DO saturation (%)", sp_cond = "Sp. conductance (uS/cm)")
+sonde_units  <- c(temp = "°C", p_h = "", do_conc = "mg/L", do_sat = "%", sp_cond = "uS/cm")
+sensor_cols  <- c(YSI = "darkorange", HOBO = "grey25")
+
+link_axes <- function(sp, n) {
+  ax <- paste0("xaxis", c("", 2:n))
+  sp <- do.call(layout, c(list(sp), setNames(rep(list(list(matches = "x")), n - 1), ax[-1])))
+  sp |> layout(margin = list(t = 30)) |> config(displaylogo = FALSE)
+}
+panel_title <- function(label) {
+  list(list(text = paste0("<b>", label, "</b>"), x = 0, y = 1.02, xref = "paper", yref = "paper",
+            xanchor = "left", yanchor = "bottom", showarrow = FALSE, font = list(size = 12)))
+}
+
+# hourly sonde readings for one net pen; WebGL keeps thousands of points responsive
+sonde_panels <- function(s) {
+  panels <- imap(sonde_labels, function(label, par) {
+    p <- plot_ly(showlegend = FALSE)
+    for (sen in names(sensor_cols)) {
+      d <- sonde |> filter(site == s, sonde == sen) |>
+        transmute(datetime = format(datetime, "%Y-%m-%d %H:%M"), value = round(.data[[par]], 2)) |>   # short strings keep the file small
+        drop_na(value)
+      if (nrow(d) == 0) next
+      p <- add_trace(p, data = d, x = ~datetime, y = ~value, type = "scattergl", mode = "markers",
+                     marker = list(color = sensor_cols[[sen]], size = 3), name = sen,
+                     hovertemplate = paste0("%{x|%d %b %Y %H:%M}<br><b>%{y:.3g}</b> ", sonde_units[[par]], " (", sen, ")<extra></extra>"))
+    }
+    p |> layout(annotations = panel_title(label), xaxis = list(title = "", tickfont = list(size = 9), nticks = 10, tickformat = "%b %Y"),
+                yaxis = list(title = "", tickfont = list(size = 9)))
+  })
+  sp <- subplot(unname(panels), nrows = length(panels), margin = c(0.04, 0.04, 0.05, 0.05), shareX = FALSE, titleY = FALSE)
+  sp <- link_axes(sp, length(panels))
+  sp$height <- 950
+  sp
+}
+
+# daily satellite chlorophyll-a plus the number of valid pixels behind each value
+chla_panels <- function() {
+  p1 <- plot_ly(showlegend = TRUE) |>
+    add_trace(data = chla, x = ~date, y = ~chla_90per, type = "scatter", mode = "markers", name = "90th percentile",
+              marker = list(color = "lightgreen", size = 4), hovertemplate = "%{x|%d %b %Y}<br>90th pct <b>%{y:.3g}</b><extra></extra>") |>
+    add_trace(data = chla, x = ~date, y = ~chla_mean, type = "scatter", mode = "markers", name = "Mean",
+              marker = list(color = "darkgreen", size = 4), hovertemplate = "%{x|%d %b %Y}<br>mean <b>%{y:.3g}</b><extra></extra>") |>
+    layout(annotations = panel_title("Chlorophyll-a (units not stated)"), legend = list(orientation = "h", y = 1.12, x = 0.35),
+           xaxis = list(title = "", tickfont = list(size = 9)), yaxis = list(title = "", tickfont = list(size = 9)))
+  p2 <- plot_ly(showlegend = FALSE) |>
+    add_trace(data = chla, x = ~date, y = ~pixelcount, type = "bar", marker = list(color = "grey60"),
+              hovertemplate = "%{x|%d %b %Y}<br><b>%{y}</b> valid pixels<extra></extra>") |>
+    layout(annotations = panel_title("Valid satellite pixels per day (0 = no data)"),
+           xaxis = list(title = "", tickfont = list(size = 9)), yaxis = list(title = "", tickfont = list(size = 9)))
+  sp <- subplot(p1, p2, nrows = 2, heights = c(0.65, 0.35), margin = c(0.04, 0.04, 0.08, 0.05), shareX = FALSE, titleY = FALSE)
+  sp <- link_axes(sp, 2)
+  sp$height <- 650
+  sp
+}
+
+tab_defs <- list(
+  list(title = "Gerber_NP", note = paste0("Net pen, south: hourly sonde readings (", fmt(min(sonde$date[sonde$site == "Gerber_NP"])), " to ",
+                                         fmt(max(sonde$date[sonde$site == "Gerber_NP"])), ")."),
+       widget = function() sonde_panels("Gerber_NP")),
+  list(title = "Gerber_NPN", note = paste0("Net pen, north: hourly sonde readings (", fmt(min(sonde$date[sonde$site == "Gerber_NPN"])), " to ",
+                                          fmt(max(sonde$date[sonde$site == "Gerber_NPN"])), ")."),
+       widget = function() sonde_panels("Gerber_NPN")),
+  list(title = "Satellite chlorophyll-a", note = "Daily summary of SFEI satellite imagery (the area covered is not documented). Days with 0 valid pixels have no value.",
+       widget = chla_panels)
+)
+
+for (tb in tab_defs) {
+  writeLines(c("", "", paste0("### ", tb$title), "", tb$note, ""))
+  print(htmltools::tagList(tb$widget()))
+}
+```
+
+# 5. Cyanobacteria samples
+
+```{r cyano-table}
+cyano |>
+  transmute(Date = date, Site = site, `Anatoxin-a` = atx, Cylindrospermopsin = cyl, Microcystin = mc, Saxitoxin = stx,
+            `Taxa observed` = taxa, Notes = notes) |>
+  kable(caption = "Cyanotoxin results (ug/L, assumed; 0 = not detected)")
+```
+
+Only 7 samples exist, so no trends can be drawn. Toxins were not detected in six of the seven; the exception is microcystin of
+`r max(cyano$mc, na.rm = TRUE)` ug/L on `r fmt(cyano$date[which.max(cyano$mc)])`. Bloom visibility and the dominant genera are recorded in free text
+(*Aphanizomenon*, *Microcystis*, *Dolichospermum*, *Gloeotrichia*).
+
+# 6. Things to note when using the data
+
+- **Seasonal, unequal coverage:** years and sites are not comparable season-for-season, because deployments start and end at different times.
+- **Extreme values:** pH reaches `r sprintf("%.1f", max(sonde$p_h, na.rm = TRUE))` (minimum `r sprintf("%.1f", min(sonde$p_h, na.rm = TRUE))`) and DO saturation `r sprintf("%.0f", max(sonde$do_sat, na.rm = TRUE))`%. These may be real (algal blooms) or sensor effects (fouling, calibration drift) and have not been checked against reference readings.
+- **Chlorophyll-a:** units and the area covered by the satellite pixels (whole reservoir or a subset) are not stated, and the maximum daily mean is an identical 134.6 in 2021, 2022 and 2023, which looks like a possible artifact worth checking with SFEI.
+- **Two sensor types:** the 2026 HOBO record at `Gerber_NP` only has temperature and DO.
+- **Stray row:** the sheet has one extra row with only a date (1 Oct 2026, after the last real reading); it was ignored.
+

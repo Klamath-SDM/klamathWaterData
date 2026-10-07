@@ -1,0 +1,229 @@
+---
+title: "Lakeside Farms Water Quality Monitoring Data Exploration"
+author: "Badhia Yunes Katz"
+date: "October 2026"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, fig.width = 9, fig.height = 4.5)
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(lubridate)
+library(leaflet)
+library(plotly)
+library(htmltools)
+library(knitr)
+```
+
+```{r read}
+f <- "data-raw/skinner-wq-data/Lakeside Farms WQ monitoring.xlsx"
+
+sites_raw <- read_excel(f, sheet = "Sample sites", .name_repair = "minimal") |> clean_names()
+
+num_cols <- c("staff_plate", "temp", "sp_cond", "depth_m", "p_h", "do_sat", "do_conc",
+              "tdp", "tp", "po4", "nh3", "n_ox", "tn", "pp", "per_pp", "n_p")
+
+# all columns read as text: "NA" is stored as literal text in many cells
+wq <- read_excel(f, sheet = "Lakeside_data", col_types = "text", .name_repair = "minimal") |>
+  clean_names() |>
+  mutate(across(everything(), ~ na_if(.x, "NA")),
+         date = as.Date(as.numeric(date), origin = "1899-12-30"),
+         across(all_of(num_cols), as.numeric))
+
+perm_sites <- c("SPR-N", "SUK-N", "WET-NE", "WET-M")
+perm <- wq |> filter(site_type == "Primary", site %in% perm_sites)
+
+visits <- wq |> distinct(date) |> arrange(date) |>
+  mutate(days_since_prev = as.numeric(date - lag(date)))
+big_gap <- visits |> slice_max(days_since_prev, n = 1)
+```
+
+This report describes the Lakeside Farms water quality monitoring workbook
+(`data-raw/skinner-wq-data/Lakeside Farms WQ monitoring.xlsx`): where the data were collected, what was measured, over
+what period, and what to watch out for when using it.
+
+# At a glance
+
+| | |
+|---|---|
+| **Where** | Four permanent sampling points on the Lakeside Farms property: a spring-fed pond, a sucker pond, and two points in a wetland. Condition-dependent canal sites were sampled occasionally. |
+| **When** | `r format(min(wq$date), "%d %b %Y")` to `r format(max(wq$date), "%d %b %Y")`, about monthly (`r n_distinct(wq$date)` sampling visits) |
+| **What** | Field readings (temperature, conductivity, pH, dissolved oxygen) and lab nutrient concentrations (phosphorus and nitrogen forms) |
+| **Type** | Discrete grab samples, one set of values per site per visit (not continuous sensors) |
+| **Main gap** | `r format(big_gap$date - big_gap$days_since_prev, "%d %b %Y")` to `r format(big_gap$date, "%d %b %Y")` (`r big_gap$days_since_prev` days, Oct-Dec 2025 unsampled) |
+
+# 1. Where the data were collected
+
+```{r coords}
+site_tbl <- sites_raw |>
+  mutate(coordinates = str_squish(coordinates)) |>
+  separate(coordinates, c("latitude", "longitude"), sep = ",", convert = TRUE) |>
+  left_join(count(wq, site, name = "n_samples"), by = c("site_code" = "site")) |>
+  select(site_code, site_name, site_type, reason_selected, latitude, longitude, n_samples)
+
+site_tbl |>
+  filter(site_code %in% perm_sites) |>
+  mutate(site_code = factor(site_code, levels = perm_sites)) |>
+  arrange(site_code) |>
+  select(Site = site_code, Name = site_name, `Why it is monitored` = reason_selected, Samples = n_samples) |>
+  kable(caption = "Permanent sites (sampled at nearly every visit)")
+```
+
+```{r map}
+site_tbl |>
+  drop_na(latitude, longitude) |>
+  leaflet() |>
+  addProviderTiles("Esri.WorldImagery") |>
+  addCircleMarkers(~longitude, ~latitude, radius = 8, color = "white", weight = 1,
+                   fillColor = "steelblue", fillOpacity = 0.9,
+                   label = ~paste0(site_code, " - ", site_name),
+                   popup = ~paste0("<b>", site_code, "</b><br>", site_name, "<br>", n_samples, " samples"),
+                   labelOptions = labelOptions(noHide = TRUE, direction = "right"))
+```
+
+Other sites in the workbook (not plotted below, and no coordinates are given for them):
+
+- **Canal sites** `ECAN-NE`, `NCAN-NE` (sampled when pumps were on) and `WCAN` (sampled when water flowed to the wetland): 3-10 samples each.
+- **One-off samples:** `ECAN-SE` and `WET-SE` (at the landowner's request) and `Wocus` (not in the site list).
+- **Staff-plate sites** `SPR-M`, `SUK-M`, `WET-S` only record water level on a staff plate, not water quality.
+- **QA/QC samples** (field blanks and duplicates) appear as extra site names ending in `b` or `d`, e.g. `WET-NEd`.
+
+# 2. What was measured
+
+```{r param-table}
+param_tbl <- tribble(
+  ~col,      ~Parameter,                           ~Code,      ~Unit,      ~Method,
+  "temp",    "Water temperature",                  "Temp",     "°C",       "Field (YSI meter)",
+  "sp_cond", "Specific conductance",               "SpCond",   "uS/cm",    "Field (YSI meter)",
+  "p_h",     "pH",                                 "pH",       "std units","Field (YSI meter)",
+  "do_conc", "Dissolved oxygen concentration",     "DO_conc",  "mg/L",     "Field (YSI meter)",
+  "do_sat",  "Dissolved oxygen saturation",        "DO_sat",   "%",        "Field (YSI meter)",
+  "tdp",     "Total dissolved phosphorus",         "TDP",      "ug/L",     "Lab",
+  "tp",      "Total phosphorus",                   "TP",       "ug/L",     "Lab",
+  "po4",     "Orthophosphate",                     "PO4",      "ug/L",     "Lab",
+  "nh3",     "Ammonia",                            "NH3",      "ug/L",     "Lab",
+  "n_ox",    "Nitrate/nitrite",                    "NOx",      "ug/L",     "Lab",
+  "tn",      "Total nitrogen",                     "TN",       "ug/L",     "Lab"
+)
+
+param_tbl |>
+  mutate(`% of permanent-site samples with a value` =
+           map_dbl(col, ~ round(100 * mean(!is.na(perm[[.x]])))) ) |>
+  select(-col) |>
+  kable()
+```
+
+The workbook also has sonde depth (`Depth`, partly filled), staff-plate readings (stage, at three sites), and three
+values calculated from the lab results (particulate phosphorus `PP`, `Per_PP`, and the N:P ratio `N_P`). These are not plotted.
+
+# 3. Time period and gaps
+
+- **Period:** `r format(min(wq$date), "%d %b %Y")` to `r format(max(wq$date), "%d %b %Y")`, covering every season including winter.
+- **Frequency:** roughly monthly (median `r median(visits$days_since_prev, na.rm = TRUE)` days between visits; mostly one visit per month).
+- **Completeness:** all four permanent sites were sampled on every visit, except 23 Mar 2023 when only WET-NE was sampled.
+- **Main gap:** `r format(big_gap$date - big_gap$days_since_prev, "%d %b %Y")` to `r format(big_gap$date, "%d %b %Y")` (`r big_gap$days_since_prev` days), so Oct-Dec 2025 has no data. All other gaps between visits are 49 days or less.
+- **Field-reading gaps:** a few YSI readings are missing, most often specific conductance and pH (each ~97% present at the permanent sites; the notes mention a "pH sensor issue" on some visits). Nutrients are essentially complete.
+
+# 4. Time series at the permanent sites
+
+Each tab shows all parameters for one permanent site, from May 2022 to Jan 2026. Orange panels are field readings and blue panels are
+lab nutrients. The plots are interactive: hover for the exact date and value, drag to zoom (all panels in a tab zoom together) and
+double-click to reset. Open red circles at zero are nutrient values reported as `0`, i.e. **below the detection limit** (not true zeros).
+Each panel has its own y-axis.
+
+```{r plotly-deps, echo = FALSE}
+# widgets printed inside the results = "asis" loop below do not register their JS dependencies on their own;
+# an empty widget here makes knitr include plotly.js in the page
+dummy <- plot_ly(x = 1, y = 1, type = "scatter", mode = "markers", marker = list(opacity = 0)) |>
+  layout(margin = list(t = 0, b = 0, l = 0, r = 0), xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
+dummy$height <- 1
+htmltools::tagList(dummy)
+```
+
+```{=html}
+<script>
+// plotly widgets drawn inside hidden tabs have no width; resize them when their tab is opened
+document.addEventListener("click", function (e) {
+  if (!e.target.closest(".tabset")) return;
+  setTimeout(function () {
+    document.querySelectorAll(".plotly.html-widget").forEach(function (w) {
+      if (w.offsetParent !== null && window.Plotly) Plotly.Plots.resize(w);
+    });
+  }, 200);
+});
+</script>
+```
+
+## Time series by site {.tabset .tabset-pills}
+
+```{r param-tabs, results = "asis"}
+param_labels <- c(temp = "Temperature (°C)", sp_cond = "Sp. conductance (uS/cm)", p_h = "pH",
+                  do_conc = "DO (mg/L)", do_sat = "DO saturation (%)",
+                  tdp = "TDP (ug/L)", tp = "TP (ug/L)", po4 = "PO4 (ug/L)",
+                  nh3 = "NH3 (ug/L)", n_ox = "NOx (ug/L)", tn = "TN (ug/L)")
+nutrient_cols <- c("tdp", "tp", "po4", "nh3", "n_ox", "tn")
+
+perm_long <- perm |>
+  select(date, site, all_of(names(param_labels))) |>
+  pivot_longer(all_of(names(param_labels)), names_to = "parameter", values_to = "value") |>
+  drop_na(value) |>
+  mutate(below_dl = parameter %in% nutrient_cols & value == 0) |>
+  arrange(site, parameter, date)
+
+# one interactive panel per parameter; x-axes are linked, so zooming one panel zooms all of them
+site_panels <- function(s) {
+  panels <- imap(param_labels, function(label, par) {
+    d <- perm_long |> filter(site == s, parameter == par)
+    col <- if (par %in% nutrient_cols) "steelblue" else "darkorange"
+    unit <- str_trim(str_remove(str_extract(label, "[(].*[)]$"), "[()]"))
+    unit <- replace_na(str_remove(unit, "[)]$"), "")   # pH has no unit
+    plot_ly(showlegend = FALSE) |>
+      add_trace(data = d, x = ~date, y = ~value, type = "scatter", mode = "lines+markers",
+                line = list(color = "grey70", width = 1),
+                marker = list(color = col, size = 6, line = list(color = "white", width = 0.5)),
+                hovertemplate = paste0("%{x|%d %b %Y}<br><b>%{y:.3g}</b> ", unit, "<extra></extra>")) |>
+      add_trace(data = filter(d, below_dl), x = ~date, y = ~value, type = "scatter", mode = "markers",
+                marker = list(color = "white", size = 7, line = list(color = "firebrick", width = 1.5)),
+                hovertemplate = "%{x|%d %b %Y}<br>below detection (0)<extra></extra>") |>
+      layout(annotations = list(list(text = paste0("<b>", label, "</b>"), x = 0, y = 1.02, xref = "paper", yref = "paper",
+                                     xanchor = "left", yanchor = "bottom", showarrow = FALSE, font = list(size = 12))),
+             xaxis = list(title = "", tickfont = list(size = 9), nticks = 6),
+             yaxis = list(title = "", tickfont = list(size = 9)))
+  })
+  sp <- subplot(unname(panels), nrows = 6, margin = c(0.04, 0.04, 0.05, 0.05), shareX = FALSE, titleY = FALSE)
+  # link every x-axis to the first one
+  ax <- paste0("xaxis", c("", 2:length(panels)))
+  sp <- do.call(layout, c(list(sp), setNames(rep(list(list(matches = "x")), length(ax)), ax[-1])))
+  sp <- sp |> layout(margin = list(t = 30)) |> config(displaylogo = FALSE)
+  sp$height <- 1100   # container height (px) of the widget
+  sp
+}
+
+for (s in perm_sites) {
+  desc <- site_tbl$site_name[site_tbl$site_code == s]
+  writeLines(c("", "", paste0("### ", s), "", desc, ""))
+  print(htmltools::tagList(site_panels(s)))
+}
+```
+
+## What the plots show {.unlisted .unnumbered}
+
+- **Site differences:** **SPR-N** (spring pond, control) has the lowest conductivity and total nitrogen. **SUK-N** (sucker pond) is similar in phosphorus but higher in nitrogen. The wetland sites (**WET-M**, **WET-NE**) have the highest conductivity, phosphorus and nitrogen (median TP about 190-210 ug/L vs 60-70 ug/L at the ponds).
+- **Trends:** specific conductance and total nitrogen decline from 2022 into 2023-2024 at SUK-N and the wetland sites, while SPR-N stays flat.
+- **Seasonality:** temperature follows a clear annual cycle at every site.
+- **Extremes:** DO drops below about 2 mg/L at times at every site, and pH has occasional spikes above 9.5.
+
+# 5. Things to note when using the data
+
+- **Below-detection values:** nutrient results of `0` mean "below the minimum detection limit", not a true zero. This is common for NOx (about a third of values) and NH3 (18%). The detection limits themselves are not given in the workbook.
+- **Field notes:** the notes column records useful context such as ice cover (the crew broke ice to sample on several winter visits), headgate positions between ponds and wetland, pumping to Upper Klamath Lake, and observations of the cyanobacterium *Aphanizomenon flos-aquae* (AFA).
+- **Reference thresholds in the workbook:** the provider's own figures mark an ODA criterion of 190 ug/L total phosphorus for turning pumps off, a DO level below which suckers are likely stressed, and an N:P ratio below which nitrogen-fixing cyanobacteria (e.g. AFA) may be favored. They are described in the workbook's Metadata tab; the values for the last two are not given.
+- **QA/QC:** field blanks and duplicates are in the sheet as separate rows; whether they passed is recorded only in free-text notes (e.g. "all dups pass", "NH3 blank fails").
+- **Only four sites have coordinates.** The canal and one-off sites have none.
+
