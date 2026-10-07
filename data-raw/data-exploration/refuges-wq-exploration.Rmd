@@ -1,7 +1,7 @@
 ---
 title: "Refuges Water Quality Data Exploration (Lower Klamath and Tule Lake NWR)"
 author: "Badhia Yunes Katz"
-date: "September 2026"
+date: "October 2026"
 output:
   html_document:
     toc: true
@@ -16,28 +16,17 @@ library(readxl)
 library(janitor)
 library(lubridate)
 library(leaflet)
+library(plotly)
+library(htmltools)
 library(knitr)
 ```
-
-This report explores the "Refuges water quality data for Recovery" workbook
-(`data-raw/skinner-wq-data/Refuges water quality data for Recovery.xlsx`) to understand its temporal coverage, data gaps and
-collection points, and how it could be formatted like the other water quality objects in klamathWaterData.
-
-The workbook covers Lower Klamath National Wildlife Refuge (LKNWR) and Tule Lake National Wildlife Refuge (TLNWR).
-The tabs used in this report:
-
-| Tab | Content |
-|---|---|
-| 2024+ sampling sites, 2021-2023 cyano sampling sites | Site descriptions and coordinates |
-| Metadata | Column definitions |
-| YSI | Sonde data: hourly continuous records plus a few discrete readings |
-| Nutrient and cyano data | Discrete nutrient and cyanotoxin samples (2021-2026) |
-| AR_Q, Ady_Q, Unit 2 WSE | Daily flow (Anderson Rose, Ady Canal) and Unit 2 water surface elevation |
-| Notes on observed taxa, State of CA tabs | Reference material (not analysed here) |
 
 ```{r read}
 f <- "data-raw/skinner-wq-data/Refuges water quality data for Recovery.xlsx"
 excel_date <- function(x) as.Date(as.numeric(x), origin = "1899-12-30")
+fmt <- function(d) format(d, "%d %b %Y")
+
+# "NA" is stored as literal text in many cells, so everything is read as text first
 read_txt <- function(sheet) {
   read_excel(f, sheet = sheet, col_types = "text", .name_repair = "minimal") |>
     clean_names() |>
@@ -50,13 +39,13 @@ nut_cols   <- c("tdp", "tp", "po4", "nh3", "n_ox", "tn", "pp", "per_pp", "n_p")
 tox_cols   <- c("atx", "cyl", "mc", "stx")
 
 ysi <- read_txt("YSI") |>
-  mutate(date = excel_date(date), site = fix_site(site),
-         across(all_of(sonde_cols), as.numeric))
+  mutate(date = excel_date(date), site = fix_site(site), across(all_of(sonde_cols), as.numeric))
+cont <- ysi |> filter(type == "Continuous")
 
 nc <- read_txt("Nutrient and cyano data ") |>
-  mutate(date = excel_date(date), site = fix_site(site),
-         across(all_of(c(nut_cols, tox_cols)), as.numeric))
+  mutate(date = excel_date(date), site = fix_site(site), across(all_of(c(nut_cols, tox_cols)), as.numeric))
 
+# site coordinates come from the two site tabs and from the coordinates recorded in the data
 sites_2024 <- read_excel(f, sheet = "2024+ sampling sites", .name_repair = "minimal") |>
   clean_names() |> transmute(site = fix_site(site_name), description = site_description, coordinates)
 sites_2021 <- read_excel(f, sheet = "2021-2023 cyano sampling sites", .name_repair = "minimal") |>
@@ -64,271 +53,343 @@ sites_2021 <- read_excel(f, sheet = "2021-2023 cyano sampling sites", .name_repa
   transmute(site = fix_site(site_id), description = NA_character_, coordinates)
 sites_data <- nc |> filter(!is.na(coordinates)) |>
   distinct(site, .keep_all = TRUE) |> select(site, description = site_description, coordinates)
-```
 
-# 1. Collection points
-
-Sites come from three places (the two site tabs and the coordinates recorded in the data), so they are combined here.
-Site ids use both `-` and `_` (e.g. `TLNWR1a-NL` / `TLNWR1a_NL`); they were standardised to `_`.
-
-```{r sites}
 site_coords <- bind_rows(sites_2024, sites_2021, sites_data) |>
   distinct(site, .keep_all = TRUE) |>
   separate(coordinates, c("latitude", "longitude"), sep = ",", convert = TRUE) |>
   mutate(latitude = as.numeric(latitude), longitude = as.numeric(longitude))
 
-all_dates <- bind_rows(ysi |> transmute(site, date, dataset = paste0("sonde (", str_to_lower(type), ")")),
-                       nc  |> transmute(site, date, dataset = "nutrient/cyano"))
-
-site_tbl <- all_dates |>
+site_tbl <- bind_rows(ysi |> transmute(site, date, dataset = paste0("sonde (", str_to_lower(type), ")")),
+                      nc  |> transmute(site, date, dataset = "nutrient/cyano")) |>
   group_by(site) |>
-  summarise(sonde_continuous_days = n_distinct(date[dataset == "sonde (continuous)"]),
-            sonde_discrete = sum(dataset == "sonde (discrete)"),
+  summarise(sonde_days = n_distinct(date[dataset == "sonde (continuous)"]),
+            discrete_readings = sum(dataset == "sonde (discrete)"),
             nutrient_cyano_samples = sum(dataset == "nutrient/cyano"),
             first = min(date), last = max(date), .groups = "drop") |>
   left_join(site_coords, by = "site") |>
   mutate(refuge = if_else(str_starts(site, "LKNWR"), "Lower Klamath", "Tule Lake")) |>
-  arrange(refuge, site) |>
-  select(refuge, site, description, latitude, longitude, everything())
+  arrange(refuge, site)
 
-kable(site_tbl)
+cont_sites <- site_tbl$site[site_tbl$sonde_days > 0]
+
+# one row per site / year of continuous sonde data
+deployments <- cont |>
+  group_by(site, year) |>
+  summarise(first = min(date), last = max(date), days = n_distinct(date), .groups = "drop") |>
+  arrange(site, first)
+
+neg_do <- round(100 * mean(cont$do_conc < 0, na.rm = TRUE))
 ```
 
-- **`r nrow(site_tbl)` sites** in total: `r sum(site_tbl$refuge == "Lower Klamath")` at Lower Klamath and `r sum(site_tbl$refuge == "Tule Lake")` at Tule Lake.
-- **Continuous sonde** sites are `LKNWR_NE` (2023), `LKNWR_AI` (2024-2025), `TLNWR1a_DH` (2024) and `TLNWR1a_LRI` (2024-2025).
-- **Cyano/nutrient sampling** was routine at Sheepy Lake (`LKNWR_SLBR`, `LKNWR_WSL`) and Tule Lake sump 1A/1B (`_BR`, `_NL`, `_SW`, `_NW`) in 2021-2023. After April 2023 only a few sites were sampled, mostly during blooms (`TLNWR1a_DH` continues to 2026).
-- Sites such as `TLNWR1a_EN`, `_SPR`, `_STN` and the `bot` (bottom) samples are one-off readings; `LKNWR_NE` has no coordinates or description.
-- `LKNWR_AI` and `LKNWR_SLBR` share the same coordinates in the site tab.
+This report describes the "Refuges water quality data for Recovery" workbook
+(`data-raw/skinner-wq-data/Refuges water quality data for Recovery.xlsx`) from Lower Klamath and Tule Lake National Wildlife Refuges:
+where the data were collected, what was measured, over what period, and what to watch out for when using it.
+
+# At a glance
+
+| | |
+|---|---|
+| **Where** | `r nrow(site_tbl)` sites on two refuges: `r sum(site_tbl$refuge == "Lower Klamath")` at Lower Klamath (Sheepy Lake area) and `r sum(site_tbl$refuge == "Tule Lake")` at Tule Lake (sumps 1A and 1B) |
+| **Continuous sonde data** | Hourly readings at `r length(cont_sites)` sites, `r fmt(min(cont$date))` to `r fmt(max(cont$date))`, in seasonal deployments |
+| **Nutrient and cyanotoxin samples** | `r nrow(nc)` samples, `r fmt(min(nc$date))` to `r fmt(max(nc$date))`, at `r n_distinct(nc$site)` sites (nutrients at one site only) |
+| **Context series** | Daily flow (Anderson Rose and Ady Canal) and Unit 2 water surface elevation |
+| **Main gaps** | No continuous data in winter, none in 2021, 2022 or 2026; sampling dropped sharply after April 2023 |
+
+# 1. Where the data were collected
+
+```{r cont-sites}
+site_tbl |>
+  filter(sonde_days > 0) |>
+  left_join(deployments |> group_by(site) |> summarise(Period = paste(fmt(min(first)), "-", fmt(max(last)))), by = "site") |>
+  transmute(Site = site, Refuge = refuge, Description = coalesce(description, "(no description given)"),
+            Latitude = latitude, Longitude = longitude, `Continuous sonde period` = Period) |>
+  kable(caption = "Sites with continuous sonde data")
+```
 
 ```{r map}
 site_tbl |>
   drop_na(latitude, longitude) |>
-  mutate(has_sonde = sonde_continuous_days > 0) |>
+  mutate(has_sonde = sonde_days > 0) |>
   leaflet() |>
   addProviderTiles("Esri.WorldImagery") |>
   addCircleMarkers(~longitude, ~latitude, radius = 7, color = "white", weight = 1,
                    fillColor = ~if_else(has_sonde, "orange", "steelblue"), fillOpacity = 0.9,
                    label = ~site,
                    popup = ~paste0("<b>", site, "</b><br>", coalesce(description, ""),
-                                   "<br>Continuous sonde days: ", sonde_continuous_days,
+                                   "<br>Continuous sonde days: ", sonde_days,
                                    "<br>Nutrient/cyano samples: ", nutrient_cyano_samples)) |>
   addLegend("bottomright", colors = c("orange", "steelblue"),
             labels = c("Continuous sonde site", "Discrete sampling only"), opacity = 1)
 ```
 
-Sites without coordinates: `r paste(site_tbl$site[is.na(site_tbl$latitude)], collapse = ", ")`.
+- **Routine cyanotoxin sites (2021-2023):** Sheepy Lake (`LKNWR_SLBR`, `LKNWR_WSL`) and Tule Lake sumps 1A/1B (`TLNWR1a_BR`, `_NL`, `_SW`, `TLNWR1b_NW`). After April 2023 only a few sites were sampled, mostly during blooms; `TLNWR1a_DH` ("Donut Hole") continues to 2026.
+- **One-off sites:** `LKNWR_U3`, `TLNWR1a_EN`, `_SPR`, `_STN`, bottom-of-water-column samples (`_bot`) and a few early `TLNWR1a_1/2/3` and `_EC` samples.
+- **Missing coordinates:** `r paste(site_tbl$site[is.na(site_tbl$latitude)], collapse = ", ")` (not shown on the map).
 
-# 2. Sonde data (YSI tab)
+# 2. What was measured
 
-## 2.1 Temporal coverage
-
-```{r deployments}
-cont <- ysi |> filter(type == "Continuous")
-
-deployments <- cont |>
-  group_by(site, year) |>
-  summarise(first = min(date), last = max(date),
-            readings = n(), days_with_data = n_distinct(date),
-            span_days = as.numeric(max(date) - min(date)) + 1, .groups = "drop") |>
-  mutate(missing_days_in_span = span_days - days_with_data)
-
-kable(deployments, caption = "Continuous sonde deployments")
+```{r param-table}
+n_nut <- sum(!is.na(nc$tp))
+tibble(
+  Data = c("Sonde (hourly)", "Nutrients (lab)", "Cyanotoxins", "Cyanobacteria taxa", "Context (daily)"),
+  Parameters = c("Temperature, pH, dissolved oxygen (concentration and saturation), specific conductance, TDS, salinity, depth",
+                 "Total dissolved P, total P, orthophosphate, ammonia, nitrate/nitrite, total N",
+                 "Microcystin, saxitoxin, anatoxin-a, cylindrospermopsin",
+                 "Qualitative description of taxa present in the toxin sample",
+                 "Anderson Rose flow, Ady Canal flow, Unit 2 water surface elevation"),
+  Units = c("°C, std units, mg/L, %, uS/cm, mg/L, psu, m (depth is relative, not accurate)", "ug/L", "ug/L", "free text",
+            "flow units not stated; elevation in ft"),
+  Coverage = c(paste(length(cont_sites), "sites, hourly"),
+               paste(n_nut, "samples, all at TLNWR1a_DH"),
+               paste(sum(!is.na(nc$mc)), "samples at", n_distinct(nc$site[!is.na(nc$mc)]), "sites"),
+               "most cyano samples", "see section 6")
+) |> kable()
 ```
 
-```{r sonde-timeline}
-ysi |>
-  distinct(site, type, date) |>
-  mutate(site = fct_reorder(site, date, .fun = min)) |>
-  ggplot(aes(date, site, colour = type)) +
-  geom_point(shape = "|", size = 4) +
-  scale_colour_brewer(palette = "Dark2") +
-  guides(colour = guide_legend(override.aes = list(size = 4))) +
-  scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
-  labs(x = NULL, y = NULL, colour = "Record type", title = "Days with sonde data") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "top")
+A `0` in a nutrient or toxin column means **not detected / below the detection limit**, not a true zero. Per the workbook, nutrient analyses
+were done by the SRWQL lab. Particulate P, percent particulate P and the N:P ratio are calculated from the lab results.
+
+# 3. Time period and gaps
+
+```{r deployment-bullets, results = "asis"}
+# one line per continuous sonde site listing its seasonal records
+deployments |>
+  mutate(period = paste0(format(first, "%d %b"), " - ", format(last, "%d %b %Y"))) |>
+  group_by(site) |>
+  summarise(txt = paste0("- **", first(site), ":** ", paste(period, collapse = "; "))) |>
+  pull(txt) |>
+  writeLines()
 ```
 
-- Continuous records run from **`r min(cont$date)`** to **`r max(cont$date)`** and are hourly.
-- Records are seasonal, and each site has its own period: `LKNWR_NE` May-Sep 2023, `TLNWR1a_DH` May-Aug 2024 (sonde stopped 16 Aug 2024), `TLNWR1a_LRI` Aug 2024-Oct 2025 and `LKNWR_AI` May 2024-Oct 2025.
-- Winter gap: `LKNWR_AI` has no data from 12 Nov 2024 to 27 May 2025 (196 days), and `TLNWR1a_LRI` has no data from 26 Nov 2024 to 27 May 2025.
-- After the `TLNWR1a_DH` sonde ended in Aug 2024, that site only has discrete readings (4-6 per year).
-- There are no continuous data for any site in 2021, 2022 or 2026.
+**Gaps**
 
-## 2.2 Parameter completeness and value ranges
+- **No winter data:** continuous records run only from about May to November. `LKNWR_AI` and `TLNWR1a_LRI` have no data from late Nov 2024 to 27 May 2025.
+- **No continuous data** in 2021, 2022 or 2026.
+- **`TLNWR1a_DH`:** the sonde ended 14 Aug 2024; after that only discrete readings exist (4-6 per year).
+- **Nutrient and cyanotoxin samples:** dense in 2021-2022 (`r sum(year(nc$date) == 2021)` and `r sum(year(nc$date) == 2022)` samples), `r sum(year(nc$date) == 2023)` in 2023 (routine sites stopped in April 2023), then only 5-10 a year.
+- **Nutrients** were only measured at `TLNWR1a_DH` (`r n_nut` samples, 2024-2026).
 
-```{r completeness}
-cont |>
-  mutate(deployment = paste(site, year, sep = " / ")) |>
-  select(deployment, all_of(sonde_cols)) |>
-  pivot_longer(-deployment, names_to = "parameter", values_to = "value") |>
-  group_by(deployment, parameter) |>
-  summarise(pct = 100 * mean(!is.na(value)), .groups = "drop") |>
-  ggplot(aes(parameter, deployment, fill = pct)) +
-  geom_tile(colour = "white") +
-  geom_text(aes(label = round(pct)), size = 3) +
-  scale_fill_viridis_c(limits = c(0, 100), name = "% present") +
-  labs(x = NULL, y = NULL, title = "% of continuous readings with a value") +
-  theme_minimal()
+# 4. Time series
+
+Each tab shows one continuous sonde site. For readability the hourly readings are summarised to a **daily mean (line) with the daily minimum-maximum range (shaded)**.
+Breaks in the line are periods with no data. The plots are interactive: hover for the date and values, drag to zoom (all panels in a tab zoom together) and double-click to reset.
+Each panel has its own y-axis.
+
+```{r plotly-deps, echo = FALSE}
+# widgets printed inside the results = "asis" loop below do not register their JS dependencies on their own;
+# an empty widget here makes knitr include plotly.js in the page
+dummy <- plot_ly(x = 1, y = 1, type = "scatter", mode = "markers", marker = list(opacity = 0)) |>
+  layout(margin = list(t = 0, b = 0, l = 0, r = 0), xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
+dummy$height <- 1
+htmltools::tagList(dummy)
 ```
 
-```{r ranges}
-cont |>
-  select(all_of(c("temp", "p_h", "do_conc", "do_sat", "sp_cond", "depth"))) |>
-  pivot_longer(everything(), names_to = "parameter", values_to = "value") |>
-  group_by(parameter) |>
-  summarise(n = sum(!is.na(value)), min = min(value, na.rm = TRUE), median = median(value, na.rm = TRUE),
-            max = max(value, na.rm = TRUE), n_negative = sum(value < 0, na.rm = TRUE)) |>
-  kable(digits = 2)
+```{=html}
+<script>
+// plotly widgets drawn inside hidden tabs have no width; resize them when their tab is opened
+document.addEventListener("click", function (e) {
+  if (!e.target.closest(".tabset")) return;
+  setTimeout(function () {
+    document.querySelectorAll(".plotly.html-widget").forEach(function (w) {
+      if (w.offsetParent !== null && window.Plotly) Plotly.Plots.resize(w);
+    });
+  }, 200);
+});
+</script>
 ```
 
-- Temperature, pH, DO and conductivity are complete in every deployment. The battery (`bat`, `cab`) columns are empty for `LKNWR_NE`.
-- **Dissolved oxygen has a data-quality issue**: 13% of continuous DO readings are negative (down to -0.49 mg/L), all at `LKNWR_AI` and `TLNWR1a_LRI` in the summer months, and about a third of readings at those sites are below 1 mg/L. This looks like real low-oxygen conditions combined with a sensor offset near zero. DO saturation also reaches 341% (`TLNWR1a_DH`), likely bloom-driven or a sensor artifact.
-- The Notes column records sonde swaps ("New sonde"), "Reference check" readings, and algae fouling with wiper changes, which explain some jumps.
+## Time series by site {.tabset .tabset-pills}
 
-```{r ts, fig.height = 7}
-cont |>
-  mutate(doy_date = as.Date(paste0("2000-", format(date, "%m-%d"))), year = factor(year(date))) |>
-  select(doy_date, year, site, temp, do_conc, p_h) |>
-  pivot_longer(c(temp, do_conc, p_h), names_to = "parameter", values_to = "value") |>
+```{r tabs, results = "asis"}
+par_labels <- c(temp = "Temperature (°C)", p_h = "pH", do_conc = "DO (mg/L)",
+                do_sat = "DO saturation (%)", sp_cond = "Sp. conductance (uS/cm)")
+par_units  <- c(temp = "°C", p_h = "", do_conc = "mg/L", do_sat = "%", sp_cond = "uS/cm")
+
+# daily mean / min / max; missing calendar days are added as NA so the line breaks at gaps
+na_if_inf <- function(x) if_else(is.finite(x), x, NA_real_)
+daily <- cont |>
+  pivot_longer(all_of(names(par_labels)), names_to = "parameter", values_to = "value") |>
   drop_na(value) |>
-  ggplot(aes(doy_date, value, colour = site)) +
-  geom_point(size = 0.3, alpha = 0.4) +
-  facet_wrap(~parameter, scales = "free_y", ncol = 1) +
-  scale_colour_brewer(palette = "Dark2") +
-  guides(colour = guide_legend(override.aes = list(size = 4, alpha = 1))) +
-  scale_x_date(date_labels = "%b") +
-  labs(x = NULL, y = NULL, colour = "Site", title = "Hourly sonde readings by day of year") +
-  theme_minimal() +
-  theme(legend.position = "top", legend.text = element_text(size = 11))
+  group_by(site, parameter, date) |>
+  summarise(mean = mean(value), lo = min(value), hi = max(value), .groups = "drop") |>
+  group_by(site, parameter) |>
+  complete(date = seq(min(date), max(date), by = "day")) |>
+  ungroup()
+
+panel_title <- function(label) {
+  list(list(text = paste0("<b>", label, "</b>"), x = 0, y = 1.02, xref = "paper", yref = "paper",
+            xanchor = "left", yanchor = "bottom", showarrow = FALSE, font = list(size = 12)))
+}
+
+site_panels <- function(s) {
+  panels <- imap(par_labels, function(label, par) {
+    d <- daily |> filter(site == s, parameter == par) |>
+      mutate(txt = sprintf("%s<br><b>%.3g</b> %s (daily mean)<br>range %.3g to %.3g", format(date, "%d %b %Y"), mean, par_units[[par]], lo, hi))
+    # runs of consecutive days with data; the min-max band is drawn per run so it does not bridge gaps
+    d <- d |> mutate(run = cumsum(!is.na(mean) & is.na(lag(mean, default = NA_real_))))
+    p <- plot_ly(showlegend = FALSE)
+    for (r in unique(d$run[!is.na(d$mean)])) {
+      dr <- filter(d, run == r, !is.na(mean))
+      p <- p |>
+        add_trace(data = dr, x = ~date, y = ~hi, type = "scatter", mode = "lines", line = list(width = 0, color = "darkorange"), hoverinfo = "skip") |>
+        add_trace(data = dr, x = ~date, y = ~lo, type = "scatter", mode = "lines", line = list(width = 0, color = "darkorange"),
+                  fill = "tonexty", fillcolor = "rgba(255,140,0,0.25)", hoverinfo = "skip")
+    }
+    p |>
+      add_trace(data = d, x = ~date, y = ~mean, type = "scatter", mode = "lines+markers", text = ~txt, hoverinfo = "text",
+                line = list(color = "darkorange3", width = 1.2), marker = list(color = "darkorange3", size = 3)) |>
+      layout(annotations = panel_title(label), xaxis = list(title = "", tickfont = list(size = 9), nticks = 8, tickformat = "%b %Y"),
+             yaxis = list(title = "", tickfont = list(size = 9)))
+  })
+  sp <- subplot(unname(panels), nrows = length(panels), margin = c(0.04, 0.04, 0.05, 0.05), shareX = FALSE, titleY = FALSE)
+  ax <- paste0("xaxis", c("", 2:length(panels)))
+  sp <- do.call(layout, c(list(sp), setNames(rep(list(list(matches = "x")), length(ax) - 1), ax[-1])))
+  sp <- sp |> layout(margin = list(t = 30)) |> config(displaylogo = FALSE)
+  sp$height <- 950
+  sp
+}
+
+for (s in cont_sites) {
+  desc <- coalesce(site_tbl$description[site_tbl$site == s], "no description given")
+  per  <- deployments |> filter(site == s)
+  writeLines(c("", "", paste0("### ", s), "", paste0(desc, ". Continuous sonde: ", fmt(min(per$first)), " to ", fmt(max(per$last)), "."), ""))
+  print(htmltools::tagList(site_panels(s)))
+}
 ```
 
-TODO this plot could be improved to make the data easier to see. Options: facet by site, plot daily mean with min/max ribbons instead of hourly points, or use a larger point size with less overplotting.
+## What the plots show {.unlisted .unnumbered}
 
-# 3. Nutrient and cyanotoxin samples
+- **Seasonal pattern:** temperature rises through summer at every site, with the sondes only deployed from spring to autumn.
+- **Large daily swings:** the shaded min-max bands show that DO and pH move strongly within a day.
+- **Low oxygen:** at `LKNWR_AI` and `TLNWR1a_LRI` DO is often near or below zero in summer and autumn, which is partly a sensor issue (see section 7).
 
-## 3.1 Temporal coverage
+# 5. Nutrient and cyanotoxin samples
 
-```{r nc-timeline}
-nc |>
-  mutate(refuge = if_else(str_starts(site, "LKNWR"), "Lower Klamath", "Tule Lake"),
-         site = fct_reorder(site, date, .fun = min)) |>
-  ggplot(aes(date, site, colour = refuge)) +
-  geom_point(alpha = 0.7, size = 2) +
-  scale_colour_brewer(palette = "Dark2") +
-  guides(colour = guide_legend(override.aes = list(size = 4, alpha = 1))) +
-  scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
-  labs(x = NULL, y = NULL, colour = "Refuge", title = "Nutrient / cyano sampling dates") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "top")
+- `r nrow(nc)` samples from `r fmt(min(nc$date))` to `r fmt(max(nc$date))`: routine sampling at 6 sites in 2021-2022 (plus a few early one-off sites), then a few sites during blooms.
+- Cyanotoxins were measured at most events (`r sum(!is.na(nc$mc))` samples). Microcystin was detected in `r sum(nc$mc > 0, na.rm = TRUE)` of them, with the highest values at `LKNWR_SLBR` (11.7 ug/L), `TLNWR1a_DH` (8.84) and `TLNWR1a_BR` (8.26).
+- Nutrients were only measured at `TLNWR1a_DH` (`r n_nut` samples): total P ranged from `r format(min(nc$tp, na.rm = TRUE), big.mark = ",")` to `r format(max(nc$tp, na.rm = TRUE), big.mark = ",")` ug/L and total N from `r format(min(nc$tn, na.rm = TRUE), big.mark = ",")` to `r format(max(nc$tn, na.rm = TRUE), big.mark = ",")` ug/L.
+- Observed cyanobacteria genera and bloom notes are in the free-text `taxa` and `notes` columns.
+
+Each tab below is a time series of the individual samples (one point per sample, no averaging). Hover for the site, date and value, drag to zoom
+(all panels in a tab zoom together). **Open markers at zero are non-detects** (below the detection limit), not true zeros. The cyanotoxin tab includes all sites; click a site in the legend to hide or show it.
+
+## Samples over time {.tabset .tabset-pills}
+
+```{r nc-tabs, results = "asis"}
+panel_title <- function(label) {
+  list(list(text = paste0("<b>", label, "</b>"), x = 0, y = 1.02, xref = "paper", yref = "paper",
+            xanchor = "left", yanchor = "bottom", showarrow = FALSE, font = list(size = 12)))
+}
+link_axes <- function(sp, n) {
+  ax <- paste0("xaxis", c("", 2:n))
+  sp <- do.call(layout, c(list(sp), setNames(rep(list(list(matches = "x")), n - 1), ax[-1])))
+  sp |> layout(margin = list(t = 30)) |> config(displaylogo = FALSE)
+}
+
+# ---- cyanotoxins, all sites ----
+tox_labels <- c(mc = "Microcystin (ug/L)", stx = "Saxitoxin (ug/L)", atx = "Anatoxin-a (ug/L)", cyl = "Cylindrospermopsin (ug/L)")
+site_order <- nc |> group_by(site) |> summarise(first = min(date)) |> arrange(first) |> pull(site)
+site_cols  <- setNames(adjustcolor(unname(palette.colors(length(site_order), "Polychrome 36")), red.f = 0.75, green.f = 0.75, blue.f = 0.75), site_order)   # darkened so pale colors stay visible
+
+tox_widget <- function() {
+  legend_done <- character()   # sites that already have a legend entry (one per site, in the first panel where it has data)
+  panels <- imap(tox_labels, function(label, par) {
+    p <- plot_ly()
+    for (s in site_order) {
+      d <- nc |> filter(site == s) |> transmute(date, value = .data[[par]]) |> drop_na(value) |>
+        mutate(txt = paste0("<b>", s, "</b><br>", format(date, "%d %b %Y"), "<br>", if_else(value == 0, "not detected", paste(signif(value, 3), "ug/L"))))
+      for (det in c(TRUE, FALSE)) {   # detected (filled) first, so legend markers are filled whenever possible
+        dd <- if (det) filter(d, value > 0) else filter(d, value == 0)
+        if (nrow(dd) == 0) next
+        show <- !(s %in% legend_done)
+        if (show) legend_done <<- c(legend_done, s)
+        p <- add_trace(p, data = dd, x = ~date, y = ~value, type = "scatter", mode = "markers", name = s, legendgroup = s,
+                       showlegend = show, text = ~txt, hoverinfo = "text",
+                       marker = list(color = site_cols[[s]], size = 8, symbol = if (det) "circle" else "circle-open",
+                                     line = list(color = site_cols[[s]], width = 1.5)))
+      }
+    }
+    p |> layout(annotations = panel_title(label), xaxis = list(title = "", tickfont = list(size = 9), tickformat = "%b %Y"),
+                yaxis = list(title = "", tickfont = list(size = 9), rangemode = "tozero"))
+  })
+  sp <- subplot(unname(panels), nrows = 4, margin = c(0.04, 0.04, 0.05, 0.05), shareX = FALSE, titleY = FALSE)
+  sp <- link_axes(sp, 4) |> layout(legend = list(title = list(text = "<b>Site</b>")))
+  sp$height <- 850
+  sp
+}
+
+# ---- nutrients, TLNWR1a_DH only ----
+nut_labels <- c(tp = "Total P (ug/L)", tdp = "Total dissolved P (ug/L)", po4 = "Orthophosphate (ug/L)",
+                tn = "Total N (ug/L)", nh3 = "Ammonia (ug/L)", n_ox = "Nitrate/nitrite (ug/L)")
+
+nut_widget <- function() {
+  panels <- imap(nut_labels, function(label, par) {
+    d <- nc |> filter(site == "TLNWR1a_DH") |> transmute(date, value = .data[[par]]) |> drop_na(value) |> arrange(date) |>
+      mutate(txt = paste0(format(date, "%d %b %Y"), "<br>", if_else(value == 0, "below detection (0)", paste(signif(value, 3), "ug/L"))))
+    plot_ly(showlegend = FALSE) |>
+      add_trace(data = d, x = ~date, y = ~value, type = "scatter", mode = "lines+markers", text = ~txt, hoverinfo = "text",
+                line = list(color = "grey70", width = 1), marker = list(color = "steelblue", size = 8)) |>
+      add_trace(data = filter(d, value == 0), x = ~date, y = ~value, type = "scatter", mode = "markers", text = ~txt, hoverinfo = "text",
+                marker = list(color = "white", size = 9, line = list(color = "firebrick", width = 1.5))) |>
+      layout(annotations = panel_title(label), xaxis = list(title = "", tickfont = list(size = 9), tickformat = "%b %Y"),
+             yaxis = list(title = "", tickfont = list(size = 9), rangemode = "tozero"))
+  })
+  sp <- subplot(unname(panels), nrows = 3, margin = c(0.05, 0.05, 0.08, 0.06), shareX = FALSE, titleY = FALSE)
+  sp <- link_axes(sp, 6)
+  sp$height <- 700
+  sp
+}
+
+tab_defs <- list(
+  list(title = "Cyanotoxins (all sites)", note = "Microcystin, saxitoxin, anatoxin-a and cylindrospermopsin in each sample.", widget = tox_widget),
+  list(title = "Nutrients (TLNWR1a_DH)", note = paste0("Lab nutrient results, the only site with nutrient data (", n_nut, " samples)."), widget = nut_widget)
+)
+for (tb in tab_defs) {
+  writeLines(c("", "", paste0("### ", tb$title), "", tb$note, ""))
+  print(htmltools::tagList(tb$widget()))
+}
 ```
 
-```{r nc-year}
-nc |> count(year = year(date), name = "samples") |> kable(caption = "Samples per year")
-```
-
-- **`r nrow(nc)` samples** from **`r min(nc$date)`** to **`r max(nc$date)`**.
-- Sampling was dense in 2021-2022 (93 and 114 samples) and ended for most routine sites in April 2023 (24 samples in 2023). From 2024 there are only 5-10 samples a year, mostly bloom-driven.
-- Notes explain some skipped sites, e.g. sites not sampled because two consecutive toxin results were non-detect.
-
-## 3.2 Which parameters were measured
-
-```{r nc-complete}
-nc |>
-  select(date, site, all_of(c(nut_cols, tox_cols))) |>
-  pivot_longer(-c(date, site), names_to = "parameter", values_to = "value") |>
-  group_by(parameter) |>
-  summarise(n_values = sum(!is.na(value)),
-            n_sites = n_distinct(site[!is.na(value)]),
-            first = min(date[!is.na(value)]), last = max(date[!is.na(value)]),
-            n_zero = sum(value == 0, na.rm = TRUE)) |>
-  kable(caption = "Non-missing values by parameter (n_zero = non-detect)")
-```
-
-- **Cyanotoxins (ATX, CYL, MC, STX)** were measured at most sampling events, with `0` meaning non-detect.
-- **Nutrients (TDP, TP, PO4, NH3, NOx, TN)** were only measured at `TLNWR1a_DH`, and only about a dozen times (2024-2026). The nutrient columns are empty for the 2021-2023 routine cyano sites.
-- As in the other workbooks, a nutrient value of `0` means below the detection limit, not a true zero.
-
-# 4. Flow and water level tabs
+# 6. Flow and water level (context series)
 
 ```{r ancillary}
-map_dfr(c(AR_Q = "AR_Q", Ady_Q = "Ady_Q", `Unit 2 WSE` = "Unit 2 WSE"), function(sh) {
-  d <- read_txt(sh) |> mutate(date = excel_date(date))
-  tibble(days = nrow(d), first = min(d$date), last = max(d$date),
-         missing_days = as.numeric(max(d$date) - min(d$date)) + 1 - n_distinct(d$date))
-}, .id = "tab") |>
-  mutate(content = c("Anderson Rose flow (Q), daily", "Ady Canal flow (Q), daily", "Unit 2 water surface elevation (ft)")) |>
+ctx <- bind_rows(
+  read_txt("AR_Q") |> transmute(series = "Anderson Rose flow (Q; units not stated)", date = excel_date(date), value = as.numeric(q)),
+  read_txt("Ady_Q") |> transmute(series = "Ady Canal flow (Q; units not stated)", date = excel_date(date), value = as.numeric(q)),
+  read_txt("Unit 2 WSE") |> transmute(series = "Unit 2 water surface elevation (ft)", date = excel_date(date), value = as.numeric(wse_ft))
+) |> drop_na(value)
+
+ctx |>
+  group_by(Series = series) |>
+  summarise(First = min(date), Last = max(date), `Days with data` = n_distinct(date), .groups = "drop") |>
   kable()
 ```
 
-- These are context series for interpreting the sonde and cyano data, not water quality.
-- Per the Metadata tab, Ady flow is from a USGS gage (site 11509250), Anderson Rose flow comes from TID daily reports, and Unit 2 water surface elevation was provided by refuge staff.
-- Units are not stated for the flow columns. The USGS Ady record could instead be pulled directly if needed for `flow_data`.
+These are context series for interpreting the sonde and cyano data (not water quality). Per the workbook, Ady flow comes from a USGS gage
+(site 11509250), Anderson Rose flow from TID daily reports, and Unit 2 elevation from refuge staff. Flow units are not stated.
+Unit 2 elevation is sparse before 2024 (`r sum(ctx$series == "Unit 2 water surface elevation (ft)" & year(ctx$date) < 2023)` reading before 2023, `r sum(ctx$series == "Unit 2 water surface elevation (ft)" & year(ctx$date) == 2023)` in 2023); the flow series only start in 2023 (Ady) and 2024 (Anderson Rose).
+Hover for values, drag to zoom (all panels zoom together).
 
-# 5. Formatting for klamathWaterData
-
-Existing continuous-data objects (`temperature_data`, `do_data`, `ph_data`) hold **daily** `mean` / `minimum` / `maximum`
-values with columns `location, gage_name, gage_id, variable_name, value, unit, statistic, date`, plus a `*_gage` table.
-Draft conversion of the **continuous** sonde data (days with at least 20 hourly readings; negative DO dropped):
-
-```{r package-format}
-param_map <- tribble(
-  ~col,      ~variable_name,      ~unit,
-  "temp",    "temperature",       "celsius",
-  "do_conc", "dissolved oxygen",  "mg/L",
-  "p_h",     "pH",                "std unit"
-)
-
-site_info <- site_tbl |>
-  mutate(location  = if_else(refuge == "Lower Klamath", "lower klamath national wildlife refuge",
-                             "tule lake national wildlife refuge"),
-         gage_name = str_to_lower(coalesce(description, site)),
-         gage_id   = paste0("REFUGES-", site)) |>
-  select(site, location, gage_name, gage_id, latitude, longitude)
-
-refuges_wq_data <- cont |>
-  select(site, date, all_of(param_map$col)) |>
-  pivot_longer(all_of(param_map$col), names_to = "col", values_to = "value") |>
-  filter(!is.na(value), !(col == "do_conc" & value < 0)) |>
-  group_by(site, date, col) |>
-  summarise(n = n(), mean = mean(value), minimum = min(value), maximum = max(value), .groups = "drop") |>
-  filter(n >= 20) |>
-  pivot_longer(c(mean, minimum, maximum), names_to = "statistic", values_to = "value") |>
-  left_join(param_map, by = "col") |>
-  left_join(site_info, by = "site") |>
-  select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
-  as.data.frame()
-
-refuges_wq_gage <- site_info |>
-  filter(site %in% cont$site) |>
-  transmute(gage_name, gage_id, agency = NA_character_, latitude, longitude,
-            river_mile = NA_real_, huc8 = NA_character_, location)
-
-refuges_wq_data |>
-  filter(statistic == "mean") |>
-  count(gage_id, variable_name, name = "n_days") |>
-  pivot_wider(names_from = variable_name, values_from = n_days) |>
-  kable(caption = "Daily records per site and variable")
+```{r ctx-plot}
+ctx_panels <- imap(split(ctx, factor(ctx$series, levels = unique(ctx$series))), function(d, label) {
+  d <- d |> arrange(date) |> mutate(txt = paste0(format(date, "%d %b %Y"), "<br><b>", signif(value, 4), "</b>"))
+  plot_ly(showlegend = FALSE) |>
+    add_trace(data = d, x = ~date, y = ~value, type = "scatter", mode = "lines+markers", text = ~txt, hoverinfo = "text",
+              line = list(color = "steelblue", width = 1.2), marker = list(color = "steelblue", size = 3)) |>
+    layout(annotations = panel_title(label), xaxis = list(title = "", tickfont = list(size = 9), tickformat = "%b %Y"),
+           yaxis = list(title = "", tickfont = list(size = 9)))
+})
+w <- subplot(unname(ctx_panels), nrows = 3, margin = c(0.04, 0.04, 0.07, 0.05), shareX = FALSE, titleY = FALSE)
+w <- link_axes(w, 3)
+w$height <- 650
+w
 ```
 
-`LKNWR_NE` has no coordinates, so it cannot get a gage location without the provider.
+# 7. Things to note when using the data
 
-# 6. Summary and open questions
-
-**Coverage**
-
-- Four sites have continuous hourly sonde data, all seasonal and non-overlapping in period: `LKNWR_NE` (2023), `LKNWR_AI` (2024-2025), `TLNWR1a_DH` (May-Aug 2024) and `TLNWR1a_LRI` (Aug 2024-Oct 2025). There is a winter gap (Nov-May) at both 2024-2025 sites.
-- Nutrient/cyanotoxin samples span 2021-2026 at 14 sites; they are dense in 2021-2023, then sparse. Nutrients are only available at `TLNWR1a_DH`.
-- Some sonde values are implausible (13% of DO readings negative at two sites, DO saturation up to 341%) and need a QC pass.
-
-**Decisions needed before adding to the package**
-
-1. **Sonde summarisation** - daily mean/min/max (as drafted, with a 20-reading minimum) or keep hourly values?
-2. **Which variables** - temperature, DO and pH map to existing objects; conductivity, TDS, salinity and depth would need new objects.
-3. **Nutrients and cyanotoxins** - the package has no nutrient or HAB objects yet. Add new objects, or leave out? Nutrients exist for only one site.
-4. **Discrete sonde readings** - include the 30 or so discrete YSI rows (e.g. top/bottom of water column, `Eagle's Nest`) or continuous data only?
-5. **QC** - how to treat negative DO (dropped in the draft above, which removes about 170 site-days (of ~750) at `LKNWR_AI` and `TLNWR1a_LRI`; alternatively set to 0 or flag) and other implausible values; confirm whether the provider has already QC'd the data ("Reference check" and "New sonde" rows are flagged in Notes).
-6. **Non-detects** - keep `0` as non-detect (with a flag) or set to missing? Detection limits are not provided.
-7. **`location` / `agency` / `huc8`** - the refuge names are placeholders; confirm data owner (USFWS refuge staff / partner lab) and HUC8.
-8. **Missing site information** - `LKNWR_NE` has no coordinates or description; site ids mix `-` and `_`; `LKNWR_AI` and `LKNWR_SLBR` share coordinates.
-9. **Flow and water level tabs** - Ady Q, Anderson Rose Q and Unit 2 WSE could feed `flow_data` / `water_level_data`; confirm units and whether to include them.
+- **Dissolved oxygen quality:** `r neg_do`% of continuous DO readings are negative (as low as -0.49 mg/L), almost all (99%) at `LKNWR_AI` and `TLNWR1a_LRI`, mostly July to October, and about 30% of readings at those two sites are below 1 mg/L. This looks like real low-oxygen conditions combined with a sensor offset near zero. DO saturation also reaches `r sprintf("%.0f", max(cont$do_sat, na.rm = TRUE))`% (`TLNWR1a_DH`), likely bloom-driven or a sensor artifact.
+- **Sensor notes:** the Notes column records sonde swaps ("New sonde"), "Reference check" readings and algae fouling with wiper changes, which explain some jumps.
+- **Site coverage differs:** the continuous sonde sites do not overlap in time, so sites and years cannot be compared season-for-season.
+- **Non-detects:** `0` means not detected; detection limits are not provided.
+- **Naming and locations:** site ids mix `-` and `_` (standardised to `_` here); `LKNWR_AI` and `LKNWR_SLBR` share the same coordinates; `LKNWR_NE` has no coordinates or description.
+- **Discrete sonde readings:** the YSI tab also has about 30 one-off discrete readings (including top and bottom of the water column), which are not plotted.
