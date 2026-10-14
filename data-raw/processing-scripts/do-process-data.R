@@ -192,6 +192,7 @@ all_usgs_do_raw_clean <- all_usgs_do_raw |>
                                     station_nm %in% c("Lake Ewauna Near Altamont, or - Bottom", "Lake Ewauna at Railroad Bridge Drawspan") ~ "Lake Ewauna",
                                     str_detect(str_to_lower(station_nm), "ukl") ~ "Upper Klamath Lake",
                                     station_nm == "Tulelake Cn a Sheepy Ridge Pumping Sta Nr Hatfield" ~ "Tule Lake",
+                                    gage_id == "420451121510000" ~ "Klamath River",
                                     T ~ waterbody_name)) |>
   glimpse()
 

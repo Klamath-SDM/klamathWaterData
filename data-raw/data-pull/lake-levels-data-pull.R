@@ -9,7 +9,7 @@ library(pins)
 
 #  USGS data ----
 # Standardized pull window - every source below uses this same start/end date.
-start_date <- as.Date("1996-01-01")
+start_date <- as.Date("1995-01-01")
 end_date   <- as.Date("2025-12-31")
 
 #### usgs lake water surface data ----

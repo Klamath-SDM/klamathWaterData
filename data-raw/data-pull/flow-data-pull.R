@@ -13,7 +13,7 @@ library(xml2)
 
 # Standardized pull window - every source below (WQX, USGS, USBR RISE, USBR
 # Hydromet, OWRD) uses this same start/end date.
-start_date <- as.Date("1996-01-01")
+start_date <- as.Date("1995-01-01")
 end_date   <- as.Date("2025-12-31")
 
 ### WQX data pull -----
@@ -93,6 +93,7 @@ usgs_gage_flow_data <- readNWISsite(usgs_gages)
 # pull with no change in the underlying data - just the standard mechanism
 # used by every other USBR Hydromet gage below.
 source("data-raw/data-pull/usbr-hydromet-pull-helpers.R")
+source("data-raw/data-pull/temperature-pull-helper-functions.R")
 
 # Pulled live rather than hand-transcribed, so coordinates stay accurate and
 # reproducible if a station's location record is ever corrected upstream.
@@ -157,7 +158,7 @@ usbr_hydromet_flow_data <- usbr_hydromet_flow_raw |>
 # (near_real_time_gage_station_kml.aspx) rather than hand-transcribed. See
 # owrd-pull-helpers.R (shared with temperature-process-data.R, which also
 # pulls a subset of these same stations for water temperature).
-source("data-raw/data-pull/owrd-pull-helpers.R")
+# source("data-raw/data-pull/owrd-pull-helpers.R")
 
 owrd_station_list <- tribble(
   ~site,      ~location,                   ~gage_name,
