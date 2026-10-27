@@ -60,7 +60,7 @@ end_date   <- as.Date("2025-12-31")
 # ------------------------------------------------------------
 
 # lat/long pulled live from the USBR RISE API (see fetch_rise_klamath_locations()
-# in usbr-hydromet-pull-helpers.R), which catalogs each Hydromet cbtt under a
+# in data-pull-helper-functions.R), which catalogs each Hydromet cbtt under a
 # named Reclamation location, rather than hand-transcribed here.
 # NOTE: LRD ("Lost River Reservoir and Diversion Dam") is used as the
 # archived-data proxy for the teacup's "LRDO" circle, but RISE shows these
@@ -68,7 +68,7 @@ end_date   <- as.Date("2025-12-31")
 # LRDO is "Lost River Diversion Channel at C-G Canal Crossing" (42.140669 /
 # -121.682313) downstream of the LRD dam site used here (42.142822 /
 # -121.672895).
-source("data-raw/data-pull/usbr-hydromet-pull-helpers.R")
+source("data-raw/data-pull/data-pull-helper-functions.R")
 
 rise_klamath_locations <- fetch_rise_klamath_locations()
 
@@ -92,7 +92,7 @@ usbr_stations <- tribble(
 
 # ------------------------------------------------------------
 # Pull/parse webarccsv.pl responses (shared with lake-levels and flow
-# pull scripts; see usbr-hydromet-pull-helpers.R)
+# pull scripts; see data-pull-helper-functions.R)
 # ------------------------------------------------------------
 
 usbr_batches <- split(usbr_stations, ceiling(seq_len(nrow(usbr_stations)) / 14))

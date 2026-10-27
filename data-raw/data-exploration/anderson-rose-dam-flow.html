@@ -1606,11 +1606,18 @@ year (Oct - Sep)</td>
 </tr>
 </tbody>
 </table>
-<p>This document reads both layouts, repairs the date problems found in
+<p>This document is the QA walkthrough for the Anderson-Rose step of the
+flow pipeline. It reads both layouts, repairs the date problems found in
 a handful of tabs, checks the result, and builds a daily series in the
-same shape as <code>flow_data</code> / <code>flow_gage</code> so it can
-be integrated into <code>flow-process-data.R</code> later. <strong>It
-does not modify any package data.</strong></p>
+same shape as <code>flow_data</code> / <code>flow_gage</code>. The same
+logic now runs in the pipeline: the workbooks are read in
+<code>flow-data-pull.R</code> (using
+<code>anderson-rose-pull-helpers.R</code>) and cleaned and added to
+<code>flow_data</code> / <code>flow_gage</code> in
+<code>flow-process-data.R</code>. <strong>This document does not modify
+any package data.</strong> It shows everything in the workbooks, while
+the pipeline clips to its standardized window (through 2025-12-31) like
+the other flow sources.</p>
 <pre class="r"><code>ar_dir &lt;- here(&quot;data-raw&quot;, &quot;anderson-rose-dam&quot;)
 
 # Identifiers for the flow_data / flow_gage rows. flow_data/flow_gage lowercase every
@@ -2596,20 +2603,20 @@ tibble(
 <code>flow_gage</code> rows.</p>
 </div>
 </div>
-<div id="notes-for-integrating-into-flow-process-data.r" class="section level2">
-<h2>Notes for integrating into <code>flow-process-data.R</code></h2>
+<div id="notes" class="section level2">
+<h2>Notes</h2>
 <ul>
-<li><strong><code>location</code> gets overwritten in the combine
-step.</strong> As of this writing the combine step does
-<code>mutate(location = tolower(stream))</code> on the stacked tables.
-Any table that carries its name in a <code>location</code> column
-instead of <code>stream</code> has it replaced with <code>NA</code>,
-which is currently what happens to the USBR Hydromet and OWRD rows
-(about 160,000 <code>flow_data</code> rows have no
-<code>location</code>). If Anderson-Rose is added to that
-<code>bind_rows()</code>, give it a <code>stream</code> column
-(<code>rename(stream = location)</code>) or fix the combine step
-first.</li>
+<li><strong>The <code>location</code> overwrite in the
+<code>flow_data</code> combine step is fixed.</strong> The combine step
+used to do <code>mutate(location = tolower(stream))</code> on the
+stacked tables, which replaced <code>location</code> with
+<code>NA</code> for any table that carries its name in a
+<code>location</code> column instead of <code>stream</code>: the USBR
+Hydromet and OWRD rows, about 160,000 <code>flow_data</code> rows. It
+now uses <code>coalesce(tolower(stream), location)</code>, and
+<code>flow-process-data.R</code> stops before saving if any
+<code>flow_data</code> location is missing or doesn’t match
+<code>flow_gage</code>.</li>
 <li><strong>Agency</strong> is assumed to be Tulelake Irrigation
 District from the workbook names, and the workbooks’ source (who
 compiles and shares them) is worth confirming for attribution.</li>

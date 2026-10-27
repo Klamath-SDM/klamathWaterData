@@ -30,9 +30,13 @@ come in two layouts:
 | 1996 - 2011 | `Daily YYYY.xls(x)`, one workbook per calendar year | the `SPILL` tab: a single grid of days (rows) by months (columns) |
 | WY 2011-12 onward | `TID Daily Report ... WY.xls(x)`, one workbook per water year (Oct - Sep) | one tab per month; the `ANDERSON-ROSE` column (called `ANDERSON-ROSE SPILL` in a couple of tabs) |
 
-This document reads both layouts, repairs the date problems found in a handful of tabs, checks the
-result, and builds a daily series in the same shape as `flow_data` / `flow_gage` so it can be
-integrated into `flow-process-data.R` later. **It does not modify any package data.**
+This document is the QA walkthrough for the Anderson-Rose step of the flow pipeline. It reads both
+layouts, repairs the date problems found in a handful of tabs, checks the result, and builds a
+daily series in the same shape as `flow_data` / `flow_gage`. The same logic now runs in the
+pipeline: the workbooks are read in `flow-data-pull.R` (using `data-pull-helper-functions.R`) and
+cleaned and added to `flow_data` / `flow_gage` in `flow-process-data.R`. **This document does not
+modify any package data.** It shows everything in the workbooks, while the pipeline clips to its
+standardized window (through 2025-12-31) like the other flow sources.
 
 ```{r config}
 ar_dir <- here("data-raw", "anderson-rose-dam")
@@ -429,14 +433,14 @@ Stacked onto the current objects this would give
 (`r format(nrow(flow_data), big.mark = ",")` + `r format(nrow(anderson_rose_flow_data), big.mark = ",")`)
 and `r nrow(flow_gage) + nrow(anderson_rose_flow_gage)` `flow_gage` rows.
 
-## Notes for integrating into `flow-process-data.R`
+## Notes
 
-* **`location` gets overwritten in the combine step.** As of this writing the combine step does
-  `mutate(location = tolower(stream))` on the stacked tables. Any table that carries its name in a
-  `location` column instead of `stream` has it replaced with `NA`, which is currently what happens to
-  the USBR Hydromet and OWRD rows (about 160,000 `flow_data` rows have no `location`). If
-  Anderson-Rose is added to that `bind_rows()`, give it a `stream` column (`rename(stream = location)`)
-  or fix the combine step first.
+* **The `location` overwrite in the `flow_data` combine step is fixed.** The combine step used to do
+  `mutate(location = tolower(stream))` on the stacked tables, which replaced `location` with `NA` for
+  any table that carries its name in a `location` column instead of `stream`: the USBR Hydromet and
+  OWRD rows, about 160,000 `flow_data` rows. It now uses `coalesce(tolower(stream), location)`, and
+  `flow-process-data.R` stops before saving if any `flow_data` location is missing or doesn't match
+  `flow_gage`.
 * **Agency** is assumed to be Tulelake Irrigation District from the workbook names, and the
   workbooks' source (who compiles and shares them) is worth confirming for attribution.
 * **Statistic** `"mean"` is an assumption about how the daily cfs figure is derived.
