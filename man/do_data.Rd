@@ -3,9 +3,9 @@
 \docType{data}
 \name{do_data}
 \alias{do_data}
-\title{Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC8 18010204)}
+\title{Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC6 180102)}
 \format{
-A tibble with 365,162 rows and 8 columns
+A tibble with 386,957 rows and 8 columns
 \itemize{
 \item \code{location}: location associated where data was collected/where gage is located
 \item \code{gage_name}: name of the gaging station
