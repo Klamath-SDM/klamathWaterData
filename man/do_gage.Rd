@@ -3,7 +3,7 @@
 \docType{data}
 \name{do_gage}
 \alias{do_gage}
-\title{Dissolved oxygen gages in the Klamath Basin watershed (HUC8 18010204)}
+\title{Dissolved oxygen gages in the Klamath Basin watershed (HUC6 180102)}
 \format{
 A tibble with 131 rows and 8 columns
 \itemize{

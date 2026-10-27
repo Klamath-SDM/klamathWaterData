@@ -3,7 +3,7 @@
 \docType{data}
 \name{flow_data}
 \alias{flow_data}
-\title{Publicly available flow data in the Klamath Basin watershed (HUC8 18010204)}
+\title{Publicly available flow data in the Klamath Basin watershed (HUC6 180102)}
 \format{
 A tibble with 436,361 rows and 8 columns
 \itemize{
