@@ -489,15 +489,8 @@ flow_data |>
             max_date = max(date),
             min_val = min(value),
             max_val = max(value),
-            n = n()) |> View()
+            n = n())
 
-klamathWaterData::flow_data  |>
-  group_by(gage_name) |>
-  summarise(min_date = min(date),
-            max_date = max(date),
-            min_val = min(value),
-            max_val = max(value),
-            n = n()) |> View()
 # ============================================================
 # Save
 # ============================================================
