@@ -99,7 +99,11 @@ usgs_gage_flow_data <- readNWISsite(usgs_gages)
 # what was previously pulled from the RISE API's result/download endpoint
 # (itemId=134084) for this same physical gage, so this replaces that bespoke
 # pull with no change in the underlying data - just the standard mechanism
-# used by every other USBR Hydromet gage below. (fetch_usbr_batch() and
+# used by every other USBR Hydromet gage below.
+#
+# Lost River below Clear Lake Dam (LRSC, the real-time "lrsc_q" discharge
+# series) is pulled the same way: "LRSC QD" is its daily archive record. It
+# only starts 2016-03-31 (empty before that), and has gaps in later years. (fetch_usbr_batch() and
 # fetch_rise_klamath_locations() are in data-pull-helper-functions.R.)
 
 # Pulled live rather than hand-transcribed, so coordinates stay accurate and
@@ -114,7 +118,8 @@ usbr_hydromet_flow_stations <- tribble(
   "LRD",  "QD",       "Lost River Diversion - Flow (cfs)",
   "HRPO", "QD",       "Lost River at Harpold Dam - Flow (cfs)",
   "LRS",  "QD",       "Clear Lake East Lobe / Lost River - Flow (cfs)",
-  "CHRO", "QD",       "Cherry Creek - Flow (cfs)"
+  "CHRO", "QD",       "Cherry Creek - Flow (cfs)",
+  "LRSC", "QD",       "Lost River below Clear Lake Dam - Flow (cfs)"
 ) |>
   left_join(rise_klamath_locations, by = "site")
 
@@ -133,7 +138,8 @@ usbr_hydromet_flow_data <- usbr_hydromet_flow_raw |>
       site == "LRD"  ~ "lost river diversion",
       site == "HRPO" ~ "lost river at harpold dam",
       site == "LRS"  ~ "clear lake east lobe / lost river",
-      site == "CHRO" ~ "cherry creek"
+      site == "CHRO" ~ "cherry creek",
+      site == "LRSC" ~ "lost river"
     ),
     gage_name = tolower(label),
     gage_id = paste0("usbr-", tolower(site)),
