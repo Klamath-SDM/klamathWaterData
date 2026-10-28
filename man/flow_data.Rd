@@ -22,5 +22,6 @@ flow_data
 }
 \description{
 Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX, USBR, and OWRD data portals.
+Anderson rose dam raw data files were shared directly by USBR.
 }
 \keyword{datasets}
