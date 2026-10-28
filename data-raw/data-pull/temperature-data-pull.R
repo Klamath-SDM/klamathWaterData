@@ -76,7 +76,7 @@ usgs_temp_gage_data <- readNWISsite(usgs_gages)
 
 ### OWRD data pull -----
 # sourcing helper functions
-source("data-raw/data-pull/temperature-pull-helper-functions.R")
+source("data-raw/data-pull/data-pull-helper-functions.R")
 
 #### temperature data ----
 owrd_temp_start_date <- as.Date("1996-01-01")
@@ -167,7 +167,7 @@ glimpse(temperature_data_owrd_raw)
 # Data Provisional. Do Not Cite without Karuk Tribe consent.") - get
 # sign-off from Karuk Tribe / KBMP before this is used in anything
 # published or operational.
-# temperature-pull-helper-functions.R
+# data-pull-helper-functions.R
 
 # Every value below was looked up by hand against the portal's own
 #  endpoints - not hand-guessed, and
@@ -263,7 +263,7 @@ glimpse(temperature_data_karuk_raw)
 #
 # This portal has no JSON API - Graph.php returns a full HTML page with
 # the chart's data embedded as a JS string (see
-# hoopa-wq-portal-pull-helpers.R). Unlike the Karuk portal, one request
+# data-pull-helper-functions.R). Unlike the Karuk portal, one request
 # returns the entire period of record at once (tested: ~53,000 rows /
 # ~7 years in ~3 seconds), no chunking needed.
 #

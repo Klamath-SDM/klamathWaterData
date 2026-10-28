@@ -3,15 +3,15 @@
 \docType{data}
 \name{temperature_gage}
 \alias{temperature_gage}
-\title{Temperature gages in the Klamath Basin watershed (HUC8 18010204)}
+\title{Temperature gages in the Klamath Basin watershed (HUC6 180102)}
 \format{
-A tibble with 96 rows and 8 columns
+A tibble with 167 rows and 8 columns
 \itemize{
 \item \code{location}: location associated where data was collected/where gage is located
 \item \code{gage_name}: name of the gaging station
 \item \code{gage_id}: unique identifier for the gage
 \item \code{agency}: agency responsible for operating or maintaining the gage (e.g., USGS, State of Oregon Dept. of Environmental Quality,
-Hoopa Valley Tribe (Tribal), USDA FS PIBO Monitoring Program)
+Hoopa Valley Tribe (Tribal), USDA FS PIBO Monitoring Program, Quartz Valley Indian Tribe, Karuk Tribe, Yurok Tribes)
 \item \code{latitude}: latitude coordinate of the gage location
 \item \code{longitude}: longitude coordinate of the gage location
 \item \code{river_mile}: closest river mile location relative to river mouth or a reference point

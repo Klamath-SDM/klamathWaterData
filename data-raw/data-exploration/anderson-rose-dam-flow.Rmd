@@ -1,0 +1,449 @@
+---
+title: "Anderson-Rose Dam Daily Flow"
+date: "October 2026"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, fig.width = 9, fig.height = 4.5)
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(knitr)
+library(sf)
+library(here)
+library(klamathWaterData)
+```
+
+## Overview
+
+Daily flow (cfs) at Anderson-Rose Dam on the Lost River, compiled from the Tulelake
+Irrigation District (TID) daily report workbooks in `data-raw/anderson-rose-dam/`. The workbooks
+come in two layouts:
+
+| Period | Files | Where Anderson-Rose is |
+|---|---|---|
+| 1996 - 2011 | `Daily YYYY.xls(x)`, one workbook per calendar year | the `SPILL` tab: a single grid of days (rows) by months (columns) |
+| WY 2011-12 onward | `TID Daily Report ... WY.xls(x)`, one workbook per water year (Oct - Sep) | one tab per month; the `ANDERSON-ROSE` column (called `ANDERSON-ROSE SPILL` in a couple of tabs) |
+
+This document is the QA walkthrough for the Anderson-Rose step of the flow pipeline. It reads both
+layouts, repairs the date problems found in a handful of tabs, checks the result, and builds a
+daily series in the same shape as `flow_data` / `flow_gage`. The same logic now runs in the
+pipeline: the workbooks are read in `flow-data-pull.R` (using `data-pull-helper-functions.R`) and
+cleaned and added to `flow_data` / `flow_gage` in `flow-process-data.R`. **This document does not
+modify any package data.** It shows everything in the workbooks, while the pipeline clips to its
+standardized window (through 2025-12-31) like the other flow sources.
+
+```{r config}
+ar_dir <- here("data-raw", "anderson-rose-dam")
+
+# Identifiers for the flow_data / flow_gage rows. flow_data/flow_gage lowercase every
+# character column except gage_id. "tid-anderson-rose" follows the "<source>-<site>" pattern
+# used for the other non-USGS gages (e.g. "usbr-lrd", "karuk-11523000"); the workbooks have no
+# official station code to use instead.
+ar_meta <- list(
+  location  = "lost river",
+  gage_name = "anderson-rose dam",
+  gage_id   = "tid-anderson-rose",
+  agency    = "tulelake irrigation district"  # from the "TID Daily Report" workbook names - confirm
+)
+```
+
+## 1996 - 2011: the `SPILL` tab
+
+Every `SPILL` tab has the same layout: the title (with the year) in `A1`, a header row starting
+with `DAY` followed by `JAN` ... `DEC`, then 31 day rows of daily cfs. Below the grid the tab has
+monthly totals (`CFS`, `AF`, `AAF`) and a table of prior years, none of which are needed here.
+Days that don't exist in a month (Feb 30, Apr 31, ...) are present in the grid, so they are
+dropped by building a real date and discarding the ones that fail.
+
+```{r read-spill}
+month_abb <- c(JAN = 1, FEB = 2, MAR = 3, APR = 4, MAY = 5, JUN = 6,
+               JUL = 7, AUG = 8, SEP = 9, OCT = 10, NOV = 11, DEC = 12)
+
+read_spill_tab <- function(path) {
+  year <- as.integer(str_extract(basename(path), "\\d{4}"))
+  raw  <- read_excel(path, sheet = "SPILL", col_names = FALSE, col_types = "text",
+                     .name_repair = "minimal")
+
+  # The title carries the year too. Several newer tabs turned out to have a template copied
+  # forward without updating the year, so confirm the two agree rather than assume.
+  title_year <- as.integer(str_extract(raw[[1]][1], "\\d{4}"))
+  if (!identical(year, title_year)) stop(basename(path), ": title year ", title_year, " != file year ", year)
+
+  header_row <- which(str_to_upper(trimws(raw[[1]])) == "DAY")[1]
+  day_rows   <- header_row + 1:31
+  if (!identical(suppressWarnings(as.integer(raw[[1]][day_rows])), 1:31)) {
+    stop(basename(path), ": the 31 rows under the DAY header are not days 1-31")
+  }
+
+  header     <- str_to_upper(trimws(unlist(raw[header_row, ])))
+  month_cols <- which(header %in% names(month_abb))
+
+  # The row labelled "CFS" under the grid is the sheet's own monthly total of the daily values;
+  # kept so the parse can be reconciled against it below.
+  cfs_row <- which(str_to_upper(trimws(raw[[1]])) == "CFS")[1]
+
+  map_dfr(month_cols, function(col) {
+    tibble(
+      year = year, month = unname(month_abb[header[col]]), day = 1:31,
+      value = suppressWarnings(as.numeric(raw[[col]][day_rows])),
+      sheet_month_total = suppressWarnings(as.numeric(raw[[col]][cfs_row])),
+      source_file = basename(path)
+    )
+  })
+}
+
+spill_files <- list.files(ar_dir, pattern = "^Daily \\d{4}\\.xlsx?$", full.names = TRUE)
+
+spill_cells <- map_dfr(spill_files, read_spill_tab) |>
+  mutate(date = make_date(year, month, day))   # NA where the day doesn't exist in that month
+
+spill_daily <- spill_cells |>
+  filter(!is.na(date)) |>
+  transmute(date, value, source_file, source_rank = year)
+```
+
+Read `r length(spill_files)` workbooks (`r min(spill_cells$year)` - `r max(spill_cells$year)`),
+`r nrow(spill_daily)` real days.
+
+### Check: do the parsed values add up to the sheet's own monthly totals?
+
+```{r spill-recon}
+spill_recon <- spill_cells |>
+  filter(!is.na(date)) |>
+  group_by(year, month) |>
+  summarise(parsed_total = sum(value, na.rm = TRUE),
+            sheet_total  = first(sheet_month_total), .groups = "drop") |>
+  mutate(difference = parsed_total - sheet_total)
+
+spill_recon |> filter(abs(difference) >= 0.5) |> kable(caption = "Months where the parsed total differs from the sheet's own total")
+```
+
+`r sum(abs(spill_recon$difference) < 0.5)` of `r nrow(spill_recon)` months match the sheet's total
+exactly. The one exception is Feb 2002: the sheet's total includes a value of 30 cfs entered on
+**Feb 29, 2002**, a date that doesn't exist (2002 wasn't a leap year; Feb 27 = 40, Feb 28 = 36,
+"Feb 29" = 30, Mar 1 = 30, so it looks like a duplicated entry). It can't be assigned to a real
+day, so it is dropped here. Every other value sitting on a non-existent date is `NA` or `0`.
+
+```{r spill-phantom}
+spill_cells |>
+  filter(is.na(date), !is.na(value), value != 0) |>
+  select(source_file, year, month, day, value) |>
+  kable(caption = "Non-zero values on dates that don't exist (dropped)")
+```
+
+## WY 2011-12 onward: monthly tabs
+
+Each tab has the header in row 1 (`DATE`, `STATION 48`, `ANDERSON-ROSE`, `J CANAL`, ...), units in
+row 2, then one row per day, then footer rows (`Monthly Total`, `Acre Feet`, `WY Total`, ...).
+Two things vary between workbooks, so the parser can't rely on position:
+
+* **Column order.** Some workbooks have an extra `LRDC` column before `STATION 48`, so
+  Anderson-Rose is found by matching `ANDERSON` in the header instead of using a fixed column.
+* **Date cells.** Real data rows are the ones whose first cell is an actual date; the footer rows
+  are text. Tabs named like a month (`Oct 2012`) are read; the empty `Sheet1` tabs are skipped.
+
+```{r read-month}
+read_month_tab <- function(path, sheet) {
+  tab_start <- parse_date_time(sheet, "b Y", quiet = TRUE)   # "Oct 2012"
+  if (is.na(tab_start)) return(NULL)                          # e.g. the empty "Sheet1" tabs
+
+  raw <- read_excel(path, sheet = sheet, col_names = FALSE, col_types = "list",
+                    .name_repair = "minimal")
+  if (nrow(raw) < 3) return(NULL)
+
+  cell_text <- function(cell) if (is.null(cell[[1]]) || is.na(cell[[1]])) NA_character_ else as.character(cell[[1]])
+  header    <- map_chr(raw[1, ], cell_text)
+
+  date_col <- which(str_detect(str_to_upper(header), "^DATE"))[1]
+  ar_col   <- which(str_detect(str_to_upper(header), "ANDERSON"))[1]
+  if (is.na(date_col) || is.na(ar_col)) stop("No DATE / ANDERSON column in ", basename(path), " | ", sheet)
+
+  is_date <- map_lgl(raw[[date_col]], ~ inherits(.x[[1]], c("POSIXct", "POSIXt", "Date")))
+
+  tibble(
+    source_file     = basename(path),
+    tab             = sheet,
+    tab_year        = year(tab_start),
+    tab_month       = month(tab_start),
+    units           = cell_text(raw[[ar_col]][2]),
+    date_as_entered = as.Date(map_vec(raw[[date_col]][is_date], ~ as.POSIXct(.x[[1]], tz = "UTC"))),
+    value           = map_dbl(raw[[ar_col]][is_date], function(cell) suppressWarnings(as.numeric(cell[[1]] %||% NA)))
+  )
+}
+
+month_files <- list.files(ar_dir, pattern = "^TID Daily Report.*\\.xlsx?$", full.names = TRUE)
+
+month_cells <- map_dfr(month_files, function(f) map_dfr(excel_sheets(f), ~ read_month_tab(f, .x)))
+```
+
+Read `r length(month_files)` workbooks, `r n_distinct(paste(month_cells$source_file, month_cells$tab))` monthly tabs,
+`r nrow(month_cells)` date rows.
+
+### Repairing the dates
+
+`r month_cells |> filter(year(date_as_entered) != tab_year | month(date_as_entered) != tab_month) |> distinct(source_file, tab) |> nrow()`
+tabs contain dates that don't match the tab they're on. Left alone they create duplicate dates and
+leave gaps in the series (for example the `Mar 2024` tab is dated entirely 2023). They look like a
+template copied forward with the date cells not fully updated. The values in those tabs are real,
+not stale copies: the `Mar 2021`, `Mar 2022`, `Mar 2023` and `Mar 2024` tabs hold clearly different
+numbers. So the **tab name** is treated as the source of truth for the year and month, and only the
+day-of-month comes from the date cell:
+
+* a date whose month matches the tab but whose year doesn't gets the tab's year
+* a date whose month doesn't match the tab is dropped. These are the blank 29th rows in the
+  `Feb 2018` and `Feb 2025` tabs, whose dates roll over to Mar 1 (the real Mar 1 is on the Mar tab).
+
+```{r repair-dates}
+month_cells <- month_cells |>
+  mutate(
+    month_matches = month(date_as_entered) == tab_month,
+    date = if_else(month_matches, make_date(tab_year, tab_month, day(date_as_entered)), as.Date(NA))
+  )
+
+month_cells |>
+  filter(!month_matches | year(date_as_entered) != tab_year) |>
+  group_by(source_file, tab) |>
+  summarise(
+    year_corrected = sum(month_matches & year(date_as_entered) != tab_year),
+    dropped        = sum(!month_matches),
+    dropped_values = paste(ifelse(is.na(value[!month_matches]), "blank", value[!month_matches]), collapse = ", "),
+    values_in_tab  = sum(!is.na(value)),
+    .groups = "drop"
+  ) |>
+  kable(caption = "Tabs where the date cells needed repair (values_in_tab = 0 means an empty template tab)")
+
+month_daily <- month_cells |>
+  filter(!is.na(date)) |>
+  transmute(date, value, source_file,
+            # later workbooks win a conflict, and any new-format workbook beats any old-format one
+            source_rank = 1000L + as.integer(str_extract(source_file, "\\d{4}")))
+```
+
+```{r month-sanity}
+# After the repair every tab with data should have exactly one row per day of its month.
+# Empty template tabs (no values at all) are skipped: their date cells are unreliable and
+# they carry nothing to check.
+month_cells |>
+  group_by(source_file, tab) |>
+  filter(any(!is.na(value))) |>
+  ungroup() |>
+  filter(!is.na(date)) |>
+  count(source_file, tab, tab_year, tab_month) |>
+  mutate(days_in_month = days_in_month(make_date(tab_year, tab_month, 1))) |>
+  filter(n != days_in_month) |>
+  kable(caption = "Tabs with data that don't have exactly one row per day after the repair (expected: none)")
+
+month_cells |> count(units) |> kable(caption = "Units label under the Anderson-Rose column (all tabs)")
+```
+
+## Combine
+
+Some dates appear in more than one workbook: `Daily 2011` covers the whole calendar year while the
+WY 2011-12 workbook starts in October, and each workbook carries the first month of the next water
+year as a leftover tab (the WY 2024-25 workbook has an `Oct 2025` tab, which the WY 2025-26 workbook
+repeats in full). Where a date is in more than one workbook the value from the newest workbook is
+kept (and a non-blank value always beats a blank one), and any dates where the workbooks
+**disagree** are counted so nothing is resolved silently.
+
+```{r combine}
+all_sources <- bind_rows(spill_daily, month_daily)
+
+overlap <- all_sources |>
+  group_by(date) |>
+  filter(n() > 1) |>
+  summarise(n_distinct_values = n_distinct(value[!is.na(value)]), .groups = "drop")
+
+overlap |>
+  mutate(month = floor_date(date, "month")) |>
+  group_by(month) |>
+  summarise(overlapping_days = n(),
+            days_where_sources_disagree = sum(n_distinct_values > 1), .groups = "drop") |>
+  kable(caption = "Months present in more than one workbook")
+
+ar_daily <- all_sources |>
+  arrange(date, is.na(value), desc(source_rank)) |>
+  distinct(date, .keep_all = TRUE) |>
+  select(date, value, source_file)
+
+# The newest workbook has tabs for months that haven't been reported yet. Blank days after the
+# last day with a value are "not reported yet", not gaps, so they are trimmed; blanks before that
+# stay as NA so real gaps remain visible.
+last_value_date     <- max(ar_daily$date[!is.na(ar_daily$value)])
+trailing_blank_days <- sum(ar_daily$date > last_value_date)
+ar_daily <- filter(ar_daily, date <= last_value_date)
+```
+
+The series ends on **`r format(last_value_date)`**, the last day with a value; `r trailing_blank_days`
+blank days after it (empty template tabs for months not reported yet) were trimmed.
+
+## Quality checks
+
+```{r qa-calendar}
+calendar <- tibble(date = seq(min(ar_daily$date), max(ar_daily$date), by = "day"))
+
+tibble(
+  first_date = min(ar_daily$date),
+  last_date  = max(ar_daily$date),
+  calendar_days = nrow(calendar),
+  missing_calendar_days = nrow(anti_join(calendar, ar_daily, by = "date")),
+  duplicate_dates = sum(duplicated(ar_daily$date)),
+  days_with_value = sum(!is.na(ar_daily$value)),
+  days_blank_in_source = sum(is.na(ar_daily$value))
+) |> kable(caption = "Series completeness (expected: no missing calendar days and no duplicate dates)")
+```
+
+Blank cells are left as `NA` rather than treated as zero. They drop out when building the `flow_data`
+rows below.
+
+```{r qa-gaps}
+ar_daily |>
+  arrange(date) |>
+  mutate(blank = is.na(value), run = consecutive_id(blank)) |>
+  filter(blank) |>
+  group_by(run) |>
+  summarise(first_blank_day = min(date), last_blank_day = max(date), days = n(), .groups = "drop") |>
+  select(-run) |>
+  kable(caption = "Runs of days with no value in the workbook")
+```
+
+The two long runs are late Jul - Sep 2013, blank in the source workbook. The rest are isolated
+single days. The file patterns above pick up any new `TID Daily Report ...` workbook automatically,
+so months filled in later flow through without changing this document.
+
+```{r qa-annual}
+ar_daily |>
+  mutate(year = year(date)) |>
+  group_by(year) |>
+  summarise(
+    days_with_value = sum(!is.na(value)),
+    days_blank      = sum(is.na(value)),
+    mean_cfs        = round(mean(value, na.rm = TRUE), 1),
+    max_cfs         = max(value, na.rm = TRUE),
+    pct_days_zero   = round(100 * mean(value == 0, na.rm = TRUE)),
+    .groups = "drop"
+  ) |>
+  kable(caption = "Annual summary (calendar years)")
+```
+
+```{r plot-series, fig.height=4}
+ggplot(ar_daily, aes(date, value)) +
+  geom_line(linewidth = 0.3, color = "#2166AC") +
+  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+  labs(title = "Anderson-Rose Dam daily flow", x = NULL, y = "Flow (cfs)",
+       caption = "Gaps in the line are days with no value in the source workbooks") +
+  theme_minimal()
+```
+
+## Rows for `flow_data` and `flow_gage`
+
+### `flow_data`
+
+Same columns and types as `flow_data`. The daily value is reported as a single cfs figure per day;
+it is labelled `statistic = "mean"` to match the other flow sources (confirm that is what TID
+reports).
+
+```{r flow-data}
+anderson_rose_flow_data <- ar_daily |>
+  filter(!is.na(value)) |>
+  transmute(
+    location      = ar_meta$location,
+    gage_name     = ar_meta$gage_name,
+    gage_id       = ar_meta$gage_id,
+    variable_name = "flow",
+    value         = value,
+    unit          = "cfs",
+    statistic     = "mean",
+    date          = date
+  )
+
+glimpse(anderson_rose_flow_data)
+```
+
+### `flow_gage`
+
+The location is the USGS site *at* Anderson-Rose Diversion Dam at Malone, OR
+(`420037121334100`, "LOST RVR AT ANDERSON ROSE DVRSN DAM AT MALONE, OR"), taken from the
+`temperature_gage` object rather than typed in: the TID workbooks don't give coordinates. `huc8` is
+assigned by point-in-polygon against `rivermile::klamath_hucs` (same as the other gage tables
+built outside the NHD river-mile step), and `river_mile` is `NA` as for the USBR Hydromet and OWRD gages.
+
+```{r flow-gage}
+# USGS NWIS site 420037121334100 (the "at dam" site; 420036121333700 is the "below dam" site
+# ~100 m downstream). USGS lat/long-style site numbers encode the position as DDMMSSDDDMMSS.
+dam_site <- temperature_gage |> filter(gage_id == "420037121334100")
+if (nrow(dam_site) != 1) stop("Expected exactly one temperature_gage row for USGS site 420037121334100, found ", nrow(dam_site))
+
+anderson_rose_flow_gage <- tibble(
+  gage_name  = ar_meta$gage_name,
+  gage_id    = ar_meta$gage_id,
+  agency     = ar_meta$agency,
+  latitude   = dam_site$latitude,
+  longitude  = dam_site$longitude,
+  river_mile = NA_real_,
+  location   = ar_meta$location
+) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326, remove = FALSE) |>
+  st_join(rivermile::klamath_hucs |> st_transform(4326), join = st_intersects) |>
+  st_drop_geometry() |>
+  mutate(huc8 = as.numeric(huc8)) |>
+  select(gage_name, gage_id, agency, latitude, longitude, river_mile, huc8, location)
+
+kable(anderson_rose_flow_gage, digits = 5)
+```
+
+### Integration check
+
+Checks that these two tables can be stacked onto the package objects as they are: same column
+names and types, no `gage_id` collision, and the gage's `huc8` agrees with the one USGS has for
+that site. Nothing is saved.
+
+```{r integration-check}
+col_types <- function(df) vapply(df, function(x) class(x)[1], character(1))
+
+tibble(
+  check = c("flow_data column names and order match",
+            "flow_data column types match",
+            "flow_gage column names and order match",
+            "flow_gage column types match",
+            "gage_id not already in flow_gage",
+            "gage_id not already in flow_data",
+            "huc8 matches USGS record for the dam site",
+            "no duplicate gage_id/date rows"),
+  passes = c(
+    identical(names(anderson_rose_flow_data), names(flow_data)),
+    identical(col_types(anderson_rose_flow_data), col_types(flow_data)),
+    identical(names(anderson_rose_flow_gage), names(flow_gage)),
+    identical(col_types(anderson_rose_flow_gage), col_types(flow_gage)),
+    !ar_meta$gage_id %in% flow_gage$gage_id,
+    !ar_meta$gage_id %in% flow_data$gage_id,
+    identical(anderson_rose_flow_gage$huc8, dam_site$huc8),
+    !anyDuplicated(anderson_rose_flow_data[c("gage_id", "date")]) > 0
+  )
+) |> kable()
+```
+
+Stacked onto the current objects this would give
+`r format(nrow(flow_data) + nrow(anderson_rose_flow_data), big.mark = ",")` `flow_data` rows
+(`r format(nrow(flow_data), big.mark = ",")` + `r format(nrow(anderson_rose_flow_data), big.mark = ",")`)
+and `r nrow(flow_gage) + nrow(anderson_rose_flow_gage)` `flow_gage` rows.
+
+## Notes
+
+* **The `location` overwrite in the `flow_data` combine step is fixed.** The combine step used to do
+  `mutate(location = tolower(stream))` on the stacked tables, which replaced `location` with `NA` for
+  any table that carries its name in a `location` column instead of `stream`: the USBR Hydromet and
+  OWRD rows, about 160,000 `flow_data` rows. It now uses `coalesce(tolower(stream), location)`, and
+  `flow-process-data.R` stops before saving if any `flow_data` location is missing or doesn't match
+  `flow_gage`.
+* **Agency** is assumed to be Tulelake Irrigation District from the workbook names, and the
+  workbooks' source (who compiles and shares them) is worth confirming for attribution.
+* **Statistic** `"mean"` is an assumption about how the daily cfs figure is derived.
+* **The newest workbook (WY 2025-26) is only filled in through `r format(last_value_date)`.** Its
+  later tabs are empty templates (the last one also has junk dates), which are trimmed rather than
+  treated as gaps. When more months are entered they come through automatically.

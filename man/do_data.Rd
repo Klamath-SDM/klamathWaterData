@@ -3,7 +3,7 @@
 \docType{data}
 \name{do_data}
 \alias{do_data}
-\title{Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC8 18010204)}
+\title{Publicly available dissolved oxygen data in the Klamath Basin watershed (HUC6 180102)}
 \format{
 A tibble with 365,162 rows and 8 columns
 \itemize{
