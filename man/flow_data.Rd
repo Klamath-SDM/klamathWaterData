@@ -5,7 +5,7 @@
 \alias{flow_data}
 \title{Publicly available flow data in the Klamath Basin watershed (HUC6 180102)}
 \format{
-A tibble with 436,361 rows and 8 columns
+A tibble with 450,483 rows and 8 columns
 \itemize{
 \item \code{location}: location associated where data was collected/where gage is located
 \item \code{gage_name}: name of the gaging station
