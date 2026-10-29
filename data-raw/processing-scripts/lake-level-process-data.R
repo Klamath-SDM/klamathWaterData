@@ -74,7 +74,7 @@ water_level_gage_usgs <- all_usgs_water_level_raw |>
 
 # USBR Hydromet - Gerber, Malone, Tule Lake Sump 1A/1B, Clear Lake West/East
 # Lobe (from teacup diagram; see lake-levels-data-pull.R) ----
-water_level_data_usbr_hydromet <- usbr_hydromet_elev_raw |>
+water_level_data_usbr_hydromet <- usbr_hydromet_elev_raw_combined |>
   mutate(
     location = case_when(
       site == "GER"   ~ "gerber reservoir",
@@ -190,7 +190,7 @@ tule_elev_raw <- map_dfr(files, function(path) {
 tule_elev <- tule_elev_raw |>
   mutate(date = as.Date(date),
          location = "tule lake",
-         gage_name = "tule lake sump 1a surface elevations",
+         gage_name = "usbr tule lake sump 1a surface elevations",
          gage_id = "usbr-tulc",
          variable_name = "water level",
          value = tule_lake_elev_ft,
@@ -206,7 +206,7 @@ tule_elev_early <- readxl::read_excel("data-raw/raw-tule-lake-level-data/TID Ele
   slice(1:9179) |>
   mutate(date = as.Date(date),
          location = "tule lake",
-         gage_name = "tule lake sump 1a surface elevations",
+         gage_name = "usbr tule lake sump 1a surface elevations",
          gage_id = "usbr-tulc",
          variable_name = "water level",
          value = tlelev,
@@ -334,6 +334,6 @@ water_level_gage <- water_level_gage_usgs |>
 #                                      type = "csv")
 
 # save rda files
-usethis::use_data(water_level_data, overwrite = TRUE)
-usethis::use_data(water_level_gage, overwrite = TRUE)
+# usethis::use_data(water_level_data, overwrite = TRUE)
+# usethis::use_data(water_level_gage, overwrite = TRUE)
 
