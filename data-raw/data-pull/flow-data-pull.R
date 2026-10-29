@@ -249,6 +249,14 @@ anderson_rose_raw <- read_anderson_rose_workbooks("data-raw/anderson-rose-dam")
 anderson_rose_spill_raw <- anderson_rose_raw$spill   # 1996-2011, SPILL tab (days x months grid)
 anderson_rose_month_raw <- anderson_rose_raw$month   # WY 2011-12 onward (one tab per month)
 
+# this excel sheet contains data from 1986, we will just keep earlier data
+anderson_rose_raw_2 <- read_xlsx("data-raw/anderson-rose-dam/KHYDRODBA_TIDSTUFF.xlsx") |>
+  clean_names() |>
+  mutate(date = as.Date(datecreated),
+         value = androse) |>
+  select(date, value) |>
+  filter(date < as.Date("1996-01-01")) #filtering more recent years since they are included above
+
 #### gage data pull----
 # The workbooks don't give coordinates. USGS has a site AT the dam
 # (420037121334100, "LOST RVR AT ANDERSON ROSE DVRSN DAM AT MALONE, OR"; the

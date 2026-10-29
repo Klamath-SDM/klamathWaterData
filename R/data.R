@@ -89,7 +89,7 @@
 #' @title Publicly available flow data in the Klamath Basin watershed (HUC6 180102)
 #' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX, USBR, and OWRD data portals.
 #' Anderson rose dam raw data files were shared directly by USBR.
-#' @format A tibble with 450,483 rows and 8 columns
+#' @format A tibble with 462,206 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
