@@ -6,13 +6,17 @@ library(janitor)
 library(httr)
 library(xml2)
 
+source("data-raw/data-pull/data-pull-helper-functions.R")
+
 # the goal of this script is to pull flow data from different sources and save into aws bucket.
 
 # Define aws bucket (klamath-sdm)
 # wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/data-raw/")
 
 # Standardized pull window - every source below (WQX, USGS, USBR RISE, USBR
-# Hydromet, OWRD) uses this same start/end date.
+# Hydromet, OWRD) uses this same start/end date. (The Anderson-Rose Dam
+# workbooks are read whole and clipped to this window in
+# flow-process-data.R instead.)
 start_date <- as.Date("1995-01-01")
 end_date   <- as.Date("2025-12-31")
 
@@ -41,7 +45,11 @@ usgs_gages <- c("11509500", "11510700", "11516530", "11520500", "11523000", "115
                 # NOTE: "11499100" (Sycan River) currently returns zero rows - per
                 # teacup-diagram-data-pull.R's own note, that gauge's daily-value
                 # record ends ~1991, before this script's start_date (above).
-                "11499100", "11504115", "11507200", "11509200")
+                "11499100", "11504115", "11507200", "11509200",
+                # used to be pulled from OWRD (see the OWRD section below): OWRD's
+                # page for these two now redirects to USGS, and NWIS has the full
+                # daily record.
+                "11493500", "11503000")
 
 # Define the parameters
 parameterCd <- "00060" # Flow parameter code
@@ -92,8 +100,11 @@ usgs_gage_flow_data <- readNWISsite(usgs_gages)
 # (itemId=134084) for this same physical gage, so this replaces that bespoke
 # pull with no change in the underlying data - just the standard mechanism
 # used by every other USBR Hydromet gage below.
-source("data-raw/data-pull/usbr-hydromet-pull-helpers.R")
-source("data-raw/data-pull/temperature-pull-helper-functions.R")
+#
+# Lost River below Clear Lake Dam (LRSC, the real-time "lrsc_q" discharge
+# series) is pulled the same way: "LRSC QD" is its daily archive record. It
+# only starts 2016-03-31 (empty before that), and has gaps in later years. (fetch_usbr_batch() and
+# fetch_rise_klamath_locations() are in data-pull-helper-functions.R.)
 
 # Pulled live rather than hand-transcribed, so coordinates stay accurate and
 # reproducible if a station's location record is ever corrected upstream.
@@ -107,7 +118,8 @@ usbr_hydromet_flow_stations <- tribble(
   "LRD",  "QD",       "Lost River Diversion - Flow (cfs)",
   "HRPO", "QD",       "Lost River at Harpold Dam - Flow (cfs)",
   "LRS",  "QD",       "Clear Lake East Lobe / Lost River - Flow (cfs)",
-  "CHRO", "QD",       "Cherry Creek - Flow (cfs)"
+  "CHRO", "QD",       "Cherry Creek - Flow (cfs)",
+  "LRSC", "QD",       "Lost River below Clear Lake Dam - Flow (cfs)"
 ) |>
   left_join(rise_klamath_locations, by = "site")
 
@@ -126,7 +138,8 @@ usbr_hydromet_flow_data <- usbr_hydromet_flow_raw |>
       site == "LRD"  ~ "lost river diversion",
       site == "HRPO" ~ "lost river at harpold dam",
       site == "LRS"  ~ "clear lake east lobe / lost river",
-      site == "CHRO" ~ "cherry creek"
+      site == "CHRO" ~ "cherry creek",
+      site == "LRSC" ~ "lost river"
     ),
     gage_name = tolower(label),
     gage_id = paste0("usbr-", tolower(site)),
@@ -146,6 +159,12 @@ usbr_hydromet_flow_data <- usbr_hydromet_flow_raw |>
 # deliberately excluded to avoid a duplicate/colliding series under the same
 # station number.
 #
+# 11493500 (Williamson R nr Klamath Agency) and 11503000 (Annie Spring nr
+# Crater Lake) used to be pulled from here too, but OWRD's page for them now
+# redirects to waterdata.usgs.gov (so get_owrd_hydro() finds no OWRD report
+# form to parse and returns nothing) - they are USGS-operated stations, and
+# NWIS has their full daily record, so they are in usgs_gages above instead.
+#
 # Five stations that were not pulled:
 #   - 11504210 (Cherry Creek nr Klamath Agency, OR) - USBR site
 #   - 11514500 (Keene Creek nr Ashland, OR) - hyatt dam and reservoir. There is discharge here from
@@ -155,17 +174,15 @@ usbr_hydromet_flow_data <- usbr_hydromet_flow_raw |>
 #   only stage
 #
 # lat/long pulled live from OWRD's own KML station feed
-# (near_real_time_gage_station_kml.aspx) rather than hand-transcribed. See
-# owrd-pull-helpers.R (shared with temperature-process-data.R, which also
-# pulls a subset of these same stations for water temperature).
-# source("data-raw/data-pull/owrd-pull-helpers.R")
+# (near_real_time_gage_station_kml.aspx) rather than hand-transcribed - see
+# fetch_owrd_coord() in data-pull-helper-functions.R (temperature-data-pull.R
+# also pulls a subset of these same stations for water temperature).
 
 owrd_station_list <- tribble(
   ~site,      ~location,                   ~gage_name,
   "11495600", "sf sprague river",          "sf sprague river nr bly, or",
   "11495900", "nf sprague river",          "n fk sprague r ab sric cn nr bly, or",
   "11491400", "williamson river",          "williamson r bl sheep cr nr lenz, or",
-  "11493500", "williamson river",          "williamson r nr klamath agency, or",
   "11494000", "williamson river",          "williamson r ab spring cr nr klamath agency, or",
   "11494100", "larkin creek",              "larkin cr nr chiloquin, or",
   "11494200", "spring creek",              "spring cr nr chiloquin, or",
@@ -178,7 +195,6 @@ owrd_station_list <- tribble(
   "11502550", "williamson river",          "williamson r at modoc pt rd, nr chiloquin, or",
   "11502950", "sun creek",                 "sun cr at ranger sta nr fort klamath, or",
   "11502980", "wood river",                "wood r bl sun cr nr fort klamath, or",
-  "11503000", "annie spring",              "annie spring nr crater lake, or",
   "11503500", "annie creek",               "annie cr nr ft klamath",
   "11504103", "wood river",                "wood r ab crooked cr, nr klamath agency, or",
   "11504109", "crooked creek",             "crooked cr nr klamath agency, or",
@@ -217,6 +233,29 @@ owrd_flow_data <- map_dfr(seq_len(nrow(owrd_stations)), function(i) {
 }) |>
   filter(!is.na(value)) |>
   glimpse()
+
+## Anderson-Rose Dam flow - Tulelake Irrigation District daily report workbooks ----
+# Daily flow (cfs) at Anderson-Rose Dam on the Lost River. Not an API pull:
+# the TID daily report workbooks are shared as files and live in
+# data-raw/anderson-rose-dam/. They come in two layouts (older calendar-year
+# "Daily YYYY" workbooks with a SPILL tab, newer water-year "TID Daily Report"
+# workbooks with one tab per month) - see the Anderson-Rose section of
+# data-pull-helper-functions.R. Read here as-is; the date repairs and overlap
+# handling are in flow-process-data.R, and
+# data-raw/data-exploration/anderson-rose-dam-flow.Rmd has the QA behind them.
+# A newly added workbook is picked up by file name.
+
+anderson_rose_raw <- read_anderson_rose_workbooks("data-raw/anderson-rose-dam")
+anderson_rose_spill_raw <- anderson_rose_raw$spill   # 1996-2011, SPILL tab (days x months grid)
+anderson_rose_month_raw <- anderson_rose_raw$month   # WY 2011-12 onward (one tab per month)
+
+#### gage data pull----
+# The workbooks don't give coordinates. USGS has a site AT the dam
+# (420037121334100, "LOST RVR AT ANDERSON ROSE DVRSN DAM AT MALONE, OR"; the
+# nearby 420036121333700 is the "below dam" site), so its NWIS record is used
+# for the gage's location, the same way the other USGS gage metadata is pulled
+# above.
+anderson_rose_site <- readNWISsite("420037121334100")
 
 
 ##### save raw data into aws bucket water-quality/data-raw/

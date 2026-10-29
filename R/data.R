@@ -71,7 +71,7 @@
 #' @title Flow gages in the Klamath Basin watershed (HUC6 180102)
 #' @description A dataset containing metadata for flow gages located across the Klamath Basin watershed.
 #' Includes location, agency, and hydrologic unit code (HUC) information for each station.
-#' @format A tibble with 118 rows and 8 columns
+#' @format A tibble with 120 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
@@ -88,7 +88,8 @@
 #' @name flow_data
 #' @title Publicly available flow data in the Klamath Basin watershed (HUC6 180102)
 #' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX, USBR, and OWRD data portals.
-#' @format A tibble with 436,361 rows and 8 columns
+#' Anderson rose dam raw data files were shared directly by USBR.
+#' @format A tibble with 450,483 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station

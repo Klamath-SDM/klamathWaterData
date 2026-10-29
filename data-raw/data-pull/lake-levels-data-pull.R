@@ -45,7 +45,7 @@ water_level_gage_data <- readNWISsite(usgs_gages)
 # duplicated/skipped a date each year at the DST transition). Hydromet's own
 # archive parses dates as plain calendar dates (see mdy() in
 # parse_webarccsv()), so this class of bug doesn't exist here.
-source("data-raw/data-pull/usbr-hydromet-pull-helpers.R")
+source("data-raw/data-pull/data-pull-helper-functions.R")
 
 # Pulled live rather than hand-transcribed, so coordinates stay accurate and
 # reproducible if a station's location record is ever corrected upstream.

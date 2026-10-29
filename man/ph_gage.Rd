@@ -3,7 +3,7 @@
 \docType{data}
 \name{ph_gage}
 \alias{ph_gage}
-\title{pH gages in the Klamath Basin watershed (HUC8 18010204)}
+\title{pH gages in the Klamath Basin watershed (HUC6 180102)}
 \format{
 A tibble with 124 rows and 8 columns
 \itemize{
