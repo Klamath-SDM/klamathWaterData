@@ -334,6 +334,6 @@ water_level_gage <- water_level_gage_usgs |>
 #                                      type = "csv")
 
 # save rda files
-# usethis::use_data(water_level_data, overwrite = TRUE)
-# usethis::use_data(water_level_gage, overwrite = TRUE)
+usethis::use_data(water_level_data, overwrite = TRUE)
+usethis::use_data(water_level_gage, overwrite = TRUE)
 
