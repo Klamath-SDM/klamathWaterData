@@ -9,7 +9,7 @@ library(pins)
 # wq_data_raw <- pins::board_s3(bucket = "klamath-sdm", region = "us-east-1", prefix = "water_quality/data-raw/")
 
 # Standardized pull window - matches lake-levels/flow/teacup-diagram pulls.
-start_date <- as.Date("1996-01-01")
+start_date <- as.Date("1995-01-01")
 end_date   <- as.Date("2025-12-31")
 
 ### WQX data pull -----

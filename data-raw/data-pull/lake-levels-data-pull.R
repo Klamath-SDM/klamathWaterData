@@ -9,7 +9,7 @@ library(pins)
 
 #  USGS data ----
 # Standardized pull window - every source below uses this same start/end date.
-start_date <- as.Date("1996-01-01")
+start_date <- as.Date("1995-01-01")
 end_date   <- as.Date("2025-12-31")
 
 #### usgs lake water surface data ----
@@ -67,6 +67,24 @@ usbr_hydromet_elev_raw <- fetch_usbr_batch(
   start_date = start_date,
   end_date   = end_date
 )
+# raw Hydromet export, split by sump
+hydromet_email <- read_excel(
+  "data-raw/raw-tule-lake-level-data/tule-lake/Tule lake elevations_Hydromet_2021_topresent.xlsx",
+  col_types = c("date", "numeric", "numeric")
+) |>
+  rename(date = DATE, TULC = `TULC FB sump 1a`, TULC2 = `TULC2 FB sump 1b`) |>
+  mutate(date = as.Date(date),
+         parameter = "FB") |>
+  pivot_longer(c(TULC, TULC2), names_to = "site", values_to = "value") |>
+  filter(!is.na(value)) |>
+  mutate(label = case_when(site == "TULC" ~ "Tule Lake Sump 1A - Forebay Elevation (ft)",
+                           site == "TULC2" ~ "Tule Lake Sump 1B - Forebay Elevation (ft)"),
+         latitude = case_when(site == "TULC" ~ 41.87862,
+                              site == "TULC2" ~ 41.85328),
+         longitude = case_when(site == "TULC" ~ -121.5453,
+                               site == "TULC2" ~ -121.4925))
+
+usbr_hydromet_elev_raw_combined <- bind_rows(usbr_hydromet_elev_raw, hydromet_email)
 
 ##### save raw data into aws bucket water-quality/data-raw/
 

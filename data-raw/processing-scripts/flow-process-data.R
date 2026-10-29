@@ -231,6 +231,11 @@ anderson_rose_spill <- anderson_rose_spill |>
   filter(!is.na(date)) |>
   transmute(date, value, source_file, source_rank = year)
 
+anderson_rose_pre1996 <- anderson_rose_raw_2 |>
+  mutate(source_file = "KHYDRODBA_TIDSTUFF.xlsx",
+         source_rank = year(date)) |>
+  glimpse()
+
 ## 2. Newer workbooks (WY 2011-12 onward, one tab per month) ----
 # The date cells on a few tabs are wrong - a template copied forward without
 # its dates being updated (e.g. the "Mar 2024" tab is dated entirely 2023,
@@ -272,7 +277,7 @@ anderson_rose_month <- anderson_rose_month |>
 # carry the start of the next one as a leftover tab (e.g. "Oct 2025" in the
 # WY 2024-25 workbook, repeated in full in WY 2025-26). The value from the
 # newest workbook is kept, and a non-blank value always beats a blank one.
-anderson_rose_all <- bind_rows(anderson_rose_spill, anderson_rose_month)
+anderson_rose_all <- bind_rows(anderson_rose_spill, anderson_rose_month, anderson_rose_pre1996)
 
 anderson_rose_conflicts <- anderson_rose_all |>
   filter(!is.na(value)) |>
@@ -295,16 +300,16 @@ message("Anderson-Rose: ", sum(!is.na(anderson_rose_daily$value)), " days with a
         " (last day with a value)")
 
 ## 4. Flow table ----
-# Clipped to the same standardized window as every other flow source
-# (start_date/end_date in flow-data-pull.R) - the workbooks run later than
-# that. Blank days drop out here, same as the other sources. Carries its name
+# keeping all available years on the package, filtering/clipping
+# to years use for modeling can happen in model-processing
+# Blank days drop out here, same as the other sources. Carries its name
 # in `location` like the USBR Hydromet and OWRD tables, which the flow_data
 # combine below accounts for. gage_id follows the "<source>-<site>" pattern
 # of the other non-USGS ids (the workbooks have no official station code).
 # statistic is "mean" to match the other flow sources - the workbooks report
 # one cfs figure per day.
 anderson_rose_flow_data <- anderson_rose_daily |>
-  filter(!is.na(value), date >= start_date, date <= end_date) |>
+  filter(!is.na(value)) |>
   transmute(
     location      = "lost river",
     gage_name     = "anderson-rose dam",
