@@ -74,7 +74,7 @@ water_level_gage_usgs <- all_usgs_water_level_raw |>
 
 # USBR Hydromet - Gerber, Malone, Tule Lake Sump 1A/1B, Clear Lake West/East
 # Lobe (from teacup diagram; see lake-levels-data-pull.R) ----
-water_level_data_usbr_hydromet <- usbr_hydromet_elev_raw |>
+water_level_data_usbr_hydromet <- usbr_hydromet_elev_raw_combined |>
   mutate(
     location = case_when(
       site == "GER"   ~ "gerber reservoir",
@@ -93,7 +93,7 @@ water_level_data_usbr_hydromet <- usbr_hydromet_elev_raw |>
     gage_name = case_when(
       site == "GER"   ~ "gerber reservoir forebay elevation",
       site == "MAL"   ~ "malone reservoir gage height",
-      site == "TULC"  ~ "usbr tule lake sump 1a surface elevations",
+      site == "TULC"  ~ "tule lake sump 1a surface elevations",
       site == "TULC2" ~ "tule lake sump 1b surface elevations",
       site == "CLK"   ~ "clear lake west lobe forebay elevation",
       site == "LRS"   ~ "clear lake east lobe forebay elevation"
