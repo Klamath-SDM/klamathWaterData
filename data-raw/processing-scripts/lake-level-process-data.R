@@ -93,7 +93,7 @@ water_level_data_usbr_hydromet <- usbr_hydromet_elev_raw_combined |>
     gage_name = case_when(
       site == "GER"   ~ "gerber reservoir forebay elevation",
       site == "MAL"   ~ "malone reservoir gage height",
-      site == "TULC"  ~ "usbr tule lake sump 1a surface elevations",
+      site == "TULC"  ~ "tule lake sump 1a surface elevations",
       site == "TULC2" ~ "tule lake sump 1b surface elevations",
       site == "CLK"   ~ "clear lake west lobe forebay elevation",
       site == "LRS"   ~ "clear lake east lobe forebay elevation"
@@ -190,7 +190,7 @@ tule_elev_raw <- map_dfr(files, function(path) {
 tule_elev <- tule_elev_raw |>
   mutate(date = as.Date(date),
          location = "tule lake",
-         gage_name = "usbr tule lake sump 1a surface elevations",
+         gage_name = "tule lake sump 1a surface elevations",
          gage_id = "usbr-tulc",
          variable_name = "water level",
          value = tule_lake_elev_ft,
@@ -206,7 +206,7 @@ tule_elev_early <- readxl::read_excel("data-raw/raw-tule-lake-level-data/TID Ele
   slice(1:9179) |>
   mutate(date = as.Date(date),
          location = "tule lake",
-         gage_name = "usbr tule lake sump 1a surface elevations",
+         gage_name = "tule lake sump 1a surface elevations",
          gage_id = "usbr-tulc",
          variable_name = "water level",
          value = tlelev,
