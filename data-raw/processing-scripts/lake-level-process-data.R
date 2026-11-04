@@ -10,6 +10,11 @@ library(stringr)
 # Additionally, this script pulls and process data for water elevation at Tule Sumps provided by Torrey Tyler (USBR)
 # both datasets are combined into water_level_data.rda
 
+# Additional note on Tule Lake data:
+# 1986-Feb 2012 (one excel file provided by BOR) - This is for 1A (confirmed by Torrey Tyler 11/3/2026)
+# Sep 2012-2024 (one workbook per year with one sheet per month, 2021 onwards are empty) - This is for 1A (confirmed by Torrey Tyler 11/3/2026)
+# 2021 to present (one excel file provided by BOR) - Both 1A and 1B, most empty for 1A. Can also pull directly from Hydromet
+
 source("data-raw/data-pull/lake-levels-data-pull.R")
 
 # USGS ----
@@ -19,18 +24,21 @@ water_level_data <- water_level_data |>
   glimpse()
 
 water_level_data_raw_clean <- water_level_data |>
-  mutate(gage_id = site_no,
-         date = as.Date(date),
-         mean_level = x_72275_00003) |>
-  select(-c(x_72275_00003_cd,x_72275_00003)) |>
-  pivot_longer(cols = c(mean_level),
-               names_to = "statistic",
-               values_to = "value",
-               values_drop_na = TRUE) |>
-  mutate(statistic = case_when(
-    statistic == "mean_level" ~ "mean"),
+  mutate(gage_id = site_no, date = as.Date(date), mean_level = x_72275_00003) |>
+  select(-c(x_72275_00003_cd, x_72275_00003)) |>
+  pivot_longer(
+    cols = c(mean_level),
+    names_to = "statistic",
+    values_to = "value",
+    values_drop_na = TRUE
+  ) |>
+  mutate(
+    statistic = case_when(
+      statistic == "mean_level" ~ "mean"
+    ),
     variable_name = "water level",
-    unit = "feet") |>
+    unit = "feet"
+  ) |>
   glimpse()
 
 ## GAGE data
@@ -40,30 +48,56 @@ water_level_gage_data <- water_level_gage_data |>
   glimpse()
 
 # JOIN - station data with temp data
-all_usgs_water_level_raw <- water_level_data_raw_clean |> left_join(water_level_gage_data, by = "site_no") |>
-  select(c(agency_cd.x, site_no, date, gage_id, statistic, value, variable_name,
-           unit, station_nm, dec_lat_va, dec_long_va, huc_cd)) |>
+all_usgs_water_level_raw <- water_level_data_raw_clean |>
+  left_join(water_level_gage_data, by = "site_no") |>
+  select(c(
+    agency_cd.x,
+    site_no,
+    date,
+    gage_id,
+    statistic,
+    value,
+    variable_name,
+    unit,
+    station_nm,
+    dec_lat_va,
+    dec_long_va,
+    huc_cd
+  )) |>
   mutate(waterbody_name = "upper klamath lake") |>
   glimpse()
 
 ### water data table usgs ----
 water_level_data_usgs <- all_usgs_water_level_raw |>
-  mutate(gage_id = as.character(site_no),
-         gage_name = tolower(station_nm),
-         stream = waterbody_name) |>
-  select(stream, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
+  mutate(
+    gage_id = as.character(site_no),
+    gage_name = tolower(station_nm),
+    stream = waterbody_name
+  ) |>
+  select(
+    stream,
+    gage_name,
+    gage_id,
+    variable_name,
+    value,
+    unit,
+    statistic,
+    date
+  ) |>
   rename(location = stream) |>
   glimpse()
 
 ### monitoring site table usgs ----
 water_level_gage_usgs <- all_usgs_water_level_raw |>
-  mutate(gage_name = tolower(station_nm),
-         gage_id = as.character(site_no),
-         agency = agency_cd.x,
-         latitude = dec_lat_va,
-         longitude = dec_long_va,
-         huc8 = huc_cd,
-         stream = waterbody_name) |>
+  mutate(
+    gage_name = tolower(station_nm),
+    gage_id = as.character(site_no),
+    agency = agency_cd.x,
+    latitude = dec_lat_va,
+    longitude = dec_long_va,
+    huc8 = huc_cd,
+    stream = waterbody_name
+  ) |>
   select(gage_name, gage_id, agency, latitude, longitude, huc8, stream) |>
   distinct() |>
   # st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
@@ -77,31 +111,41 @@ water_level_gage_usgs <- all_usgs_water_level_raw |>
 water_level_data_usbr_hydromet <- usbr_hydromet_elev_raw_combined |>
   mutate(
     location = case_when(
-      site == "GER"   ~ "gerber reservoir",
-      site == "MAL"   ~ "malone reservoir",
+      site == "GER" ~ "gerber reservoir",
+      site == "MAL" ~ "malone reservoir",
       site %in% c("TULC", "TULC2") ~ "tule lake",
       site %in% c("CLK", "LRS") ~ "clear lake"
     ),
     gage_id = case_when(
-      site == "GER"   ~ "usbr-ger",
-      site == "MAL"   ~ "usbr-mal",
-      site == "TULC"  ~ "usbr-tulc",
+      site == "GER" ~ "usbr-ger",
+      site == "MAL" ~ "usbr-mal",
+      site == "TULC" ~ "usbr-tulc",
       site == "TULC2" ~ "usbr-tulc2",
-      site == "CLK"   ~ "usbr-clk",
-      site == "LRS"   ~ "usbr-lrs"
+      site == "CLK" ~ "usbr-clk",
+      site == "LRS" ~ "usbr-lrs"
     ),
     gage_name = case_when(
-      site == "GER"   ~ "gerber reservoir forebay elevation",
-      site == "MAL"   ~ "malone reservoir gage height",
-      site == "TULC"  ~ "tule lake sump 1a surface elevations",
+      site == "GER" ~ "gerber reservoir forebay elevation",
+      site == "MAL" ~ "malone reservoir gage height",
+      site == "TULC" ~ "tule lake sump 1a surface elevations",
       site == "TULC2" ~ "tule lake sump 1b surface elevations",
-      site == "CLK"   ~ "clear lake west lobe forebay elevation",
-      site == "LRS"   ~ "clear lake east lobe forebay elevation"
+      site == "CLK" ~ "clear lake west lobe forebay elevation",
+      site == "LRS" ~ "clear lake east lobe forebay elevation"
     ),
     variable_name = "water level",
     unit = "feet above sea level - usbr datum",
-    statistic = "mean") |>
-  select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |>
+    statistic = "mean"
+  ) |>
+  select(
+    location,
+    gage_name,
+    gage_id,
+    variable_name,
+    value,
+    unit,
+    statistic,
+    date
+  ) |>
   glimpse()
 
 # ============================================================
@@ -114,42 +158,56 @@ water_level_data_usbr_hydromet <- usbr_hydromet_elev_raw_combined |>
 #   date, tule_lake_elev_ft, water_year, sheet, file
 # ============================================================
 
-
 # ---- 1. Locate the files ------------------------------------------------
 # Point this at the folder that holds the 13 workbooks.
 data_dir <- "data-raw/raw-tule-lake-level-data"
 
 files <- list.files(
   data_dir,
-  pattern    = "^TID[ _]Daily[ _]Report[ _]WY[ _]\\d{4}-\\d{4}\\.xlsx$",
+  # \\.xlsx?$ - two of the workbooks (WY 2013-2014, WY 2014-2015) are legacy
+  # .xls, not .xlsx; an .xlsx-only pattern here silently dropped them,
+  # wiping out an otherwise-complete calendar year (2014) of real elevation
+  # readings.
+  pattern = "^TID[ _]Daily[ _]Report[ _]WY[ _]\\d{4}-\\d{4}\\.xlsx?$",
   full.names = TRUE,
   ignore.case = TRUE
 )
 
-if (length(files) == 0) stop("No 'TID Daily Report WY ....xlsx' files found in ", data_dir)
+if (length(files) == 0) {
+  stop("No 'TID Daily Report WY ....xls(x)' files found in ", data_dir)
+}
 message("Found ", length(files), " workbook(s).")
 
 # ---- 2. Function to read one monthly sheet ------------------------------
 read_month_sheet <- function(path, sheet) {
-
   raw <- read_excel(
-    path, sheet = sheet,
-    col_names = FALSE,           # read raw; we handle headers ourselves
-    col_types = "list",          # keep mixed types (dates + text + totals)
+    path,
+    sheet = sheet,
+    col_names = FALSE, # read raw; we handle headers ourselves
+    col_types = "list", # keep mixed types (dates + text + totals)
     .name_repair = "minimal"
   )
 
   # Row 1 holds the headers ("DATE", ..., "TULE LAKE ELEV.", ...)
-  headers <- map_chr(raw[1, ], ~ ifelse(is.null(.x[[1]]), NA_character_,
-                                        as.character(.x[[1]])))
+  headers <- map_chr(
+    raw[1, ],
+    ~ ifelse(is.null(.x[[1]]), NA_character_, as.character(.x[[1]]))
+  )
 
   date_col <- which(str_detect(str_to_upper(headers), "^DATE"))[1]
-  elev_col <- which(str_detect(str_to_upper(headers), "TULE") &
-                      str_detect(str_to_upper(headers), "ELEV"))[1]
+  elev_col <- which(
+    str_detect(str_to_upper(headers), "TULE") &
+      str_detect(str_to_upper(headers), "ELEV")
+  )[1]
 
   if (is.na(date_col) || is.na(elev_col)) {
-    warning("Could not find DATE / TULE LAKE ELEV columns in ",
-            basename(path), " | ", sheet, " - sheet skipped.")
+    warning(
+      "Could not find DATE / TULE LAKE ELEV columns in ",
+      basename(path),
+      " | ",
+      sheet,
+      " - sheet skipped."
+    )
     return(NULL)
   }
 
@@ -160,12 +218,20 @@ read_month_sheet <- function(path, sheet) {
   # A cell is a real data row only if the DATE cell is a date/POSIXct.
   # This automatically drops the header row, the units row, the
   # "Monthly Total" / "WY Total" rows, and every table below.
-  is_date <- map_lgl(date_cells, ~ inherits(.x[[1]], c("POSIXct", "POSIXt", "Date")))
+  is_date <- map_lgl(
+    date_cells,
+    ~ inherits(.x[[1]], c("POSIXct", "POSIXt", "Date"))
+  )
 
-  if (!any(is_date)) return(NULL)
+  if (!any(is_date)) {
+    return(NULL)
+  }
 
   tibble(
-    date = as.Date(map_vec(date_cells[is_date], ~ as.POSIXct(.x[[1]], tz = "UTC"))),
+    date = as.Date(map_vec(
+      date_cells[is_date],
+      ~ as.POSIXct(.x[[1]], tz = "UTC")
+    )),
     tule_lake_elev_ft = map_dbl(elev_cells[is_date], function(cell) {
       val <- cell[[1]] %||% NA
       if (is.character(val)) {
@@ -175,7 +241,7 @@ read_month_sheet <- function(path, sheet) {
       suppressWarnings(as.numeric(val))
     }),
     sheet = sheet,
-    file  = basename(path)
+    file = basename(path)
   )
 }
 
@@ -188,45 +254,75 @@ tule_elev_raw <- map_dfr(files, function(path) {
 # TODO note that 2021- 2025 are empty
 # ---- 4. Clean & finalize ------------------------------------------------
 tule_elev <- tule_elev_raw |>
-  mutate(date = as.Date(date),
-         location = "tule lake",
-         gage_name = "tule lake sump 1a surface elevations",
-         gage_id = "usbr-tulc",
-         variable_name = "water level",
-         value = tule_lake_elev_ft,
-         unit = "feet above sea level - USBR datum",
-         statistic = "mean") |>
-  select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |> glimpse()
+  mutate(
+    date = as.Date(date),
+    location = "tule lake",
+    gage_name = "tule lake sump 1a surface elevations",
+    gage_id = "usbr-tulc",
+    variable_name = "water level",
+    value = tule_lake_elev_ft,
+    unit = "feet above sea level - USBR datum",
+    statistic = "mean"
+  ) |>
+  select(
+    location,
+    gage_name,
+    gage_id,
+    variable_name,
+    value,
+    unit,
+    statistic,
+    date
+  ) |>
+  glimpse()
 
 
 # earlier years
-tule_elev_early <- readxl::read_excel("data-raw/raw-tule-lake-level-data/TID Elevation Report 1986-2012.xls") |>
+tule_elev_early <- readxl::read_excel(
+  "data-raw/raw-tule-lake-level-data/TID Elevation Report 1986-2012.xls"
+) |>
   clean_names() |>
   select(-x3) |>
   slice(1:9179) |>
-  mutate(date = as.Date(date),
-         location = "tule lake",
-         gage_name = "tule lake sump 1a surface elevations",
-         gage_id = "usbr-tulc",
-         variable_name = "water level",
-         value = tlelev,
-         unit = "feet above sea level - USBR datum",
-         statistic = "mean") |> # TODO confirm that these values are mean
-  select(location, gage_name, gage_id, variable_name, value, unit, statistic, date) |> glimpse()
+  mutate(
+    date = as.Date(date),
+    location = "tule lake",
+    gage_name = "tule lake sump 1a surface elevations",
+    gage_id = "usbr-tulc",
+    variable_name = "water level",
+    value = tlelev,
+    unit = "feet above sea level - USBR datum",
+    statistic = "mean"
+  ) |> # TODO confirm that these values are mean
+  select(
+    location,
+    gage_name,
+    gage_id,
+    variable_name,
+    value,
+    unit,
+    statistic,
+    date
+  ) |>
+  glimpse()
 
 #combine Tule data
 # TULC (from usbr_hydromet_elev_raw, via the teacup diagram pull) is the same
 # physical gage as the TID-report-derived series above ("usbr tule lake sump
-# 1a") - union them into one continuous series. distinct() guards against
-# date overlap (there's none today: TID data ends 2021-07-05, TULC starts
-# 2024-04-15) should the two source windows ever grow to overlap.
+# 1a") - union them into one continuous series. The TID workbooks stopped
+# recording an elevation (every day is a "-" placeholder, parsed as NA) from
+# WY 2022-2023 onward, but the workbook rows - and their dates - keep being
+# produced through WY 2024-2025. Those dates DO overlap with real TULC
+# readings from the Hydromet pull/email (2024-04-15 onward), so the NA rows
+# are dropped before the union - otherwise distinct()'s "keep first match"
+# rule would let an NA TID row silently shadow a real Hydromet value for the
+# same date.
 tule_elevation <- bind_rows(
-  tule_elev,
-  tule_elev_early,
+  tule_elev |> filter(!is.na(value)),
+  tule_elev_early |> filter(!is.na(value)),
   water_level_data_usbr_hydromet |> filter(gage_id == "usbr-tulc")
 ) |>
   distinct(gage_id, date, .keep_all = TRUE)
-
 
 
 #### water data table ----
@@ -241,7 +337,11 @@ water_level_data <- bind_rows(
   # 40235 ft, 3035 ft, against a true range of ~4030-4036 ft). Scoped to
   # just these two gages so it doesn't also strip Malone's legitimate
   # gage-height readings (a few feet, not an elevation in the thousands).
-  filter(!(gage_id %in% c("usbr-tulc", "usbr-tulc2") & !(value > 3500 & value < 10000))) |>
+  filter(
+    !(gage_id %in%
+      c("usbr-tulc", "usbr-tulc2") &
+      !(value > 3500 & value < 10000))
+  ) |>
   filter(!is.na(value)) |>
   glimpse()
 
@@ -274,34 +374,42 @@ huc_coord <- function(site_code) {
 }
 
 water_level_gage <- water_level_gage_usgs |>
-  add_row(location = "tule lake",
-          gage_name = "tule lake sump 1a surface elevations",
-          gage_id = "usbr-tulc",
-          agency = "u.s. bureau of reclamation",
-          latitude = rise_coord("TULC", "lat"),
-          longitude = rise_coord("TULC", "long"),
-          huc8 = huc_coord("TULC")) |>
-  add_row(location = "tule lake",
-          gage_name = "tule lake sump 1b surface elevations",
-          gage_id = "usbr-tulc2",
-          agency = "u.s. bureau of reclamation",
-          latitude = rise_coord("TULC2", "lat"),
-          longitude = rise_coord("TULC2", "long"),
-          huc8 = huc_coord("TULC2")) |>
-  add_row(location = "gerber reservoir",
-          gage_name = "gerber reservoir forebay elevation",
-          gage_id = "usbr-ger",
-          agency = "u.s. bureau of reclamation",
-          latitude = rise_coord("GER", "lat"),
-          longitude = rise_coord("GER", "long"),
-          huc8 = huc_coord("GER")) |>
-  add_row(location = "malone reservoir",
-          gage_name = "malone reservoir gage height",
-          gage_id = "usbr-mal",
-          agency = "u.s. bureau of reclamation",
-          latitude = rise_coord("MAL", "lat"),
-          longitude = rise_coord("MAL", "long"),
-          huc8 = huc_coord("MAL")) |>
+  add_row(
+    location = "tule lake",
+    gage_name = "tule lake sump 1a surface elevations",
+    gage_id = "usbr-tulc",
+    agency = "u.s. bureau of reclamation",
+    latitude = rise_coord("TULC", "lat"),
+    longitude = rise_coord("TULC", "long"),
+    huc8 = huc_coord("TULC")
+  ) |>
+  add_row(
+    location = "tule lake",
+    gage_name = "tule lake sump 1b surface elevations",
+    gage_id = "usbr-tulc2",
+    agency = "u.s. bureau of reclamation",
+    latitude = rise_coord("TULC2", "lat"),
+    longitude = rise_coord("TULC2", "long"),
+    huc8 = huc_coord("TULC2")
+  ) |>
+  add_row(
+    location = "gerber reservoir",
+    gage_name = "gerber reservoir forebay elevation",
+    gage_id = "usbr-ger",
+    agency = "u.s. bureau of reclamation",
+    latitude = rise_coord("GER", "lat"),
+    longitude = rise_coord("GER", "long"),
+    huc8 = huc_coord("GER")
+  ) |>
+  add_row(
+    location = "malone reservoir",
+    gage_name = "malone reservoir gage height",
+    gage_id = "usbr-mal",
+    agency = "u.s. bureau of reclamation",
+    latitude = rise_coord("MAL", "lat"),
+    longitude = rise_coord("MAL", "long"),
+    huc8 = huc_coord("MAL")
+  ) |>
   add_row(
     location = "clear lake",
     gage_name = "clear lake west lobe forebay elevation",
@@ -309,7 +417,8 @@ water_level_gage <- water_level_gage_usgs |>
     agency = "u.s. bureau of reclamation",
     latitude = rise_coord("CLK", "lat"),
     longitude = rise_coord("CLK", "long"),
-    huc8 = huc_coord("CLK")) |>
+    huc8 = huc_coord("CLK")
+  ) |>
   add_row(
     location = "clear lake",
     gage_name = "clear lake east lobe forebay elevation",
@@ -317,7 +426,8 @@ water_level_gage <- water_level_gage_usgs |>
     agency = "u.s. bureau of reclamation",
     latitude = rise_coord("LRS", "lat"),
     longitude = rise_coord("LRS", "long"),
-    huc8 = huc_coord("LRS")) |>
+    huc8 = huc_coord("LRS")
+  ) |>
   mutate(huc8 = as.numeric(huc8)) |>
   glimpse()
 
@@ -336,4 +446,3 @@ water_level_gage <- water_level_gage_usgs |>
 # save rda files
 usethis::use_data(water_level_data, overwrite = TRUE)
 usethis::use_data(water_level_gage, overwrite = TRUE)
-
