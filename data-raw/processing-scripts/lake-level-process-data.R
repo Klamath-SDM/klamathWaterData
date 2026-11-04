@@ -121,12 +121,16 @@ data_dir <- "data-raw/raw-tule-lake-level-data"
 
 files <- list.files(
   data_dir,
-  pattern    = "^TID[ _]Daily[ _]Report[ _]WY[ _]\\d{4}-\\d{4}\\.xlsx$",
+  # \\.xlsx?$ - two of the workbooks (WY 2013-2014, WY 2014-2015) are legacy
+  # .xls, not .xlsx; an .xlsx-only pattern here silently dropped them,
+  # wiping out an otherwise-complete calendar year (2014) of real elevation
+  # readings.
+  pattern    = "^TID[ _]Daily[ _]Report[ _]WY[ _]\\d{4}-\\d{4}\\.xlsx?$",
   full.names = TRUE,
   ignore.case = TRUE
 )
 
-if (length(files) == 0) stop("No 'TID Daily Report WY ....xlsx' files found in ", data_dir)
+if (length(files) == 0) stop("No 'TID Daily Report WY ....xls(x)' files found in ", data_dir)
 message("Found ", length(files), " workbook(s).")
 
 # ---- 2. Function to read one monthly sheet ------------------------------
@@ -217,12 +221,17 @@ tule_elev_early <- readxl::read_excel("data-raw/raw-tule-lake-level-data/TID Ele
 #combine Tule data
 # TULC (from usbr_hydromet_elev_raw, via the teacup diagram pull) is the same
 # physical gage as the TID-report-derived series above ("usbr tule lake sump
-# 1a") - union them into one continuous series. distinct() guards against
-# date overlap (there's none today: TID data ends 2021-07-05, TULC starts
-# 2024-04-15) should the two source windows ever grow to overlap.
+# 1a") - union them into one continuous series. The TID workbooks stopped
+# recording an elevation (every day is a "-" placeholder, parsed as NA) from
+# WY 2022-2023 onward, but the workbook rows - and their dates - keep being
+# produced through WY 2024-2025. Those dates DO overlap with real TULC
+# readings from the Hydromet pull/email (2024-04-15 onward), so the NA rows
+# are dropped before the union - otherwise distinct()'s "keep first match"
+# rule would let an NA TID row silently shadow a real Hydromet value for the
+# same date.
 tule_elevation <- bind_rows(
-  tule_elev,
-  tule_elev_early,
+  tule_elev |> filter(!is.na(value)),
+  tule_elev_early |> filter(!is.na(value)),
   water_level_data_usbr_hydromet |> filter(gage_id == "usbr-tulc")
 ) |>
   distinct(gage_id, date, .keep_all = TRUE)
