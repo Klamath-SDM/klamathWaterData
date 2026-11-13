@@ -9,7 +9,7 @@ library(readxl)
 #   source("data-raw/data-pull/data-pull-helper-functions.R")
 #
 # Sections (alphabetical by source):
-#   1. Anderson-Rose Dam - Tulelake Irrigation District daily report workbooks
+#   1. Tulelake Irrigation District daily report workbooks (Anderson-Rose Dam, D Plant)
 #   2. Hoopa Valley Tribe - Hydromet portal (wxvisual.com)
 #   3. Karuk Tribe - Water Quality portal (waterquality.karuk.us)
 #   4. OWRD - near real time gage station feed
@@ -17,78 +17,98 @@ library(readxl)
 # ============================================================
 
 # ====================================================================
-# 1. Anderson-Rose Dam (TID daily report workbooks)
+# 1. Tulelake Irrigation District (TID) daily report workbooks
+#    (Anderson-Rose Dam flow, D Plant pumping)
 # ====================================================================
 
 # ============================================================
 # Readers for the Tulelake Irrigation District (TID) daily report workbooks
-# in data-raw/anderson-rose-dam/, which carry Anderson-Rose Dam daily flow
-# (cfs). Unlike the other flow sources this is not an API pull - the
-# workbooks are shared as files. Shared by flow-data-pull.R; the cleaning
-# (date repair, overlap handling) happens in flow-process-data.R.
+# in data-raw/tid-reports/. Unlike the other flow sources this is not an API
+# pull - the workbooks are shared as files. Shared by flow-data-pull.R; the
+# cleaning (date repair, overlap handling) happens in flow-process-data.R.
 # data-raw/data-exploration/anderson-rose-dam-flow.Rmd walks through the QA
-# behind the choices made here and there.
+# behind the choices made here and there (for Anderson-Rose; D Plant is read
+# the same way).
+#
+# Each workbook carries several series; this reads one at a time:
+#   read_anderson_rose_workbooks()  Anderson-Rose Dam flow, cfs
+#   read_d_plant_workbooks()        D Plant (pumping plant) volume, acre-feet/day
 #
 # The workbooks come in two layouts:
 #   - "Daily YYYY.xls(x)" (1996-2011): one workbook per calendar year, with
-#     Anderson-Rose on the "SPILL" tab as one grid of days (rows) by months
-#     (columns).
+#     each series on its own tab as one grid of days (rows) by months
+#     (columns) - Anderson-Rose on "SPILL", D Plant acre-feet on "D-PLNT A.F."
+#     (spelled "D-PLANT A.F." in 1996).
 #   - "TID Daily Report ... WY.xls(x)" (WY 2011-12 onward): one workbook per
-#     water year (Oct-Sep), one tab per month, Anderson-Rose in the
-#     "ANDERSON-ROSE" column (a couple of tabs call it "ANDERSON-ROSE SPILL").
+#     water year (Oct-Sep), one tab per month, one column per series -
+#     "ANDERSON-ROSE" (a couple of tabs call it "ANDERSON-ROSE SPILL") and
+#     "D PLANT" (in AF).
 # ============================================================
 
-anderson_rose_month_abb <- c(JAN = 1, FEB = 2, MAR = 3, APR = 4, MAY = 5, JUN = 6,
-                             JUL = 7, AUG = 8, SEP = 9, OCT = 10, NOV = 11, DEC = 12)
+tid_month_abb <- c(JAN = 1, FEB = 2, MAR = 3, APR = 4, MAY = 5, JUN = 6,
+                   JUL = 7, AUG = 8, SEP = 9, OCT = 10, NOV = 11, DEC = 12)
 
-# One older workbook's SPILL tab -> one row per cell of the days x months grid
-# (so days that don't exist, like Feb 30, are still present; they're dropped
-# when the dates are built in flow-process-data.R). sheet_month_total is the
-# tab's own "CFS" monthly total row, kept so the parse can be reconciled
-# against it (see the Rmd).
-read_anderson_rose_spill_tab <- function(path) {
-  year <- as.integer(str_extract(basename(path), "\\d{4}"))
-  raw  <- read_excel(path, sheet = "SPILL", col_names = FALSE, col_types = "text",
-                     .name_repair = "minimal")
+# One older workbook's tab for one series -> one row per cell of the days x
+# months grid (so days that don't exist, like Feb 30, are still present; they're
+# dropped when the dates are built in flow-process-data.R). `sheet_pattern`
+# picks the tab by name (regex, case-insensitive). sheet_month_total is the
+# tab's own monthly total row (labelled `total_label`: "CFS" on SPILL, "AF" on
+# the D Plant acre-feet tab), kept so the parse can be reconciled against it
+# (see the Rmd).
+read_tid_grid_tab <- function(path, sheet_pattern, total_label) {
+  year  <- as.integer(str_extract(basename(path), "\\d{4}"))
+  sheet <- str_subset(excel_sheets(path), regex(sheet_pattern, ignore_case = TRUE))
+  if (length(sheet) != 1) stop(basename(path), ": expected one tab matching '", sheet_pattern, "', found ", length(sheet))
 
-  # The title carries the year too. Several newer tabs turned out to have a
-  # template copied forward without updating the year, so confirm the two
-  # agree rather than assume.
-  title_year <- as.integer(str_extract(raw[[1]][1], "\\d{4}"))
-  if (!identical(year, title_year)) stop(basename(path), ": title year ", title_year, " != file year ", year)
+  raw <- read_excel(path, sheet = sheet, col_names = FALSE, col_types = "text",
+                    .name_repair = "minimal")
+
+  # The title carries the year too (in the first or second cell of row 1,
+  # depending on the tab). Templates get copied forward without updating the
+  # year, so check the two agree rather than assume. The file name wins - it
+  # is what the rest of the pipeline uses. Known case: the "D-PLNT A.F." tab
+  # in Daily 2007.xlsx is still titled 2006, but its values are 2007's (362 of
+  # 365 days match KHYDRODBA_TIDSTUFF.xlsx's 2007 plant D record, and 2006's
+  # tab has different numbers).
+  title_year <- as.integer(str_extract(paste(na.omit(unlist(raw[1, ])), collapse = " "), "\\d{4}"))
+  if (!identical(year, title_year)) {
+    warning(basename(path), " | ", sheet, ": title year ", title_year, " != file year ", year,
+            " - using the file year")
+  }
 
   header_row <- which(str_to_upper(trimws(raw[[1]])) == "DAY")[1]
   day_rows   <- header_row + 1:31
   if (!identical(suppressWarnings(as.integer(raw[[1]][day_rows])), 1:31)) {
-    stop(basename(path), ": the 31 rows under the DAY header are not days 1-31")
+    stop(basename(path), " | ", sheet, ": the 31 rows under the DAY header are not days 1-31")
   }
 
   header     <- str_to_upper(trimws(unlist(raw[header_row, ])))
-  month_cols <- which(header %in% names(anderson_rose_month_abb))
-  cfs_row    <- which(str_to_upper(trimws(raw[[1]])) == "CFS")[1]
+  month_cols <- which(header %in% names(tid_month_abb))
+  total_row  <- which(str_to_upper(trimws(raw[[1]])) == total_label)[1]
 
   map_dfr(month_cols, function(col) {
     tibble(
-      year = year, month = unname(anderson_rose_month_abb[header[col]]), day = 1:31,
+      year = year, month = unname(tid_month_abb[header[col]]), day = 1:31,
       value = suppressWarnings(as.numeric(raw[[col]][day_rows])),
-      sheet_month_total = suppressWarnings(as.numeric(raw[[col]][cfs_row])),
+      sheet_month_total = suppressWarnings(as.numeric(raw[[col]][total_row])),
       source_file = basename(path)
     )
   })
 }
 
-# One monthly tab of a newer workbook -> one row per day row on the tab.
+# One monthly tab of a newer workbook -> one row per day row on the tab, for
+# the one column whose header matches `column_pattern`.
 # date_as_entered is the date cell exactly as typed: it is NOT reliable (a
 # handful of tabs have a template copied forward with the year or even the
 # whole month's dates left stale), so the tab name is carried alongside
 # (tab_year / tab_month) for flow-process-data.R to repair the dates with.
 #
-# Anderson-Rose is found by matching "ANDERSON" in the header row rather than
-# by position: some workbooks have an extra LRDC column before STATION 48.
+# The series column is found by matching the header row rather than by
+# position: some workbooks have an extra LRDC column before STATION 48.
 # Real data rows are the ones whose first cell is an actual date; the footer
 # rows under them (Monthly Total, Acre Feet, WY Total, ...) are text.
 # Tabs not named like a month (the empty "Sheet1" tabs) are skipped.
-read_anderson_rose_month_tab <- function(path, sheet) {
+read_tid_month_tab <- function(path, sheet, column_pattern, units_pattern) {
   tab_start <- parse_date_time(sheet, "b Y", quiet = TRUE)   # "Oct 2012"
   if (is.na(tab_start)) return(NULL)
 
@@ -99,15 +119,18 @@ read_anderson_rose_month_tab <- function(path, sheet) {
   cell_text <- function(cell) if (is.null(cell[[1]]) || is.na(cell[[1]])) NA_character_ else as.character(cell[[1]])
   header    <- map_chr(raw[1, ], cell_text)
 
-  date_col <- which(str_detect(str_to_upper(header), "^DATE"))[1]
-  ar_col   <- which(str_detect(str_to_upper(header), "ANDERSON"))[1]
-  if (is.na(date_col) || is.na(ar_col)) stop("No DATE / ANDERSON column in ", basename(path), " | ", sheet)
+  date_col   <- which(str_detect(str_to_upper(header), "^DATE"))[1]
+  series_col <- which(str_detect(str_to_upper(header), column_pattern))[1]
+  if (is.na(date_col) || is.na(series_col)) stop("No DATE / ", column_pattern, " column in ", basename(path), " | ", sheet)
 
   # Row 2 of every tab is a units row ("(in CFS)") - carried through so a
-  # workbook that ever switched units doesn't get stacked in silently.
-  units <- cell_text(raw[[ar_col]][2])
-  if (!isTRUE(str_detect(str_to_upper(units), "CFS"))) {
-    warning(basename(path), " | ", sheet, ": units under the Anderson-Rose column are '", units, "', not CFS")
+  # workbook that ever switched units doesn't get stacked in silently. (The
+  # October tabs leave it blank under D PLANT; the values there are the same
+  # acre-feet as the other months, so a blank isn't flagged, only a different
+  # unit is.)
+  units <- cell_text(raw[[series_col]][2])
+  if (!is.na(units) && !str_detect(str_to_upper(units), units_pattern)) {
+    warning(basename(path), " | ", sheet, ": units under the ", header[series_col], " column are '", units, "', not ", units_pattern)
   }
 
   is_date <- map_lgl(raw[[date_col]], ~ inherits(.x[[1]], c("POSIXct", "POSIXt", "Date")))
@@ -119,20 +142,35 @@ read_anderson_rose_month_tab <- function(path, sheet) {
     tab_month       = month(tab_start),
     units           = units,
     date_as_entered = as.Date(map_vec(raw[[date_col]][is_date], ~ as.POSIXct(.x[[1]], tz = "UTC"))),
-    value           = map_dbl(raw[[ar_col]][is_date], function(cell) suppressWarnings(as.numeric(cell[[1]] %||% NA)))
+    value           = map_dbl(raw[[series_col]][is_date], function(cell) suppressWarnings(as.numeric(cell[[1]] %||% NA)))
   )
 }
 
-# Reads every workbook in `dir`: both layouts are picked up by file name, so a
-# newly added workbook (e.g. the next water year's) is read with no changes here.
-read_anderson_rose_workbooks <- function(dir) {
-  spill_files <- list.files(dir, pattern = "^Daily \\d{4}\\.xlsx?$", full.names = TRUE)
+# Reads every workbook in `dir` for one series: both layouts are picked up by
+# file name, so a newly added workbook (e.g. the next water year's) is read
+# with no changes here.
+read_tid_workbooks <- function(dir, grid_sheet_pattern, total_label, column_pattern, units_pattern) {
+  grid_files  <- list.files(dir, pattern = "^Daily \\d{4}\\.xlsx?$", full.names = TRUE)
   month_files <- list.files(dir, pattern = "^TID Daily Report.*\\.xlsx?$", full.names = TRUE)
 
   list(
-    spill = map_dfr(spill_files, read_anderson_rose_spill_tab),
-    month = map_dfr(month_files, function(f) map_dfr(excel_sheets(f), ~ read_anderson_rose_month_tab(f, .x)))
+    spill = map_dfr(grid_files, read_tid_grid_tab, sheet_pattern = grid_sheet_pattern, total_label = total_label),
+    month = map_dfr(month_files, function(f) {
+      map_dfr(excel_sheets(f), ~ read_tid_month_tab(f, .x, column_pattern, units_pattern))
+    })
   )
+}
+
+# Anderson-Rose Dam flow (cfs)
+read_anderson_rose_workbooks <- function(dir) {
+  read_tid_workbooks(dir, grid_sheet_pattern = "^SPILL$", total_label = "CFS",
+                     column_pattern = "ANDERSON", units_pattern = "CFS")
+}
+
+# D Plant pumping (acre-feet per day - convert to cfs in flow-process-data.R)
+read_d_plant_workbooks <- function(dir) {
+  read_tid_workbooks(dir, grid_sheet_pattern = "^D-PL[A-Z]*T A\\.F\\.$", total_label = "AF",
+                     column_pattern = "^D[ -]?PL", units_pattern = "AF")
 }
 
 # ====================================================================

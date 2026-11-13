@@ -202,104 +202,127 @@ flow_gage_owrd <- owrd_flow_data |>
   rename(latitude = lat, longitude = long)
 
 # ============================================================
-# Anderson-Rose Dam (Tulelake Irrigation District daily report workbooks -
-# see flow-data-pull.R for reading them; cleaned and shaped here)
+# Tulelake Irrigation District (TID) daily report workbooks: Anderson-Rose
+# Dam and D Plant (see flow-data-pull.R for reading them; cleaned and shaped
+# here)
 # ============================================================
+# Both series come out of the same workbooks, in the same two layouts, with
+# the same problems, so one function cleans either.
 # data-raw/data-exploration/anderson-rose-dam-flow.Rmd has the QA behind each
-# step below (reconciliation against the workbooks' own monthly totals, which
-# tabs needed repair, the overlap checks, plots).
+# step (reconciliation against the workbooks' own monthly totals, which tabs
+# needed repair, the overlap checks, plots) for Anderson-Rose; D Plant's
+# older tabs reconcile to the sheet's acre-feet totals the same way.
 
-## 1. Older workbooks (1996-2011, SPILL tab) ----
-# The grid has a cell for every day 1-31 of every month, so days that don't
-# exist (Feb 30, Apr 31, Feb 29 in a non-leap year) come out as NA dates and
-# are dropped. That drops one real value: 30 cfs on "Feb 29, 2002" (2002
-# wasn't a leap year - Feb 27 = 40, Feb 28 = 36, "Feb 29" = 30, Mar 1 = 30, so
-# it looks like a duplicated entry), which can't be assigned to a real day.
-anderson_rose_spill <- anderson_rose_spill_raw |>
-  mutate(date = make_date(year, month, day))
+## 1. Clean one series -> one value per day ----
+# grid_raw:  older workbooks (1996-2011), one tab per series laid out as days x
+#            months. The grid has a cell for every day 1-31 of every month, so
+#            days that don't exist (Feb 30, Apr 31, Feb 29 in a non-leap year)
+#            come out as NA dates and are dropped. A non-zero value on one of
+#            them can't be assigned to a real day, so it's dropped with a
+#            message (Anderson-Rose has one: 30 cfs on "Feb 29, 2002" - 2002
+#            wasn't a leap year; Feb 27 = 40, Feb 28 = 36, "Feb 29" = 30, Mar 1
+#            = 30, so it looks like a duplicated entry).
+# month_raw: newer workbooks (WY 2011-12 onward), one tab per month. The date
+#            cells on a few tabs are wrong - a template copied forward without
+#            its dates being updated (e.g. the "Mar 2024" tab is dated entirely
+#            2023, "Mar 2022"/"Mar 2023" keep stale 2021 dates from the 7th on,
+#            "Sep 2018" has two 2016 dates). The values on those tabs are real
+#            (the March tabs hold clearly different numbers), so the tab name
+#            is treated as the source of truth for the year and month, and only
+#            the day-of-month comes from the date cell. A date whose month
+#            doesn't match its tab is dropped: those are the blank 29th rows on
+#            some Feb tabs, whose dates roll over to Mar 1 (the real Mar 1 is
+#            on the Mar tab), and the junk dates on empty template tabs.
+# pre1996_raw: date/value from KHYDRODBA_TIDSTUFF.xlsx, already filtered to
+#            before the workbooks start.
+# A few dates are in more than one source: Oct-Dec 2011 is in both "Daily 2011"
+# and the WY 2011-12 workbook, and each water-year workbook can carry the start
+# of the next one as a leftover tab (e.g. "Oct 2025" in the WY 2024-25
+# workbook, repeated in full in WY 2025-26). The value from the newest source
+# is kept, and a non-blank value always beats a blank one.
+clean_tid_series <- function(grid_raw, month_raw, pre1996_raw, label) {
+  # older workbooks
+  grid <- grid_raw |>
+    mutate(date = make_date(year, month, day))
 
-anderson_rose_phantom <- anderson_rose_spill |>
-  filter(is.na(date), !is.na(value), value != 0)
-if (nrow(anderson_rose_phantom) > 0) {
-  message("Anderson-Rose: dropped ", nrow(anderson_rose_phantom),
-          " non-zero SPILL value(s) on dates that don't exist: ",
-          paste0(anderson_rose_phantom$year, "-", anderson_rose_phantom$month, "-",
-                 anderson_rose_phantom$day, " = ", anderson_rose_phantom$value, collapse = "; "))
+  phantom <- grid |>
+    filter(is.na(date), !is.na(value), value != 0)
+  if (nrow(phantom) > 0) {
+    message(label, ": dropped ", nrow(phantom),
+            " non-zero value(s) on dates that don't exist: ",
+            paste0(phantom$year, "-", phantom$month, "-", phantom$day, " = ", phantom$value, collapse = "; "))
+  }
+
+  grid <- grid |>
+    filter(!is.na(date)) |>
+    transmute(date, value, source_file, source_rank = year)
+
+  # pre-1996 record
+  pre1996 <- pre1996_raw |>
+    mutate(source_file = "KHYDRODBA_TIDSTUFF.xlsx",
+           source_rank = year(date))
+
+  # newer workbooks
+  month <- month_raw |>
+    mutate(
+      month_matches = month(date_as_entered) == tab_month,
+      date = if_else(month_matches, make_date(tab_year, tab_month, day(date_as_entered)), as.Date(NA))
+    )
+
+  message(label, ": ", sum(month$month_matches & year(month$date_as_entered) != month$tab_year),
+          " date(s) with the wrong year corrected from the tab name; ",
+          sum(!month$month_matches), " row(s) dropped (date in a different month than its tab)")
+
+  # dropping a row is only safe if it's blank - say so if that ever stops being true
+  if (any(!month$month_matches & !is.na(month$value))) {
+    warning(label, ": dropped row(s) with a value because their date is in a different month than their tab:\n",
+            paste(capture.output(print(month |>
+                                         filter(!month_matches, !is.na(value)) |>
+                                         select(source_file, tab, date_as_entered, value))), collapse = "\n"))
+  }
+
+  month <- month |>
+    filter(!is.na(date)) |>
+    transmute(date, value, source_file,
+              # any newer-layout workbook outranks any older-layout one, and later
+              # water years outrank earlier ones
+              source_rank = 1000L + as.integer(str_extract(source_file, "\\d{4}")))
+
+  # combine - newest source wins
+  all <- bind_rows(grid, month, pre1996)
+
+  conflicts <- all |>
+    filter(!is.na(value)) |>
+    group_by(date) |>
+    filter(n_distinct(value) > 1) |>
+    ungroup()
+  if (nrow(conflicts) > 0) {
+    warning(label, ": ", n_distinct(conflicts$date),
+            " date(s) have different values in different workbooks (newest workbook kept): ",
+            paste(format(sort(unique(conflicts$date))), collapse = ", "))
+  }
+
+  daily <- all |>
+    arrange(date, is.na(value), desc(source_rank)) |>
+    distinct(date, .keep_all = TRUE)
+
+  message(label, ": ", sum(!is.na(daily$value)), " days with a value, ",
+          format(min(daily$date[!is.na(daily$value)])), " to ",
+          format(max(daily$date[!is.na(daily$value)])),
+          " (first / last day with a value)")
+
+  daily
 }
 
-anderson_rose_spill <- anderson_rose_spill |>
-  filter(!is.na(date)) |>
-  transmute(date, value, source_file, source_rank = year)
+## 2. Anderson-Rose Dam (cfs) ----
+anderson_rose_daily <- clean_tid_series(anderson_rose_spill_raw, anderson_rose_month_raw,
+                                        anderson_rose_raw_pre1996, label = "Anderson-Rose")
 
-anderson_rose_pre1996 <- anderson_rose_raw_2 |>
-  mutate(source_file = "KHYDRODBA_TIDSTUFF.xlsx",
-         source_rank = year(date)) |>
-  glimpse()
+## 3. D Plant (acre-feet per day) ----
+d_plant_daily <- clean_tid_series(d_plant_spill_raw, d_plant_month_raw,
+                                  d_plant_raw_pre1996, label = "D Plant")
 
-## 2. Newer workbooks (WY 2011-12 onward, one tab per month) ----
-# The date cells on a few tabs are wrong - a template copied forward without
-# its dates being updated (e.g. the "Mar 2024" tab is dated entirely 2023,
-# "Mar 2022"/"Mar 2023" keep stale 2021 dates from the 7th on, "Sep 2018" has
-# two 2016 dates). The values on those tabs are real (the March tabs hold
-# clearly different numbers), so the tab name is treated as the source of
-# truth for the year and month, and only the day-of-month comes from the date
-# cell. A date whose month doesn't match its tab is dropped: those are the
-# blank 29th rows on some Feb tabs, whose dates roll over to Mar 1 (the real
-# Mar 1 is on the Mar tab), and the junk dates on empty template tabs.
-anderson_rose_month <- anderson_rose_month_raw |>
-  mutate(
-    month_matches = month(date_as_entered) == tab_month,
-    date = if_else(month_matches, make_date(tab_year, tab_month, day(date_as_entered)), as.Date(NA))
-  )
-
-message("Anderson-Rose: ", sum(anderson_rose_month$month_matches & year(anderson_rose_month$date_as_entered) != anderson_rose_month$tab_year),
-        " date(s) with the wrong year corrected from the tab name; ",
-        sum(!anderson_rose_month$month_matches), " row(s) dropped (date in a different month than its tab)")
-
-# dropping a row is only safe if it's blank - say so if that ever stops being true
-if (any(!anderson_rose_month$month_matches & !is.na(anderson_rose_month$value))) {
-  warning("Anderson-Rose: dropped row(s) with a value because their date is in a different month than their tab:\n",
-          paste(capture.output(print(anderson_rose_month |>
-                                       filter(!month_matches, !is.na(value)) |>
-                                       select(source_file, tab, date_as_entered, value))), collapse = "\n"))
-}
-
-anderson_rose_month <- anderson_rose_month |>
-  filter(!is.na(date)) |>
-  transmute(date, value, source_file,
-            # any newer-layout workbook outranks any older-layout one, and later
-            # water years outrank earlier ones
-            source_rank = 1000L + as.integer(str_extract(source_file, "\\d{4}")))
-
-## 3. Combine - newest workbook wins ----
-# A few dates are in more than one workbook: Oct-Dec 2011 is in both
-# "Daily 2011" and the WY 2011-12 workbook, and each water-year workbook can
-# carry the start of the next one as a leftover tab (e.g. "Oct 2025" in the
-# WY 2024-25 workbook, repeated in full in WY 2025-26). The value from the
-# newest workbook is kept, and a non-blank value always beats a blank one.
-anderson_rose_all <- bind_rows(anderson_rose_spill, anderson_rose_month, anderson_rose_pre1996)
-
-anderson_rose_conflicts <- anderson_rose_all |>
-  filter(!is.na(value)) |>
-  group_by(date) |>
-  filter(n_distinct(value) > 1) |>
-  ungroup()
-if (nrow(anderson_rose_conflicts) > 0) {
-  warning("Anderson-Rose: ", n_distinct(anderson_rose_conflicts$date),
-          " date(s) have different values in different workbooks (newest workbook kept): ",
-          paste(format(sort(unique(anderson_rose_conflicts$date))), collapse = ", "))
-}
-
-anderson_rose_daily <- anderson_rose_all |>
-  arrange(date, is.na(value), desc(source_rank)) |>
-  distinct(date, .keep_all = TRUE)
-
-message("Anderson-Rose: ", sum(!is.na(anderson_rose_daily$value)), " days with a value, ",
-        format(min(anderson_rose_daily$date)), " to ",
-        format(max(anderson_rose_daily$date[!is.na(anderson_rose_daily$value)])),
-        " (last day with a value)")
-
-## 4. Flow table ----
+## 4. Anderson-Rose flow table ----
 # keeping all available years on the package, filtering/clipping
 # to years use for modeling can happen in model-processing
 # Blank days drop out here, same as the other sources. Carries its name
@@ -321,7 +344,7 @@ anderson_rose_flow_data <- anderson_rose_daily |>
     date          = date) |>
   glimpse()
 
-## 5. Gage table ----
+## 5. Anderson-Rose gage table ----
 # Built from the flow table like the USBR Hydromet/OWRD gages, so the two
 # can't drift. Coordinates are the NWIS site AT the dam (pulled in
 # flow-data-pull.R). river_mile and huc8 are filled in the combine below,
@@ -332,14 +355,45 @@ flow_gage_anderson_rose <- anderson_rose_flow_data |>
          latitude  = anderson_rose_site$dec_lat_va,
          longitude = anderson_rose_site$dec_long_va)
 
+## 6. D Plant flow table ----
+# D Plant is a pumping plant (Tule Lake sump pumped out through the tunnel),
+# and TID reports it as acre-feet pumped per day, not a flow rate. Converted
+# to the mean daily flow in cfs so it sits in flow_data with every other
+# gage: 1 acre-foot = 43,560 cubic feet, 1 day = 86,400 seconds, so
+# 1 AF/day = 0.5042 cfs. Zero is a real value (the plant is off), so zeros are
+# kept; only blank days drop out. gage_id follows the same "<source>-<site>"
+# pattern as Anderson-Rose.
+af_per_day_to_cfs <- 43560 / 86400
+
+d_plant_flow_data <- d_plant_daily |>
+  filter(!is.na(value)) |>
+  transmute(
+    location      = "d plant",
+    gage_name     = "d plant",
+    gage_id       = "tid-d-plant",
+    variable_name = "flow",
+    value         = value * af_per_day_to_cfs,
+    unit          = "cfs",
+    statistic     = "mean",
+    date          = date) |>
+  glimpse()
+
+## 7. D Plant gage table ----
+# Coordinates are the NWIS site at the plant (pulled in flow-data-pull.R).
+flow_gage_d_plant <- d_plant_flow_data |>
+  distinct(location, gage_name, gage_id) |>
+  mutate(agency = "Tulelake Irrigation District",
+         latitude  = d_plant_site$dec_lat_va,
+         longitude = d_plant_site$dec_long_va)
+
 # ============================================================
 # Combine all sources
 # ============================================================
 
-## 1. Combine USBR Hydromet + OWRD + Anderson-Rose gage rows, assign huc8 ----
+## 1. Combine USBR Hydromet + OWRD + Anderson-Rose + D Plant gage rows, assign huc8 ----
 # huc8 determined by spatial join against rivermile::klamath_hucs
 # (point-in-polygon on lat/long) rather than hand-transcribed.
-flow_gage_usbr_owrd <- bind_rows(flow_gage_usbr, flow_gage_owrd, flow_gage_anderson_rose) |>
+flow_gage_usbr_owrd <- bind_rows(flow_gage_usbr, flow_gage_owrd, flow_gage_anderson_rose, flow_gage_d_plant) |>
   mutate(river_mile = NA_real_) |>
   st_as_sf(coords = c("longitude", "latitude"), crs = 4326, remove = FALSE) |>
   st_join(klamath_hucs |> st_transform(4326), join = st_intersects) |>
@@ -402,9 +456,9 @@ flow_data <- flow_wqx |>
   mutate(date = as.Date(date)) |>
   bind_rows(flow_usgs |>
               mutate(gage_id = as.character(gage_id)),
-            usbr_hydromet_flow_data, owrd_flow_data, anderson_rose_flow_data) |>
+            usbr_hydromet_flow_data, owrd_flow_data, anderson_rose_flow_data, d_plant_flow_data) |>
   # flow_wqx/flow_usgs carry the stream name in `stream`; the USBR Hydromet,
-  # OWRD and Anderson-Rose tables carry it in `location`. Take whichever is
+  # OWRD, Anderson-Rose and D Plant tables carry it in `location`. Take whichever is
   # there - `tolower(stream)` on its own overwrote `location` with NA for
   # every row of the second group (~160,000 rows).
   mutate(location = coalesce(tolower(stream), location)) |>
