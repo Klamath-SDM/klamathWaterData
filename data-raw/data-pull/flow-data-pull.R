@@ -234,36 +234,48 @@ owrd_flow_data <- map_dfr(seq_len(nrow(owrd_stations)), function(i) {
   filter(!is.na(value)) |>
   glimpse()
 
-## Anderson-Rose Dam flow - Tulelake Irrigation District daily report workbooks ----
-# Daily flow (cfs) at Anderson-Rose Dam on the Lost River. Not an API pull:
-# the TID daily report workbooks are shared as files and live in
-# data-raw/anderson-rose-dam/. They come in two layouts (older calendar-year
-# "Daily YYYY" workbooks with a SPILL tab, newer water-year "TID Daily Report"
-# workbooks with one tab per month) - see the Anderson-Rose section of
-# data-pull-helper-functions.R. Read here as-is; the date repairs and overlap
-# handling are in flow-process-data.R, and
+## Tulelake Irrigation District (TID) daily report workbooks - Anderson-Rose Dam and D Plant ----
+# Not an API pull: the TID daily report workbooks are shared as files and live
+# in data-raw/tid-reports/. Each workbook carries several series; two are
+# pulled from them here:
+#   - Anderson-Rose Dam on the Lost River, daily flow (cfs)
+#   - D Plant, the Tule Lake pumping plant, acre-feet pumped per day (converted
+#     to cfs in flow-process-data.R)
+# They come in two layouts (older calendar-year "Daily YYYY" workbooks with one
+# tab per series, newer water-year "TID Daily Report" workbooks with one tab per
+# month) - see the TID section of data-pull-helper-functions.R. Read here
+# as-is; the date repairs and overlap handling are in flow-process-data.R, and
 # data-raw/data-exploration/anderson-rose-dam-flow.Rmd has the QA behind them.
 # A newly added workbook is picked up by file name.
 
-anderson_rose_raw <- read_anderson_rose_workbooks("data-raw/anderson-rose-dam")
+anderson_rose_raw <- read_anderson_rose_workbooks("data-raw/tid-reports")
 anderson_rose_spill_raw <- anderson_rose_raw$spill   # 1996-2011, SPILL tab (days x months grid)
 anderson_rose_month_raw <- anderson_rose_raw$month   # WY 2011-12 onward (one tab per month)
 
+d_plant_raw <- read_d_plant_workbooks("data-raw/tid-reports")
+d_plant_spill_raw <- d_plant_raw$spill   # 1996-2011, "D-PLNT A.F." tab (days x months grid)
+d_plant_month_raw <- d_plant_raw$month   # WY 2011-12 onward (one tab per month)
+
 # this excel sheet contains data from 1986, we will just keep earlier data
-anderson_rose_raw_2 <- read_xlsx("data-raw/anderson-rose-dam/KHYDRODBA_TIDSTUFF.xlsx") |>
+# (it runs to Sep 2012, so it overlaps the workbooks above and they are kept
+# for those years)
+tid_khydrodba_raw <- read_xlsx("data-raw/tid-reports/KHYDRODBA_TIDSTUFF.xlsx") |>
   clean_names() |>
-  mutate(date = as.Date(datecreated),
-         value = androse) |>
-  select(date, value) |>
+  mutate(date = as.Date(datecreated)) |>
   filter(date < as.Date("1996-01-01")) #filtering more recent years since they are included above
+
+anderson_rose_raw_pre1996 <- tid_khydrodba_raw |> transmute(date, value = androse)
+d_plant_raw_pre1996       <- tid_khydrodba_raw |> transmute(date, value = plantd)   # acre-feet per day
 
 #### gage data pull----
 # The workbooks don't give coordinates. USGS has a site AT the dam
 # (420037121334100, "LOST RVR AT ANDERSON ROSE DVRSN DAM AT MALONE, OR"; the
 # nearby 420036121333700 is the "below dam" site), so its NWIS record is used
 # for the gage's location, the same way the other USGS gage metadata is pulled
-# above.
+# above. Same for D Plant (415505121334701, "TULE LK A PUMPING PLANT D NT
+# TULELAKE CA").
 anderson_rose_site <- readNWISsite("420037121334100")
+d_plant_site       <- readNWISsite("415505121334701")
 
 
 ##### save raw data into aws bucket water-quality/data-raw/
