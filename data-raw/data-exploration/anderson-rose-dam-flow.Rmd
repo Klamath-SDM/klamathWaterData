@@ -22,7 +22,7 @@ library(klamathWaterData)
 ## Overview
 
 Daily flow (cfs) at Anderson-Rose Dam on the Lost River, compiled from the Tulelake
-Irrigation District (TID) daily report workbooks in `data-raw/anderson-rose-dam/`. The workbooks
+Irrigation District (TID) daily report workbooks in `data-raw/tid-reports/`. The workbooks
 come in two layouts:
 
 | Period | Files | Where Anderson-Rose is |
@@ -39,7 +39,7 @@ modify any package data.** It shows everything in the workbooks, while the pipel
 standardized window (through 2025-12-31) like the other flow sources.
 
 ```{r config}
-ar_dir <- here("data-raw", "anderson-rose-dam")
+ar_dir <- here("data-raw", "tid-reports")
 
 # Identifiers for the flow_data / flow_gage rows. flow_data/flow_gage lowercase every
 # character column except gage_id. "tid-anderson-rose" follows the "<source>-<site>" pattern

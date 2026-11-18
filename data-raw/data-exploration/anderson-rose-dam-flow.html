@@ -1575,7 +1575,7 @@ border-radius: 0px;
 <h2>Overview</h2>
 <p>Daily flow (cfs) at Anderson-Rose Dam on the Lost River, compiled
 from the Tulelake Irrigation District (TID) daily report workbooks in
-<code>data-raw/anderson-rose-dam/</code>. The workbooks come in two
+<code>data-raw/tid-reports/</code>. The workbooks come in two
 layouts:</p>
 <table>
 <colgroup>
@@ -1612,13 +1612,13 @@ a handful of tabs, checks the result, and builds a daily series in the
 same shape as <code>flow_data</code> / <code>flow_gage</code>. The same
 logic now runs in the pipeline: the workbooks are read in
 <code>flow-data-pull.R</code> (using
-<code>anderson-rose-pull-helpers.R</code>) and cleaned and added to
+<code>data-pull-helper-functions.R</code>) and cleaned and added to
 <code>flow_data</code> / <code>flow_gage</code> in
 <code>flow-process-data.R</code>. <strong>This document does not modify
 any package data.</strong> It shows everything in the workbooks, while
 the pipeline clips to its standardized window (through 2025-12-31) like
 the other flow sources.</p>
-<pre class="r"><code>ar_dir &lt;- here(&quot;data-raw&quot;, &quot;anderson-rose-dam&quot;)
+<pre class="r"><code>ar_dir &lt;- here(&quot;data-raw&quot;, &quot;tid-reports&quot;)
 
 # Identifiers for the flow_data / flow_gage rows. flow_data/flow_gage lowercase every
 # character column except gage_id. &quot;tid-anderson-rose&quot; follows the &quot;&lt;source&gt;-&lt;site&gt;&quot; pattern
@@ -2582,11 +2582,11 @@ tibble(
 </tr>
 <tr class="odd">
 <td align="left">gage_id not already in flow_gage</td>
-<td align="left">TRUE</td>
+<td align="left">FALSE</td>
 </tr>
 <tr class="even">
 <td align="left">gage_id not already in flow_data</td>
-<td align="left">TRUE</td>
+<td align="left">FALSE</td>
 </tr>
 <tr class="odd">
 <td align="left">huc8 matches USGS record for the dam site</td>
@@ -2598,8 +2598,8 @@ tibble(
 </tr>
 </tbody>
 </table>
-<p>Stacked onto the current objects this would give 447,480
-<code>flow_data</code> rows (436,361 + 11,119) and 119
+<p>Stacked onto the current objects this would give 473,325
+<code>flow_data</code> rows (462,206 + 11,119) and 121
 <code>flow_gage</code> rows.</p>
 </div>
 </div>
