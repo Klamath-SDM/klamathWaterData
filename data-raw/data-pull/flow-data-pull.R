@@ -256,16 +256,17 @@ d_plant_raw <- read_d_plant_workbooks("data-raw/tid-reports")
 d_plant_spill_raw <- d_plant_raw$spill   # 1996-2011, "D-PLNT A.F." tab (days x months grid)
 d_plant_month_raw <- d_plant_raw$month   # WY 2011-12 onward (one tab per month)
 
-# this excel sheet contains data from 1986, we will just keep earlier data
-# (it runs to Sep 2012, so it overlaps the workbooks above and they are kept
-# for those years)
+# KHYDRODBA_TIDSTUFF.xlsx is a USBR Klamath Project database extract with
+# Anderson-Rose and D Plant daily values from 1986-08 to 2012-09. It is the
+# only source before 1996. From 1996 on it overlaps the TID workbooks above, and
+# where the two disagree the KHYDRODBA value is used, per Viktor Stromberg of
+# USBR (see clean_tid_series() in flow-process-data.R).
 tid_khydrodba_raw <- read_xlsx("data-raw/tid-reports/KHYDRODBA_TIDSTUFF.xlsx") |>
   clean_names() |>
-  mutate(date = as.Date(datecreated)) |>
-  filter(date < as.Date("1996-01-01")) #filtering more recent years since they are included above
+  mutate(date = as.Date(datecreated))
 
-anderson_rose_raw_pre1996 <- tid_khydrodba_raw |> transmute(date, value = androse)
-d_plant_raw_pre1996       <- tid_khydrodba_raw |> transmute(date, value = plantd)   # acre-feet per day
+anderson_rose_raw_khydrodba <- tid_khydrodba_raw |> transmute(date, value = androse)
+d_plant_raw_khydrodba       <- tid_khydrodba_raw |> transmute(date, value = plantd)   # acre-feet per day
 
 #### gage data pull----
 # The workbooks don't give coordinates. USGS has a site AT the dam

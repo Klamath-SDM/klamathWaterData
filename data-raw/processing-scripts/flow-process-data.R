@@ -233,14 +233,19 @@ flow_gage_owrd <- owrd_flow_data |>
 #            doesn't match its tab is dropped: those are the blank 29th rows on
 #            some Feb tabs, whose dates roll over to Mar 1 (the real Mar 1 is
 #            on the Mar tab), and the junk dates on empty template tabs.
-# pre1996_raw: date/value from KHYDRODBA_TIDSTUFF.xlsx, already filtered to
-#            before the workbooks start.
+# khydrodba_raw: date/value from KHYDRODBA_TIDSTUFF.xlsx (USBR, 1986-2012). The
+#            only source before 1996. Where it disagrees with the TID workbooks
+#            the KHYDRODBA value is used, per Viktor Stromberg of USBR (the TID
+#            workbooks have stretches that look wrong, e.g. D Plant reads 0 from
+#            Oct 21 to Dec 31, 1996 while USBR's daily operations report shows
+#            real pumping). A blank KHYDRODBA value never overrides a workbook.
 # A few dates are in more than one source: Oct-Dec 2011 is in both "Daily 2011"
 # and the WY 2011-12 workbook, and each water-year workbook can carry the start
 # of the next one as a leftover tab (e.g. "Oct 2025" in the WY 2024-25
 # workbook, repeated in full in WY 2025-26). The value from the newest source
-# is kept, and a non-blank value always beats a blank one.
-clean_tid_series <- function(grid_raw, month_raw, pre1996_raw, label) {
+# is kept, and a non-blank value always beats a blank one. KHYDRODBA outranks
+# all of the workbooks (see above).
+clean_tid_series <- function(grid_raw, month_raw, khydrodba_raw, label) {
   # older workbooks
   grid <- grid_raw |>
     mutate(date = make_date(year, month, day))
@@ -257,10 +262,11 @@ clean_tid_series <- function(grid_raw, month_raw, pre1996_raw, label) {
     filter(!is.na(date)) |>
     transmute(date, value, source_file, source_rank = year)
 
-  # pre-1996 record
-  pre1996 <- pre1996_raw |>
+  # KHYDRODBA: pre-1996 record, and the preferred value wherever it disagrees
+  # with a workbook (per Viktor Stromberg, USBR)
+  khydrodba <- khydrodba_raw |>
     mutate(source_file = "KHYDRODBA_TIDSTUFF.xlsx",
-           source_rank = year(date))
+           source_rank = 1e6)
 
   # newer workbooks
   month <- month_raw |>
@@ -289,9 +295,10 @@ clean_tid_series <- function(grid_raw, month_raw, pre1996_raw, label) {
               source_rank = 1000L + as.integer(str_extract(source_file, "\\d{4}")))
 
   # combine - newest source wins
-  all <- bind_rows(grid, month, pre1996)
+  all <- bind_rows(grid, month, khydrodba)
 
-  conflicts <- all |>
+  # workbook vs workbook
+  conflicts <- bind_rows(grid, month) |>
     filter(!is.na(value)) |>
     group_by(date) |>
     filter(n_distinct(value) > 1) |>
@@ -306,6 +313,15 @@ clean_tid_series <- function(grid_raw, month_raw, pre1996_raw, label) {
     arrange(date, is.na(value), desc(source_rank)) |>
     distinct(date, .keep_all = TRUE)
 
+  # KHYDRODBA vs workbooks
+  overridden <- bind_rows(grid, month) |>
+    filter(!is.na(value)) |>
+    inner_join(khydrodba_raw |> filter(!is.na(value)) |> select(date, khydrodba_value = value),
+               by = "date") |>
+    filter(value != khydrodba_value)
+  message(label, ": KHYDRODBA value used over the TID workbook on ",
+          n_distinct(overridden$date), " day(s) where they disagree")
+
   message(label, ": ", sum(!is.na(daily$value)), " days with a value, ",
           format(min(daily$date[!is.na(daily$value)])), " to ",
           format(max(daily$date[!is.na(daily$value)])),
@@ -316,11 +332,11 @@ clean_tid_series <- function(grid_raw, month_raw, pre1996_raw, label) {
 
 ## 2. Anderson-Rose Dam (cfs) ----
 anderson_rose_daily <- clean_tid_series(anderson_rose_spill_raw, anderson_rose_month_raw,
-                                        anderson_rose_raw_pre1996, label = "Anderson-Rose")
+                                        anderson_rose_raw_khydrodba, label = "Anderson-Rose")
 
 ## 3. D Plant (acre-feet per day) ----
 d_plant_daily <- clean_tid_series(d_plant_spill_raw, d_plant_month_raw,
-                                  d_plant_raw_pre1996, label = "D Plant")
+                                  d_plant_raw_khydrodba, label = "D Plant")
 
 ## 4. Anderson-Rose flow table ----
 # keeping all available years on the package, filtering/clipping
