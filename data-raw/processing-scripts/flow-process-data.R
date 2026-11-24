@@ -117,6 +117,19 @@ usgs_data_raw_clean <- usgs_data_raw |>
          statistic = "mean") |>
   select(date, agency_cd, gage_id, variable_name, value, unit, site_no, statistic)
 
+### append ady canal data for pre 2012 from USBR
+ady_flow_data_clean <- ady_flow_data |>
+  mutate(agency_cd = "USGS",
+         gage_id = "11509250",
+         variable_name = "flow",
+         unit = "cfs",
+         site_no = "11509250",
+         statistic = "mean") |>
+  select(date, agency_cd, gage_id, variable_name, value, unit, site_no, statistic)
+
+usgs_data_raw_clean <- usgs_data_raw_clean |>
+  bind_rows(ady_flow_data_clean) |> glimpse()
+
 # stream names live in the gage data, so pull that in and join
 usgs_gage_raw <- usgs_gage_flow_data |>
   janitor::clean_names() |>
