@@ -84,6 +84,31 @@ usgs_flow_data <- usgs_flow_data |>
 usgs_gage_flow_data <- readNWISsite(usgs_gages)
 
 
+#### additional Ady Canal----
+#  this data was shared by usbr. We are assuming theses are  are the daily mean -
+# it doesn't explicitly state this in the excel workbook.
+ady_raw <- read_excel("data-raw/ady-flow/Ady to Refuge 1980-Mar 2012.xls")
+
+# Second tab ("Daily Data") has daily Ady Canal to Refuge flow. Column A is the
+# date (stored as an Excel serial number) and column B is flow in cfs; the
+# remaining columns (af, etc.) are dropped. The sheet has 7 rows of notes above
+# the header. Data are quality-controlled through 25 Dec 2010; values after that
+# are unvalidated BOR electronic records.
+ady_flow_data <- read_excel(
+  "data-raw/ady-flow/Ady to Refuge 1980-Mar 2012.xls",
+  sheet = "Daily Data",
+  skip = 7,
+  col_types = "text"
+) |>
+  select(1:2) |>
+  set_names(c("date", "value")) |>
+  mutate(
+    date = as.Date(as.numeric(date), origin = "1899-12-30"),
+    value = as.numeric(value),
+    location = "ady canal"
+  ) |>
+  filter(!is.na(date), !is.na(value)) |>
+  glimpse()
 
 ## USBR Hydromet flow gages - missing from flow_data ----
 # On the "teacup diagram" (teacup-diagram-data-pull.R) but never pulled into

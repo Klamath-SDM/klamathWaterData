@@ -90,8 +90,9 @@
 #' @description Mean flow data from gages across the Klamath Basin. Raw data was obtained from USGS, WQX, USBR, and OWRD data portals.
 #' Anderson rose dam and d plant raw data files were shared directly by USBR.
 #' Where the Tulelake Irrigation District daily report workbooks and the USBR KHYDRODBA extract disagree
-#' (1996-2012), the KHYDRODBA value is used, per Viktor Stromberg of USBR.
-#' @format A tibble with 476,590 rows and 8 columns
+#' (1996-2012), the KHYDRODBA value is used, per Viktor Stromberg of USBR. Ady canal flow data comes from usbr pre 2012, and
+#' from usgs 2012 onwards.
+#' @format A tibble with 488,366 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station
