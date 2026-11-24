@@ -85,7 +85,8 @@ usgs_gage_flow_data <- readNWISsite(usgs_gages)
 
 
 #### additional Ady Canal----
-
+#  this data was shared by usbr. We are assuming theses are  are the daily mean -
+# it doesn't explicitly state this in the excel workbook.
 ady_raw <- read_excel("data-raw/ady-flow/Ady to Refuge 1980-Mar 2012.xls")
 
 # Second tab ("Daily Data") has daily Ady Canal to Refuge flow. Column A is the
