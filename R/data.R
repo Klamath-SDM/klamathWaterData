@@ -91,7 +91,7 @@
 #' Anderson rose dam and d plant raw data files were shared directly by USBR.
 #' Where the Tulelake Irrigation District daily report workbooks and the USBR KHYDRODBA extract disagree
 #' (1996-2012), the KHYDRODBA value is used, per Viktor Stromberg of USBR.
-#' @format A tibble with 476,590 rows and 8 columns
+#' @format A tibble with 488,366 rows and 8 columns
 #' \itemize{
 #'   \item \code{location}: location associated where data was collected/where gage is located
 #'   \item \code{gage_name}: name of the gaging station

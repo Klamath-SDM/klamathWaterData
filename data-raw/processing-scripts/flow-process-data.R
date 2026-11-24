@@ -118,6 +118,8 @@ usgs_data_raw_clean <- usgs_data_raw |>
   select(date, agency_cd, gage_id, variable_name, value, unit, site_no, statistic)
 
 ### append ady canal data for pre 2012 from USBR
+#  note that this is a USGS gage that has data 2012 onwards
+# the pre 2012 data was shared by usbr
 ady_flow_data_clean <- ady_flow_data |>
   mutate(agency_cd = "USGS",
          gage_id = "11509250",
