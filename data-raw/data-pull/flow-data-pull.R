@@ -79,6 +79,58 @@ usgs_flow_data <- usgs_flow_data |>
   janitor::clean_names() |>
   glimpse()
 
+# ---- ALTERNATIVE (new USGS Water Data API) ----
+# The code above uses the legacy NWIS service (readNWISdv), which USGS is
+# decommissioning. The block below is the replacement using
+# dataRetrieval::read_waterdata_daily() and creates usgs_flow_data_new, meant to
+# replicate usgs_flow_data (same columns: site_no, date, x_00060_00003,
+# x_00060_00003_cd after clean_names()).
+#
+# Differences vs. NWIS worth knowing:
+#  - site ids need the agency prefix: "USGS-11509500" instead of "11509500".
+#  - dates go in a single `time` argument as "start/end" (not startDate/endDate).
+#  - the API is rate-limited and long multi-site requests can fail (URL length /
+#    result limits), so gages are requested in small batches instead of one at
+#    a time (slow) or all at once (fails). Adjust `batch_size` if needed. An
+#    API token (API_USGS_PAT in .Renviron) raises the hourly rate limit.
+#  - by default it returns an sf object with geometry; skipGeometry = TRUE
+#    returns a plain data frame.
+
+batch_size <- 5
+gage_batches <- split(usgs_gages, ceiling(seq_along(usgs_gages) / batch_size))
+
+all_flow_data_new <- list()
+
+for (i in seq_along(gage_batches)) {
+  batch <- gage_batches[[i]]
+  message(paste("Pulling data for gages:", paste(batch, collapse = ", ")))
+  try({
+    flow_data_new <- dataRetrieval::read_waterdata_daily(
+      monitoring_location_id = paste0("USGS-", batch),
+      parameter_code = parameterCd,
+      statistic_id = statCd,
+      time = paste(start_date, end_date, sep = "/"),
+      skipGeometry = TRUE)
+
+    all_flow_data_new[[i]] <- flow_data_new
+  }, silent = TRUE)
+}
+
+# Combine all batches and reshape to match the NWIS output (usgs_flow_data)
+usgs_flow_data_new <- bind_rows(all_flow_data_new) |>
+  transmute(
+    agency_cd = "USGS",
+    site_no = str_remove(monitoring_location_id, "^USGS-"),
+    date = as.Date(time),
+    x_00060_00003 = as.numeric(value),    # daily mean discharge (cfs)
+    x_00060_00003_cd = approval_status    # NWIS "cd" is A/P (+ flags like "e"); new API gives "Approved"/"Provisional" words only
+  ) |>
+  arrange(site_no, date) |>
+  glimpse()
+
+# quick check against the NWIS pull (gages/rows that differ)
+# anti_join(usgs_flow_data, usgs_flow_data_new, by = c("site_no", "date"))
+
 
 #### gage data pull----
 usgs_gage_flow_data <- readNWISsite(usgs_gages)
