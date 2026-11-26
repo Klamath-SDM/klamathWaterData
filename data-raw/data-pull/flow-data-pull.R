@@ -135,6 +135,14 @@ usgs_flow_data_new <- bind_rows(all_flow_data_new) |>
 #### gage data pull----
 usgs_gage_flow_data <- readNWISsite(usgs_gages)
 
+# New USGS Water Data API
+usgs_gage_flow_data_new <- dataRetrieval::read_waterdata_monitoring_location(
+  monitoring_location_id = paste0("USGS-", usgs_gages),
+  skipGeometry = TRUE) |>
+  mutate(site_no = monitoring_location_number)
+
+# anti_join(usgs_gage_flow_data, usgs_gage_flow_data_new, by = "site_no")   # in NWIS only
+# anti_join(usgs_gage_flow_data_new, usgs_gage_flow_data, by = "site_no")   # in new only
 
 #### additional Ady Canal----
 #  this data was shared by usbr. We are assuming theses are  are the daily mean -
